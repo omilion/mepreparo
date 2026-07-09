@@ -13,6 +13,7 @@ import { StepFade } from "@/components/StepFade";
 import { DevPanel, type EtapaDev } from "@/components/DevPanel";
 import { AuthForm } from "@/components/AuthForm";
 import { MiCuenta } from "@/components/MiCuenta";
+import { Landing } from "@/components/Landing";
 import { authClient } from "@/lib/auth-client";
 import { cuentaDePrueba } from "@/lib/dev/seed";
 import {
@@ -33,6 +34,7 @@ import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 
 type Etapa =
   | "cargando"
+  | "landing"
   | "auth"
   | "cuenta"
   | "registro"
@@ -52,6 +54,8 @@ export default function Home() {
   // para el wizard multi-hijo recién registrado
   const [nuevos, setNuevos] = useState<PerfilNino[]>([]);
   const [wizIdx, setWizIdx] = useState(0);
+  // con qué modo abrir el formulario de auth (según de dónde venga el clic)
+  const [modoAuth, setModoAuth] = useState<"login" | "registro">("registro");
 
   // Escuchar eventos de sincronización en segundo plano para actualizar el estado React
   useEffect(() => {
@@ -73,7 +77,9 @@ export default function Home() {
     }
 
     if (!session) {
-      setEtapa("auth");
+      // visitante sin sesión: parte en la landing de venta. Si ya está en el
+      // formulario de registro (auth), lo dejamos ahí (no lo devolvemos atrás).
+      setEtapa((prev) => (prev === "auth" ? "auth" : "landing"));
       setCuenta(null);
       return;
     }
@@ -191,8 +197,12 @@ export default function Home() {
   const pupilo = cuenta?.pupilos[enfocado];
   const enWizardOnboarding = etapa === "wizard" && nuevos.length > 0;
 
-  // el tutor es una pantalla inmersiva: sin barra global
-  const mostrarTopBar = etapa !== "tutor" && etapa !== "auth" && etapa !== "cargando";
+  // el tutor y la landing son pantallas inmersivas: sin barra global
+  const mostrarTopBar =
+    etapa !== "tutor" &&
+    etapa !== "auth" &&
+    etapa !== "landing" &&
+    etapa !== "cargando";
 
   return (
     <main className="min-h-screen">
@@ -209,8 +219,34 @@ export default function Home() {
         </div>
       )}
 
+      {etapa === "landing" && (
+        <>
+          {/* barra mínima de la landing: marca + acceso a login */}
+          <div className="mx-auto flex h-[58px] max-w-zen items-center justify-between px-[22px]">
+            <span className="font-serif text-[19px]">mepreparo</span>
+            <button
+              type="button"
+              onClick={() => {
+                setModoAuth("login");
+                setEtapa("auth");
+              }}
+              className="text-[13.5px] text-sage-deep hover:opacity-80"
+            >
+              Ingresar
+            </button>
+          </div>
+          <Landing
+            onComenzar={() => {
+              setModoAuth("registro");
+              setEtapa("auth");
+            }}
+          />
+        </>
+      )}
+
       {etapa === "auth" && (
         <AuthForm
+          modoInicial={modoAuth}
           onSuccess={(nombre, email) => {
             // El hook useSession reactivo de Better Auth se actualizará solo.
             console.log("Autenticación exitosa:", nombre, email);

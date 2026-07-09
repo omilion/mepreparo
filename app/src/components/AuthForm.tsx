@@ -6,10 +6,13 @@ import { Reveal } from "./Reveal";
 
 export function AuthForm({
   onSuccess,
+  modoInicial = "login",
 }: {
   onSuccess: (apoderadoName: string, email: string) => void;
+  // desde la landing entramos en "registro"; desde "Ingresar", en "login".
+  modoInicial?: "login" | "registro";
 }) {
-  const [esLogin, setEsLogin] = useState(true);
+  const [esLogin, setEsLogin] = useState(modoInicial === "login");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
