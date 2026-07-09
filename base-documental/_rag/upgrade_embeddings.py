@@ -13,12 +13,20 @@ report_file = os.path.join(RAG_DIR, "reporte.json")
 # Retrieve API key
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
+# Modelo vigente (text-embedding-004 fue retirado de la API en 2026).
+# 768 dims para mantener el archivo liviano; RETRIEVAL_DOCUMENT porque estos
+# son los documentos del índice (las consultas usan RETRIEVAL_QUERY).
+EMBED_MODEL = "gemini-embedding-2"
+EMBED_DIMS = 768
+
 def call_gemini_embedding(text, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{EMBED_MODEL}:embedContent?key={api_key}"
     payload = {
         "content": {
             "parts": [{"text": text}]
-        }
+        },
+        "taskType": "RETRIEVAL_DOCUMENT",
+        "outputDimensionality": EMBED_DIMS,
     }
     
     retries = 5
@@ -47,7 +55,7 @@ def call_gemini_embedding(text, api_key):
 
 def main():
     print("=" * 60)
-    print("MIGRACIÓN A EMBEDDINGS DE GEMINI (text-embedding-004)")
+    print(f"MIGRACIÓN A EMBEDDINGS DE GEMINI ({EMBED_MODEL})")
     print("=" * 60)
     
     if not GEMINI_KEY:
@@ -84,7 +92,7 @@ def main():
         chunk = json.loads(line)
         
         # Check if already processed with Gemini
-        if chunk.get("modelo_embedding") == "text-embedding-004":
+        if chunk.get("modelo_embedding") == EMBED_MODEL:
             # Write directly to temp file
             with open(temp_file, "a", encoding="utf-8") as f_out:
                 f_out.write(json.dumps(chunk, ensure_ascii=False) + "\n")
@@ -97,7 +105,7 @@ def main():
         
         if vector is not None:
             chunk["embedding"] = vector
-            chunk["modelo_embedding"] = "text-embedding-004"
+            chunk["modelo_embedding"] = EMBED_MODEL
             upgraded_count += 1
         else:
             print(f"\n[!] Falló la obtención de embedding para el chunk: {chunk['id']}")
@@ -131,7 +139,7 @@ def main():
     else:
         report = {}
         
-    report["modelo_embeddings"] = "text-embedding-004 (Google API)"
+    report["modelo_embeddings"] = f"{EMBED_MODEL} (Google API, {EMBED_DIMS} dims)"
     report["dimension_embeddings"] = 768
     report["fecha_actualizacion_gemini"] = time.strftime("%Y-%m-%d %H:%M:%S")
     report["chunks_actualizados"] = upgraded_count

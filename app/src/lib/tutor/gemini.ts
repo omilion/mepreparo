@@ -68,16 +68,24 @@ export async function generar(opts: {
   return texto.trim();
 }
 
-// Obtiene el embedding vectorial de un texto usando el modelo text-embedding-004.
+// Modelo de embeddings vigente (text-embedding-004 fue retirado de la API).
+// Debe coincidir con el usado por upgrade_embeddings.py sobre los chunks.
+export const MODELO_EMBEDDING = "gemini-embedding-2";
+const EMBED_DIMS = 768;
+
+// Obtiene el embedding vectorial de una CONSULTA (RETRIEVAL_QUERY; los chunks
+// del índice se generan con RETRIEVAL_DOCUMENT — mejora la recuperación).
 export async function obtenerEmbedding(texto: string): Promise<number[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("SIN_CLAVE");
 
-  const url = `${BASE}/text-embedding-004:embedContent?key=${key}`;
+  const url = `${BASE}/${MODELO_EMBEDDING}:embedContent?key=${key}`;
   const body = {
     content: {
       parts: [{ text: texto }]
-    }
+    },
+    taskType: "RETRIEVAL_QUERY",
+    outputDimensionality: EMBED_DIMS,
   };
 
   let res: Response | null = null;

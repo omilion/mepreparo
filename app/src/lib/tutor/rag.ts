@@ -1,10 +1,10 @@
 // Recuperación RAG para el tutor (lado servidor). Lee los chunks del currículum
 // oficial y devuelve los más relevantes para inyectar en el prompt.
 //
-// NOTA sobre embeddings: mientras chunks.jsonl tenga los embeddings del fallback
-// (bag-of-words, sin valor semántico), recuperamos por solapamiento de términos
-// filtrando por materia/curso. Cuando se regeneren con text-embedding-004, se
-// puede cambiar `recuperar` por búsqueda vectorial sin tocar el resto.
+// NOTA sobre embeddings: los chunks marcados con modelo_embedding =
+// gemini-embedding-2 (migrados por upgrade_embeddings.py) se comparan por
+// similitud coseno; los no migrados caen a solapamiento de términos. Así la
+// migración puede ser parcial sin romper nada.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -26,7 +26,8 @@ interface Chunk {
   modeloEmbedding?: string;
 }
 
-const MODELO_REAL = "text-embedding-004";
+// Debe coincidir con el marcador que escribe upgrade_embeddings.py.
+const MODELO_REAL = "gemini-embedding-2";
 
 let CHUNKS: Chunk[] | null = null;
 
