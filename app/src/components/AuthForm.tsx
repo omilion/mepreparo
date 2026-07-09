@@ -2,7 +2,18 @@
 
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { rutEsValido, formatearRut } from "@/lib/rut";
 import { Reveal } from "./Reveal";
+
+// versión del consentimiento aceptado (subir si cambian los términos)
+const CONSENTIMIENTO_VERSION = "2026-07-v1";
+
+const RELACIONES = [
+  { id: "madre", label: "Madre" },
+  { id: "padre", label: "Padre" },
+  { id: "tutor", label: "Tutor/a legal" },
+  { id: "otro", label: "Otro" },
+];
 
 export function AuthForm({
   onSuccess,
@@ -16,14 +27,57 @@ export function AuthForm({
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // datos de responsabilidad sobre el menor (solo registro)
+  const [telefono, setTelefono] = useState("");
+  const [rut, setRut] = useState("");
+  const [relacion, setRelacion] = useState("madre");
+  const [comuna, setComuna] = useState("");
+  const [consiente, setConsiente] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
+  // Guarda los datos extra del apoderado tras crear la cuenta (endpoint propio).
+  async function guardarPerfilApoderado() {
+    try {
+      await fetch("/api/apoderado/perfil", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefono: telefono.trim(),
+          rut: formatearRut(rut),
+          relacion,
+          comuna: comuna.trim(),
+          consentimientoVersion: CONSENTIMIENTO_VERSION,
+        }),
+      });
+    } catch (err) {
+      // no bloqueamos el registro por esto; se puede completar en Mi cuenta
+      console.error("No se pudo guardar el perfil del apoderado:", err);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !password.trim() || (!esLogin && !nombre.trim())) {
-      setError("Por favor completa todos los campos.");
-      return;
+
+    if (esLogin) {
+      if (!email.trim() || !password.trim()) {
+        setError("Por favor completa todos los campos.");
+        return;
+      }
+    } else {
+      // validación de registro (datos para operar con un menor)
+      if (!nombre.trim() || !email.trim() || !password.trim() || !telefono.trim() || !rut.trim() || !comuna.trim()) {
+        setError("Por favor completa todos los campos.");
+        return;
+      }
+      if (!rutEsValido(rut)) {
+        setError("El RUT no es válido. Revísalo (incluye el dígito verificador).");
+        return;
+      }
+      if (!consiente) {
+        setError("Debes aceptar los términos y confirmar que eres responsable del menor.");
+        return;
+      }
     }
 
     setError("");
@@ -51,6 +105,7 @@ export function AuthForm({
         if (authError) {
           setError(authError.message || "Error al registrarse.");
         } else if (data?.user) {
+          await guardarPerfilApoderado();
           onSuccess(data.user.name, data.user.email);
         }
       }
@@ -138,6 +193,99 @@ export function AuthForm({
               className="input w-full"
             />
           </div>
+
+          {!esLogin && (
+            <>
+              <div className="flex gap-3">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label htmlFor="tel" className="text-[12px] font-semibold text-ink-soft uppercase tracking-wider">
+                    Teléfono
+                  </label>
+                  <input
+                    id="tel"
+                    type="tel"
+                    value={telefono}
+                    placeholder="+56 9 1234 5678"
+                    onChange={(e) => setTelefono(e.target.value)}
+                    disabled={cargando}
+                    className="input w-full"
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label htmlFor="rut" className="text-[12px] font-semibold text-ink-soft uppercase tracking-wider">
+                    RUT
+                  </label>
+                  <input
+                    id="rut"
+                    type="text"
+                    value={rut}
+                    placeholder="12.345.678-5"
+                    onChange={(e) => setRut(e.target.value)}
+                    onBlur={() => rut.trim() && setRut(formatearRut(rut))}
+                    disabled={cargando}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label htmlFor="rel" className="text-[12px] font-semibold text-ink-soft uppercase tracking-wider">
+                    Eres…
+                  </label>
+                  <select
+                    id="rel"
+                    value={relacion}
+                    onChange={(e) => setRelacion(e.target.value)}
+                    disabled={cargando}
+                    className="input w-full bg-transparent"
+                  >
+                    {RELACIONES.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label htmlFor="comuna" className="text-[12px] font-semibold text-ink-soft uppercase tracking-wider">
+                    Comuna
+                  </label>
+                  <input
+                    id="comuna"
+                    type="text"
+                    value={comuna}
+                    placeholder="Ej. Providencia"
+                    onChange={(e) => setComuna(e.target.value)}
+                    disabled={cargando}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              <label className="mt-1 flex cursor-pointer items-start gap-2.5 text-[13px] leading-snug text-ink-soft">
+                <input
+                  type="checkbox"
+                  checked={consiente}
+                  onChange={(e) => setConsiente(e.target.checked)}
+                  disabled={cargando}
+                  className="mt-0.5 h-4 w-4 flex-none accent-sage-deep"
+                />
+                <span>
+                  Soy mayor de edad y responsable del/los menor(es) que voy a
+                  registrar. Acepto los{" "}
+                  <a href="#" className="text-sage-deep underline underline-offset-2">
+                    términos
+                  </a>{" "}
+                  y la{" "}
+                  <a href="#" className="text-sage-deep underline underline-offset-2">
+                    política de privacidad
+                  </a>
+                  , y autorizo el tratamiento de los datos de estudio del menor.
+                </span>
+              </label>
+            </>
+          )}
 
           <button
             type="submit"

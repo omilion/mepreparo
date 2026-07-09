@@ -26,7 +26,7 @@ function Hero({ onComenzar }: { onComenzar: () => void }) {
     <section className="flex flex-col items-center pt-14 pb-20 text-center">
       <Reveal variant="lead" delay={60}>
         <div className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.16em] text-sage-deep">
-          Preparación para exámenes libres · Educación básica
+          Preparación para exámenes libres en Chile · Educación básica 2026
         </div>
       </Reveal>
       <Reveal variant="lead" delay={120}>
@@ -36,9 +36,7 @@ function Hero({ onComenzar }: { onComenzar: () => void }) {
       </Reveal>
       <Reveal delay={480}>
         <p className="mt-6 max-w-[46ch] text-[16.5px] leading-[1.5] text-ink-soft">
-          Rai acompaña a cada niño con un plan a la medida: recuerda cómo
-          aprende, en qué se traba y qué lo motiva. Estudiar en casa, con calma
-          y con rumbo hacia el examen.
+          Rai acompaña a cada estudiante con un plan a la medida diseñado para preparar con éxito sus <strong>exámenes libres en Chile</strong>. Con el respaldo de bases curriculares vigentes y temarios oficiales, tu hijo estudiará en casa con rumbo, calma y confianza.
         </p>
       </Reveal>
       <Reveal delay={640}>
@@ -63,9 +61,9 @@ const BENEFICIOS = [
       "Rai arma contigo un horario semanal, recuerda de qué hablaron la última vez y retoma justo donde quedaron.",
   },
   {
-    titulo: "Anclado al currículum oficial",
+    titulo: "Bases curriculares y profesores expertos",
     texto:
-      "Cada explicación se apoya en los programas del MINEDUC y en los temarios reales de los exámenes de validación.",
+      "Nuestros tutores son expertos profesores que estructuran cada clase y explicación según las bases curriculares vigentes para cada curso y los temarios oficiales de exámenes libres en Chile para este año escolar 2026.",
   },
   {
     titulo: "Un plan según la fecha del examen",

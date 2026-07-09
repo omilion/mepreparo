@@ -52,6 +52,40 @@ export const verification = pgTable("verification", {
 });
 
 // --- TABLAS DEL SISTEMA MEPREPARO ---
+
+// Datos extra del apoderado (1:1 con user de Better Auth). No tocamos la tabla
+// `user` para no romper la migración de Better Auth: los campos propios y el
+// consentimiento legal (clave al tratar datos de menores) viven aquí.
+export const apoderadoPerfil = pgTable("apoderado_perfil", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  telefono: text("telefono"),
+  rut: text("rut"), // formato chileno, validado en el server
+  relacion: text("relacion"), // 'madre' | 'padre' | 'tutor' | 'otro'
+  comuna: text("comuna"),
+  region: text("region"),
+  // Consentimiento explícito del apoderado sobre el tratamiento de datos del
+  // menor (Ley 19.628 / 21.719). Guardamos el CUÁNDO y la versión aceptada.
+  consentimientoAt: timestamp("consentimiento_at"),
+  consentimientoVersion: text("consentimiento_version"),
+  perfilCompleto: boolean("perfil_completo").notNull().default(false),
+  actualizadoEn: timestamp("actualizado_en").defaultNow().notNull(),
+});
+
+// Leads de la demo: email del apoderado capturado antes de la mini-sesión de
+// prueba, para remarketing. NO es una cuenta todavía; puede o no convertir.
+export const leads = pgTable("leads", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  nombreNino: text("nombre_nino"), // opcional, si lo damos
+  origen: text("origen").notNull().default("demo"),
+  // marketing: acepta recibir novedades
+  aceptaContacto: boolean("acepta_contacto").notNull().default(false),
+  convertido: boolean("convertido").notNull().default(false), // ¿creó cuenta luego?
+  creadoEn: timestamp("creado_en").defaultNow().notNull(),
+});
+
 export const pupilos = pgTable("pupilos", {
   id: text("id").primaryKey(),
   cuentaId: text("cuenta_id")
