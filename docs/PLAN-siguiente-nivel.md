@@ -92,21 +92,44 @@ fracciones. — **Usuario corre el script** (o Gema); nosotros el cambio en rag.
 
 ---
 
-## FASE B — Cuentas y datos (Supabase)
+## FASE B — Cuentas y datos (Postgres propio, listo para VPS)
 
-**Decisión Supabase vs Docker:** Supabase para producción. Es Postgres
-gestionado + Auth incluida + pgvector + Row Level Security + tier gratis, cero
-administración. Docker requeriría un VPS 24/7 pagado y administrado a mano, y
-construir el login desde cero. Sin lock-in real: es Postgres estándar
-(`pg_dump` y te vas cuando quieras). Docker queda como opción de Postgres
-LOCAL para desarrollo si se quiere trabajar offline.
+**Decisión (del usuario): el destino final es un VPS propio** → se descarta
+Supabase (su Auth y SDK habría que reescribirlos al migrar). Stack 100%
+portable desde el día uno:
+
+- **Postgres en Docker** con la imagen `pgvector/pgvector` (BD + búsqueda
+  vectorial para el RAG en el mismo motor). En desarrollo corre local
+  (`docker compose up db`); en el VPS corre EXACTAMENTE igual.
+- **Auth dentro de la app Next** con **Better Auth** (email + contraseña,
+  sesiones, sus tablas viven en nuestro Postgres). Nada externo que migrar.
+  Alternativa equivalente: Auth.js v5.
+- **Drizzle ORM** + migraciones versionadas en el repo: el mismo código habla
+  con el Postgres local y con el del VPS.
+- **Deploy en VPS = un solo `docker-compose.yml`**: app Next + postgres +
+  Caddy (TLS automático) + cron de `pg_dump` diario como backup (a OneDrive u
+  object storage).
+
+### B0. Infraestructura de datos
+- `docker-compose.yml` en la raíz (servicios: `db` ahora; `app` y `caddy` se
+  activan al pasar al VPS).
+- Esquema Drizzle: `cuentas`, `pupilos` (jsonb del perfil + columnas
+  indexables: curso, fecha_examen), `sesiones` (las de A1, fila por sesión),
+  `contenido_validado` (para C1), `cache_respuestas` (para C2).
+- **Multi-tenancy en código**: toda query pasa por un repositorio que exige
+  `cuentaId` de la sesión (no existe el RLS automático de Supabase, así que la
+  regla vive en una sola capa auditable). Refuerzo opcional: RLS nativo de
+  Postgres con variables de sesión, más adelante.
+
+**CA:** `docker compose up db` + `npm run db:migrate` deja el esquema listo;
+los tests corren contra esa BD. — **Nosotros**
 
 ### B1. Inscripción del apoderado (punto nuevo del usuario)
 Hoy el onboarding parte directo con los niños; falta el registro del padre.
 
-- **Registro**: email + contraseña (Supabase Auth; magic link como alternativa
-  sin contraseña). Nombre del apoderado. El flujo actual pasa a ser:
-  registro padre → registrar pupilos (ya existe) → wizard (ya existe).
+- **Registro**: email + contraseña con Better Auth. Nombre del apoderado. El
+  flujo pasa a ser: registro padre → registrar pupilos (ya existe) → wizard
+  (ya existe).
 - **Página "Mi cuenta"**: datos del apoderado (editar nombre/email), lista de
   pupilos con su estado, horarios acordados, y sección **suscripción/medios de
   pago** — en esta fase solo la ESTRUCTURA (plan actual: "beta gratuita"); la
@@ -117,15 +140,13 @@ Hoy el onboarding parte directo con los niños; falta el registro del padre.
 **CA:** un padre nuevo se registra con email, crea 2 pupilos, cierra el
 navegador, entra desde OTRO dispositivo y ve todo. — **Nosotros**
 
-### B2. Migración de datos: localStorage → Supabase (offline-first)
+### B2. Migración de datos: localStorage → Postgres (offline-first)
 `storage.ts` ya está aislado a propósito — se cambia el adaptador sin tocar
 pantallas:
-- Tablas: `cuentas` (1:1 auth.users), `pupilos` (jsonb del perfil + columnas
-  indexables: curso, fecha_examen), `sesiones` (las de A1, fila por sesión).
-- **RLS**: cada apoderado solo lee/escribe sus filas (crítico: datos de niños).
-- Estrategia: escribir SIEMPRE local primero (la app nunca se bloquea sin
-  internet) y sincronizar a Supabase en background con `updatedAt` como
-  resolución de conflictos (gana el más reciente).
+- El cliente escribe SIEMPRE local primero (la app nunca se bloquea sin
+  internet) y sincroniza en background contra nuestros endpoints
+  (`/api/sync`), con `updatedAt` como resolución de conflictos (gana el más
+  reciente).
 - Migración suave: al iniciar sesión por primera vez, si hay cuenta local, se
   sube y se marca migrada.
 
@@ -168,7 +189,7 @@ y la refinamos así:
      el chunk RAG como fuente de verdad. Solo aprueba con veredicto explícito.
 - **Estados**: `candidata → validada → publicada` (+ `reportada` si un padre
   marca un error — botón de reporte en la UI, humano en el circuito).
-- **Biblioteca compartida** (tabla `contenido_validado` en Supabase, B2):
+- **Biblioteca compartida** (tabla `contenido_validado` en nuestro Postgres, B0):
   indexada por materia+curso+oa+dificultad. **Compartida entre TODOS los
   usuarios**: lo que se validó para un niño de 5° sirve a todos los de 5°.
   El costo de generar se paga UNA vez por contenido, no por niño. A más
@@ -180,7 +201,8 @@ latencia <200ms y 0 tokens. — **Diseño nosotros; generación masiva la corre 
 
 ### C2. Caché de respuestas del tutor
 Hash de (pregunta normalizada + materia + curso) → respuesta previa. Guarda en
-Supabase con TTL largo. Cubre el "¿qué es una fracción?" que preguntan todos.
+`cache_respuestas` (Postgres) con TTL largo. Cubre el "¿qué es una fracción?"
+que preguntan todos.
 **CA:** repetir una pregunta típica no llama a Gemini. — **Nosotros**
 
 ### C3. Enrutado de modelos + presupuesto por sesión
@@ -211,7 +233,7 @@ tokens) intercalada con el tutor en vivo solo cuando se traba — la arquitectur
 "IA in the middle" completa. — **Nosotros**
 
 ### D2. Panel de progreso del padre
-Con las sesiones de A1 en Supabase: historial por hijo (fecha, duración,
+Con las sesiones de A1 en Postgres: historial por hijo (fecha, duración,
 materia, título, resumen), horas/semana reales vs plan, avance por materia.
 Es leer datos que ya existen — por eso A1 va primero. — **Nosotros**
 
@@ -226,7 +248,7 @@ sentido cuando D1 esté vivo. — **Nosotros, al final**
 
 ```
 A1 memoria Rai ──────────────┐
-A2 respuestas al server ─────┤→ B1 registro padre → B2 Supabase ─→ C1 checker+biblioteca
+A2 respuestas al server ─────┤→ B0 Postgres → B1 registro padre → B2 sync ─→ C1 checker+biblioteca
 A3 tests + CI (paralelo) ────┤                                  ├→ C2 caché
 A4 embeddings (paralelo) ────┘                                  └→ C3 enrutado
                                                                      ↓
@@ -235,7 +257,7 @@ A4 embeddings (paralelo) ────┘                                  └→
 
 - **A1 es lo primero**: sin memoria real, el diferenciador del producto no existe.
 - A3 y A4 pueden ir en paralelo (A4 lo puede correr Gema/usuario hoy mismo).
-- C1 necesita B2 (la biblioteca vive en Supabase), pero el CHECKER se puede
+- C1 necesita B0 (la biblioteca vive en nuestro Postgres), pero el CHECKER se puede
   prototipar antes contra archivos locales.
 - Pendientes menores que se limpian al pasar: borrar `bancoSemilla.ts` si ya no
   se usa, unificar `diaId()` con `diaDeHoy()`, pasada de accesibilidad (roles
@@ -246,5 +268,7 @@ A4 embeddings (paralelo) ────┘                                  └→
 - Cerrar el túnel cloudflare cuando no se esté probando en el móvil.
 - `/api/tutor`: rate limit simple por IP/cuenta (aunque haya tope de gasto,
   evita que un tercero queme el presupuesto del mes en una tarde).
-- Con B2: RLS en todas las tablas; los datos de niños nunca salen de la cuenta
-  del apoderado.
+- Con B0/B2: toda query filtrada por `cuentaId` en la capa de repositorio; los
+  datos de niños nunca salen de la cuenta del apoderado. En el VPS: firewall
+  (Postgres NO expuesto a internet, solo la app lo alcanza por la red interna
+  de Docker) + backups `pg_dump` diarios.
