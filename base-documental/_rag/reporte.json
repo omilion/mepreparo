@@ -2,7 +2,7 @@
   "fecha_procesamiento": "2026-07-08",
   "total_documentos_procesados": 46,
   "total_chunks_generados": 9899,
-  "modelo_embeddings": "local-hashing-bag-of-words (Fallback)",
+  "modelo_embeddings": "gemini-embedding-2 (Google API, 768 dims)",
   "dimension_embeddings": 768,
   "distribucion_por_materia": {
     "lenguaje": 2332,
@@ -18,5 +18,7 @@
     "temario_examen_libre": 111,
     "programa_estudio": 9049
   },
-  "ruta_almacenamiento": "base-documental/_rag/chunks.jsonl (Opción B)"
+  "ruta_almacenamiento": "base-documental/_rag/chunks.jsonl (Opción B)",
+  "fecha_actualizacion_gemini": "2026-07-09 14:59:54",
+  "chunks_actualizados": 9899
 }

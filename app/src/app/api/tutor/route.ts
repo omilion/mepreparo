@@ -13,7 +13,7 @@ import {
   instruccionExtraerHorario,
   fechaHoraLegible,
 } from "@/lib/tutor/personaje";
-import { generar, tieneClave } from "@/lib/tutor/gemini";
+import { generar, tieneClave, MODELO_CHAT, MODELO_LITE } from "@/lib/tutor/gemini";
 import { recuperar } from "@/lib/tutor/rag";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
@@ -83,13 +83,13 @@ Retorna un objeto JSON con el siguiente formato exacto:
 
     if (tieneClave()) {
       try {
-        // C3. Enrutado de modelos: usar gemini-2.5-flash-lite para resúmenes
+        // C3. Enrutado de modelos: modelo barato (lite) para resúmenes
         const cruda = await generar({
           sistema: sistemaPrompt,
           usuario: `Conversación de estudio:\n${historialText}`,
           maxTokens: 400,
           json: true,
-          model: "gemini-2.5-flash-lite",
+          model: MODELO_LITE,
         });
 
         const parsed = JSON.parse(cruda);
@@ -204,11 +204,11 @@ Retorna un objeto JSON con el siguiente formato exacto:
   if (tieneClave()) {
     try {
       // C3. Enrutado de modelos:
-      // - Saludos o primera charla: usar gemini-2.5-flash-lite
-      // - Respuestas de chat con RAG y explicaciones: usar gemini-2.5-flash
+      // - Saludos o primera charla: modelo barato (lite)
+      // - Respuestas de chat con RAG y explicaciones: modelo completo
       const modeloElegido = (accion === "saludo" || esPrimera)
-        ? "gemini-2.5-flash-lite"
-        : "gemini-2.5-flash";
+        ? MODELO_LITE
+        : MODELO_CHAT;
 
       const cruda = await generar({
         sistema,

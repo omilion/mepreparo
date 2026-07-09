@@ -14,6 +14,7 @@ import { DevPanel, type EtapaDev } from "@/components/DevPanel";
 import { AuthForm } from "@/components/AuthForm";
 import { MiCuenta } from "@/components/MiCuenta";
 import { Landing } from "@/components/Landing";
+import { Demo } from "@/components/Demo";
 import { authClient } from "@/lib/auth-client";
 import { cuentaDePrueba } from "@/lib/dev/seed";
 import {
@@ -35,6 +36,7 @@ import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 type Etapa =
   | "cargando"
   | "landing"
+  | "demo"
   | "auth"
   | "cuenta"
   | "registro"
@@ -77,9 +79,11 @@ export default function Home() {
     }
 
     if (!session) {
-      // visitante sin sesión: parte en la landing de venta. Si ya está en el
-      // formulario de registro (auth), lo dejamos ahí (no lo devolvemos atrás).
-      setEtapa((prev) => (prev === "auth" ? "auth" : "landing"));
+      // visitante sin sesión: parte en la landing. Si ya está en el formulario
+      // de registro (auth) o en la demo, lo dejamos ahí (no lo devolvemos atrás).
+      setEtapa((prev) =>
+        prev === "auth" || prev === "demo" ? prev : "landing"
+      );
       setCuenta(null);
       return;
     }
@@ -197,11 +201,12 @@ export default function Home() {
   const pupilo = cuenta?.pupilos[enfocado];
   const enWizardOnboarding = etapa === "wizard" && nuevos.length > 0;
 
-  // el tutor y la landing son pantallas inmersivas: sin barra global
+  // el tutor, la landing y la demo son pantallas inmersivas: sin barra global
   const mostrarTopBar =
     etapa !== "tutor" &&
     etapa !== "auth" &&
     etapa !== "landing" &&
+    etapa !== "demo" &&
     etapa !== "cargando";
 
   return (
@@ -240,8 +245,19 @@ export default function Home() {
               setModoAuth("registro");
               setEtapa("auth");
             }}
+            onProbar={() => setEtapa("demo")}
           />
         </>
+      )}
+
+      {etapa === "demo" && (
+        <Demo
+          onSalir={() => setEtapa("landing")}
+          onRegistrarse={() => {
+            setModoAuth("registro");
+            setEtapa("auth");
+          }}
+        />
       )}
 
       {etapa === "auth" && (

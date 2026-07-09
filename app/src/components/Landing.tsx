@@ -8,10 +8,16 @@ import { calcularPrecio, clp, DESCUENTO_ANUAL } from "@/lib/precios";
 // registro (AuthForm). Regla de marca: NUNCA decir "inteligencia artificial" —
 // hablamos de un "tutor inteligente" que conoce a cada niño.
 
-export function Landing({ onComenzar }: { onComenzar: () => void }) {
+export function Landing({
+  onComenzar,
+  onProbar,
+}: {
+  onComenzar: () => void;
+  onProbar: () => void;
+}) {
   return (
     <div className="mx-auto max-w-zen px-[22px] pb-28">
-      <Hero onComenzar={onComenzar} />
+      <Hero onComenzar={onComenzar} onProbar={onProbar} />
       <Valor />
       <ComoFunciona />
       <Precios onComenzar={onComenzar} />
@@ -21,7 +27,13 @@ export function Landing({ onComenzar }: { onComenzar: () => void }) {
 }
 
 // ---------------------------------------------------------------- Hero
-function Hero({ onComenzar }: { onComenzar: () => void }) {
+function Hero({
+  onComenzar,
+  onProbar,
+}: {
+  onComenzar: () => void;
+  onProbar: () => void;
+}) {
   return (
     <section className="flex flex-col items-center pt-14 pb-20 text-center">
       <Reveal variant="lead" delay={60}>
@@ -43,6 +55,12 @@ function Hero({ onComenzar }: { onComenzar: () => void }) {
         <div className="mt-9 flex flex-col items-center gap-3">
           <button onClick={onComenzar} className="cta px-9">
             Comienza gratis
+          </button>
+          <button
+            onClick={onProbar}
+            className="text-[14px] font-[560] text-sage-deep underline underline-offset-4 hover:opacity-80"
+          >
+            o prueba una clase con Rai, sin registrarte →
           </button>
           <span className="text-[12.5px] text-ink-soft">
             Primer mes sin costo · sin tarjeta para empezar

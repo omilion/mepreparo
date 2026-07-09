@@ -1,4 +1,4 @@
-import { tieneClave, generar } from "./gemini";
+import { tieneClave, generar, MODELO_LITE } from "./gemini";
 
 interface EjercicioGenerado {
   enunciado: string;
@@ -69,7 +69,7 @@ Responde únicamente con un objeto JSON con el siguiente formato exacto:
       maxTokens: 250,
       json: true,
       // auditoría = tarea simple y frecuente → modelo barato (C3)
-      model: "gemini-2.5-flash-lite",
+      model: MODELO_LITE,
     });
 
     const data = JSON.parse(respuesta);

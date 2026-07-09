@@ -3,12 +3,17 @@
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
+// Modelos vigentes (verificados contra la API 2026-07). gemini-2.5-flash-lite
+// y text-embedding-004 fueron retirados; estos son los actuales elegidos.
+export const MODELO_CHAT = "gemini-3.5-flash"; // explicaciones con RAG
+export const MODELO_LITE = "gemini-3.1-flash-lite"; // saludos, resúmenes, demo, auditoría
+
 export function tieneClave(): boolean {
   return !!process.env.GEMINI_API_KEY;
 }
 
 function modelo(): string {
-  return process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+  return process.env.GEMINI_MODEL || MODELO_CHAT;
 }
 
 // Genera una respuesta con Gemini. Lanza si no hay clave o si la API falla,
