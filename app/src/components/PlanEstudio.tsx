@@ -26,6 +26,43 @@ const VEREDICTO: Record<
   },
 };
 
+// Calcula la racha de días de estudio consecutivos basándose en el historial de sesiones
+function calcularRacha(sesiones: any[]): number {
+  if (!sesiones || sesiones.length === 0) return 0;
+  
+  const fechasUnicas = sesiones
+    .map((s) => new Date(s.fecha).toDateString())
+    .filter((v, i, self) => self.indexOf(v) === i); // fechas únicas
+  
+  const sorted = fechasUnicas.map(f => new Date(f)).sort((a, b) => b.getTime() - a.getTime());
+  
+  let racha = 0;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  
+  const ultimaSesion = sorted[0];
+  if (!ultimaSesion) return 0;
+  
+  const diffTime = Math.abs(hoy.getTime() - ultimaSesion.getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays > 1) return 0; // racha rota
+  
+  let checkDate = diffDays === 1 ? ultimaSesion : hoy;
+  
+  for (const f of sorted) {
+    const diff = Math.abs(checkDate.getTime() - f.getTime());
+    const diffD = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (diffD <= 1) {
+      racha++;
+      checkDate = f;
+    } else {
+      break;
+    }
+  }
+  return racha;
+}
+
 export function PlanEstudio({
   perfil,
   onVolver,
@@ -40,12 +77,45 @@ export function PlanEstudio({
   const maxHoras = Math.max(...plan.materias.map((m) => m.horas), 1);
   const v = VEREDICTO[plan.veredicto];
 
+  // Gamificación y Objetivos de Hoy (D1)
+  const sesiones = perfil.tutoria?.sesiones || [];
+  const racha = useMemo(() => calcularRacha(sesiones), [sesiones]);
+  
+  const yaEstudioHoy = useMemo(() => {
+    const hoyStr = new Date().toDateString();
+    return sesiones.some(s => new Date(s.fecha).toDateString() === hoyStr);
+  }, [sesiones]);
+
+  const diaHoyLabel = new Date().toLocaleDateString("es-CL", { weekday: "long" });
+  const materiasHoy = perfil.tutoria ? materiasDeHoy(perfil.tutoria) : [];
+  const materiaHoyLabel = materiasHoy.length > 0 
+    ? materiasHoy.map(m => MATERIAS.find(x => x.id === m)?.label || m).join(" y ")
+    : "Repaso General";
+
   return (
     <div className="mx-auto flex max-w-zen flex-col gap-[26px] px-[22px] pb-24 pt-10">
+      {/* Racha y Saludo de Alumno (D1) */}
       <Reveal variant="lead" delay={80}>
+        <div className="flex items-center justify-between rounded-xl bg-sage/5 border border-hair p-4 mb-2">
+          <div className="flex flex-col gap-1 text-left">
+            <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-sage-deep">
+              ¡Hola, {nombre}! 👋
+            </span>
+            <span className="text-[13.5px] text-ink-soft">
+              Hoy es {diaHoyLabel}. Toca estudiar: <strong className="text-ink font-medium">{materiaHoyLabel}</strong>
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-paper rounded-full border border-hair px-3 py-1 text-[13px] font-semibold shadow-sm select-none">
+            <span className="text-[15px]" aria-hidden>🔥</span>
+            <span className="font-mono text-ink leading-none">{racha} {racha === 1 ? "día" : "días"}</span>
+          </div>
+        </div>
+      </Reveal>
+
+      <Reveal variant="lead" delay={120}>
         <header>
           <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
-            Plan de estudio
+            Progreso General
           </div>
           <h1 className="max-w-[20ch] text-[27px] leading-[1.2]">
             {v.titulo(nombre)}
@@ -54,6 +124,30 @@ export function PlanEstudio({
             {v.frase}
           </p>
         </header>
+      </Reveal>
+
+      {/* Meta del día (D1) */}
+      <Reveal delay={250}>
+        <div className="rounded-zen border border-hair p-5 flex flex-col gap-3.5 bg-white/40">
+          <div className="flex justify-between items-baseline border-b border-hair pb-2">
+            <h3 className="font-serif text-[18px] text-ink">Objetivo de hoy</h3>
+            <span className="text-[12px] text-ink-soft font-semibold uppercase tracking-wider">
+              {yaEstudioHoy ? "¡Completado! 🎉" : "Pendiente"}
+            </span>
+          </div>
+          <div className="flex items-start gap-3">
+            <input 
+              type="checkbox" 
+              checked={yaEstudioHoy} 
+              readOnly 
+              className="mt-0.5 h-4.5 w-4.5 rounded border-hair text-sage-deep focus:ring-sage"
+            />
+            <div className="flex flex-col text-left">
+              <span className="text-[14.5px] font-medium text-ink">Realizar una sesión de estudio con Rai</span>
+              <span className="text-[12.5px] text-ink-soft">Repasa la materia asignada hoy por 20-25 minutos.</span>
+            </div>
+          </div>
+        </div>
       </Reveal>
 
       {/* resumen de tiempo */}
@@ -156,6 +250,22 @@ export function PlanEstudio({
       </Reveal>
     </div>
   );
+}
+
+// Helpers requeridos para calcular materias de hoy
+function materiasDeHoy(acuerdo: any): any[] {
+  const diaMap: Record<number, string> = {
+    0: "dom",
+    1: "lun",
+    2: "mar",
+    3: "mie",
+    4: "jue",
+    5: "vie",
+    6: "sab",
+  };
+  const hoyNum = new Date().getDay();
+  const diaClave = diaMap[hoyNum] as any;
+  return acuerdo.horario[diaClave] || [];
 }
 
 function Metrica({ valor, unidad }: { valor: string; unidad: string }) {

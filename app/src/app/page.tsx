@@ -11,12 +11,16 @@ import { Tutor } from "@/components/Tutor";
 import { PanelHijos } from "@/components/PanelHijos";
 import { StepFade } from "@/components/StepFade";
 import { DevPanel, type EtapaDev } from "@/components/DevPanel";
+import { AuthForm } from "@/components/AuthForm";
+import { MiCuenta } from "@/components/MiCuenta";
+import { authClient } from "@/lib/auth-client";
 import { cuentaDePrueba } from "@/lib/dev/seed";
 import {
   leerCuenta,
   guardarCuenta,
   guardarPupilo,
   borrarCuenta,
+  sincronizarConServidor,
 } from "@/lib/storage";
 import {
   nuevaCuenta,
@@ -29,6 +33,8 @@ import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 
 type Etapa =
   | "cargando"
+  | "auth"
+  | "cuenta"
   | "registro"
   | "panel"
   | "wizard"
@@ -38,6 +44,7 @@ type Etapa =
   | "tutor";
 
 export default function Home() {
+  const { data: session, isPending } = authClient.useSession();
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   const [etapa, setEtapa] = useState<Etapa>("cargando");
   // índice del pupilo enfocado dentro de cuenta.pupilos
@@ -46,16 +53,59 @@ export default function Home() {
   const [nuevos, setNuevos] = useState<PerfilNino[]>([]);
   const [wizIdx, setWizIdx] = useState(0);
 
-  // cargar sesión al arrancar
+  // Escuchar eventos de sincronización en segundo plano para actualizar el estado React
   useEffect(() => {
-    const c = leerCuenta();
-    if (c && c.pupilos.length > 0) {
-      setCuenta(c);
-      setEtapa("panel");
-    } else {
-      setEtapa("registro");
+    function alSincronizar() {
+      const c = leerCuenta();
+      if (c) setCuenta(c);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("sync-completed", alSincronizar);
+      return () => window.removeEventListener("sync-completed", alSincronizar);
     }
   }, []);
+
+  // React al estado de sesión de Better Auth
+  useEffect(() => {
+    if (isPending) {
+      setEtapa("cargando");
+      return;
+    }
+
+    if (!session) {
+      setEtapa("auth");
+      setCuenta(null);
+      return;
+    }
+
+    const user = session.user;
+    const local = leerCuenta() || nuevaCuenta();
+    const updatedCuenta: Cuenta = {
+      ...local,
+      apoderado: { nombre: user.name || "Apoderado", email: user.email },
+    };
+
+    setCuenta(updatedCuenta);
+
+    // Sincronizar perfiles locales con base de datos del servidor Postgres
+    sincronizarConServidor(updatedCuenta)
+      .then((sincronizada) => {
+        setCuenta(sincronizada);
+        if (sincronizada.pupilos.length > 0) {
+          setEtapa("panel");
+        } else {
+          setEtapa("registro");
+        }
+      })
+      .catch((err) => {
+        console.error("Error al sincronizar al montar sesión:", err);
+        if (updatedCuenta.pupilos.length > 0) {
+          setEtapa("panel");
+        } else {
+          setEtapa("registro");
+        }
+      });
+  }, [session, isPending]);
 
   // --- onboarding (primera vez o al agregar) ---
   function alRegistrar(pupilosNuevos: PerfilNino[]) {
@@ -65,7 +115,6 @@ export default function Home() {
   }
 
   function alConfigurarHijo(perfil: PerfilNino) {
-    // asegura una cuenta y guarda el pupilo configurado
     const base = cuenta ?? nuevaCuenta();
     const actualizada = guardarPupilo(base, perfil);
     setCuenta(actualizada);
@@ -109,6 +158,12 @@ export default function Home() {
     setEtapa("panel");
   }
 
+  function alCerrarSesionAuth() {
+    borrarCuenta();
+    setCuenta(null);
+    setEtapa("auth");
+  }
+
   // --- modo desarrollo: carga de datos de prueba y saltos directos ---
   function cargarPrueba() {
     const c = cuentaDePrueba();
@@ -134,20 +189,41 @@ export default function Home() {
 
   // --- render ---
   const pupilo = cuenta?.pupilos[enfocado];
-  // en el wizard de onboarding usamos la lista `nuevos`
   const enWizardOnboarding = etapa === "wizard" && nuevos.length > 0;
 
-  // el tutor es una pantalla inmersiva: sin barra global (tiene su propio ←)
-  const mostrarTopBar = etapa !== "tutor";
+  // el tutor es una pantalla inmersiva: sin barra global
+  const mostrarTopBar = etapa !== "tutor" && etapa !== "auth" && etapa !== "cargando";
 
   return (
     <main className="min-h-screen">
-      {mostrarTopBar && <TopBar onHome={irAlPanel} />}
+      {mostrarTopBar && (
+        <TopBar
+          onHome={irAlPanel}
+          onCuenta={() => setEtapa("cuenta")}
+        />
+      )}
 
       {etapa === "cargando" && (
         <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen items-center justify-center">
           <p className="text-ink-soft">Cargando…</p>
         </div>
+      )}
+
+      {etapa === "auth" && (
+        <AuthForm
+          onSuccess={(nombre, email) => {
+            // El hook useSession reactivo de Better Auth se actualizará solo.
+            console.log("Autenticación exitosa:", nombre, email);
+          }}
+        />
+      )}
+
+      {etapa === "cuenta" && cuenta && (
+        <MiCuenta
+          cuenta={cuenta}
+          onCerrarSesion={alCerrarSesionAuth}
+          onVolver={irAlPanel}
+        />
       )}
 
       {etapa === "registro" && <Registro onListo={alRegistrar} />}
@@ -213,8 +289,6 @@ export default function Home() {
         />
       )}
 
-      {/* Si un pupilo ya diagnosticado entra y quiere (re)hacer diagnóstico,
-          el botón vive en el plan/resultado. Guardamos cuenta ante cambios. */}
       <PersistenciaGuard cuenta={cuenta} />
 
       {process.env.NODE_ENV === "development" && (
@@ -229,7 +303,7 @@ export default function Home() {
   );
 }
 
-// Persiste la cuenta ante cualquier cambio (respaldo simple).
+// Persiste la cuenta ante cualquier cambio
 function PersistenciaGuard({ cuenta }: { cuenta: Cuenta | null }) {
   useEffect(() => {
     if (cuenta) guardarCuenta(cuenta);

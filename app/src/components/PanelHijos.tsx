@@ -165,6 +165,55 @@ function TarjetaPupilo({
             </div>
           )}
 
+          {/* Gráfico de Progreso Pedagógico (D2) */}
+          {p.tutoria?.sesiones && p.tutoria.sesiones.length > 0 && (
+            <div className="border-t border-hair pt-3">
+              <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
+                Progreso de Estudio (Minutos por Sesión)
+              </div>
+              <div className="h-[95px] w-full rounded-lg bg-sage/5 border border-hair/50 p-2 flex items-center justify-center">
+                {(() => {
+                  const ses = p.tutoria.sesiones.slice(-7); // Últimas 7 sesiones
+                  const maxDur = Math.max(...ses.map(s => s.duracionMin), 15);
+                  const padding = 15;
+                  const width = 280;
+                  const height = 65;
+                  const pts = ses.map((s, idx) => {
+                    const x = padding + (idx * (width - padding * 2)) / (ses.length - 1 || 1);
+                    const y = height - padding - (s.duracionMin * (height - padding * 2 - 10)) / maxDur - 5;
+                    return { x, y, dur: s.duracionMin, fecha: new Date(s.fecha).toLocaleDateString("es-CL", { day: 'numeric', month: 'short' }) };
+                  });
+                  const pathData = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                  
+                  return (
+                    <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`}>
+                      {/* Línea base */}
+                      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--hair)" strokeWidth="1" strokeDasharray="3 3" />
+                      
+                      {/* Curva de minutos */}
+                      {pts.length > 1 && (
+                        <path d={pathData} fill="none" stroke="var(--sage-deep)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      )}
+                      
+                      {/* Puntos y etiquetas */}
+                      {pts.map((pt, idx) => (
+                        <g key={idx}>
+                          <circle cx={pt.x} cy={pt.y} r="3.5" fill="var(--paper)" stroke="var(--sage-deep)" strokeWidth="2" />
+                          <text x={pt.x} y={pt.y - 7} textAnchor="middle" fontSize="8.5" fontWeight="bold" fill="var(--ink)" className="font-mono">
+                            {pt.dur}m
+                          </text>
+                          <text x={pt.x} y={height - 2} textAnchor="middle" fontSize="7" fill="var(--ink-soft)" className="font-mono">
+                            {pt.fecha}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Historial de sesiones */}
           {p.tutoria?.sesiones && p.tutoria.sesiones.length > 1 && (
             <div className="border-t border-hair pt-3">

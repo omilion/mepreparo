@@ -17,6 +17,9 @@ import { generar, tieneClave } from "@/lib/tutor/gemini";
 import { recuperar } from "@/lib/tutor/rag";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
+import { db } from "@/lib/db/db";
+import { cacheRespuestas as cacheRespuestasTable } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 export const runtime = "nodejs"; // necesitamos fs para leer los chunks
 
@@ -38,6 +41,14 @@ interface Body {
   historial?: Turno[]; // conversación previa (para dar continuidad)
 }
 
+function normalizarPregunta(texto: string): string {
+  return texto
+    .trim()
+    .toLowerCase()
+    .replace(/[¿?¡!.,:;_\-\(\)]/g, "")
+    .replace(/\s+/g, " ");
+}
+
 export async function POST(req: NextRequest) {
   let body: Body;
   try {
@@ -49,6 +60,7 @@ export async function POST(req: NextRequest) {
   const esPrimera = !body.acuerdo;
   const accion = body.accion ?? "chat";
 
+  // --- ACCIÓN: CERRAR (RESUMEN DE SESIÓN) ---
   if (accion === "cerrar") {
     const historialText = (body.historial || [])
       .map((t) => `${t.de === "rai" ? "Rai" : "Niño"}: ${t.texto}`)
@@ -71,11 +83,13 @@ Retorna un objeto JSON con el siguiente formato exacto:
 
     if (tieneClave()) {
       try {
+        // C3. Enrutado de modelos: usar gemini-2.5-flash-lite para resúmenes
         const cruda = await generar({
           sistema: sistemaPrompt,
           usuario: `Conversación de estudio:\n${historialText}`,
           maxTokens: 400,
           json: true,
+          model: "gemini-2.5-flash-lite",
         });
 
         const parsed = JSON.parse(cruda);
@@ -110,6 +124,34 @@ Retorna un objeto JSON con el siguiente formato exacto:
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
   }
 
+  // --- C2. CACHÉ DE RESPUESTAS DEL TUTOR ---
+  const preguntaNormalizada = normalizarPregunta(body.pregunta || "");
+  if (accion === "chat" && preguntaNormalizada.length > 5 && body.materia && body.curso) {
+    try {
+      const cacheRecords = await db
+        .select()
+        .from(cacheRespuestasTable)
+        .where(
+          and(
+            eq(cacheRespuestasTable.preguntaNormalizada, preguntaNormalizada),
+            eq(cacheRespuestasTable.materia, body.materia),
+            eq(cacheRespuestasTable.curso, body.curso)
+          )
+        )
+        .limit(1);
+
+      if (cacheRecords.length > 0) {
+        return NextResponse.json({
+          respuesta: cacheRecords[0].respuesta,
+          fuentes: [],
+          modo: "cache_respuestas",
+        });
+      }
+    } catch (err) {
+      console.error("Error al consultar caché de respuestas:", err);
+    }
+  }
+
   // --- Prompt de sistema según el momento ---
   let sistema: string;
   if (esPrimera) {
@@ -130,7 +172,7 @@ Retorna un objeto JSON con el siguiente formato exacto:
     );
   }
 
-  // --- RAG solo cuando hay una pregunta concreta (en el saludo no hace falta) ---
+  // --- RAG solo cuando hay una pregunta concreta ---
   let fuentes: string[] = [];
   let contexto = "";
   if (accion === "chat" && body.materia) {
@@ -161,17 +203,41 @@ Retorna un objeto JSON con el siguiente formato exacto:
   // --- CAPA IA (con fallback simulado) ---
   if (tieneClave()) {
     try {
+      // C3. Enrutado de modelos:
+      // - Saludos o primera charla: usar gemini-2.5-flash-lite
+      // - Respuestas de chat con RAG y explicaciones: usar gemini-2.5-flash
+      const modeloElegido = (accion === "saludo" || esPrimera)
+        ? "gemini-2.5-flash-lite"
+        : "gemini-2.5-flash";
+
       const cruda = await generar({
         sistema,
         usuario,
-        // el thinkingBudget (128) se descuenta de aquí, así que dejamos aire
         maxTokens: esPrimera ? 640 : 560,
+        model: modeloElegido,
       });
+
       const { texto, horario } = separarHorario(cruda, body.materias || []);
+
+      // C2. Guardar respuesta en la tabla caché si corresponde
+      if (accion === "chat" && preguntaNormalizada.length > 5 && body.materia && body.curso && texto) {
+        try {
+          await db.insert(cacheRespuestasTable).values({
+            id: crypto.randomUUID(),
+            preguntaNormalizada,
+            materia: body.materia,
+            curso: body.curso,
+            respuesta: texto,
+          });
+        } catch (err) {
+          console.error("Error al registrar respuesta en cache_respuestas:", err);
+        }
+      }
+
       return NextResponse.json({
         respuesta: texto,
         fuentes,
-        horario, // presente solo si Rai cerró el acuerdo
+        horario,
         modo: "gemini",
       });
     } catch (e) {
@@ -193,8 +259,6 @@ Retorna un objeto JSON con el siguiente formato exacto:
   });
 }
 
-// Extrae el bloque <<HORARIO>>{...}<<FIN>> si Rai lo incluyó, y devuelve el
-// texto limpio (sin el bloque) + el horario parseado y saneado.
 function separarHorario(
   cruda: string,
   materias: Materia[]
@@ -219,7 +283,7 @@ function separarHorario(
     }
     return { texto, horario: Object.keys(horario).length ? horario : undefined };
   } catch {
-    return { texto }; // JSON malo: al menos devolvemos el texto limpio
+    return { texto };
   }
 }
 

@@ -87,6 +87,7 @@ export interface PerfilNino {
   // Memoria del tutor: se crea en la primera charla con Rai. Vacío hasta entonces.
   tutoria?: AcuerdoTutoria;
   creadoEn: string; // ISO
+  updatedAt?: string; // ISO de última modificación para sincronización offline-first
 }
 
 // Perfil vacío con valores por defecto sensatos para el formulario.

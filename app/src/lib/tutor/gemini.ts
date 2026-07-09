@@ -18,11 +18,13 @@ export async function generar(opts: {
   usuario: string;
   maxTokens?: number;
   json?: boolean;
+  model?: string;
 }): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("SIN_CLAVE");
 
-  const url = `${BASE}/${modelo()}:generateContent?key=${key}`;
+  const chosenModel = opts.model || modelo();
+  const url = `${BASE}/${chosenModel}:generateContent?key=${key}`;
   const body = {
     system_instruction: { parts: [{ text: opts.sistema }] },
     contents: [{ role: "user", parts: [{ text: opts.usuario }] }],

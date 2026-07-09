@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, memo } from "react";
 import { type PerfilNino } from "@/lib/profile";
 import { TUTOR } from "@/lib/tutor/personaje";
 import { resumenPerfil } from "@/lib/tutor/resumenPerfil";
@@ -39,15 +39,16 @@ export function Tutor({
   // la esfera empieza grande y centrada; tras la 1ª respuesta del niño sube a
   // la esquina para dar espacio a la conversación (transición fluida).
   const [compacta, setCompacta] = useState(false);
+  const [sesionTerminada, setSesionTerminada] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
   const inicioSesion = useRef(Date.now());
 
-  function scrollAlFinal() {
+  const scrollAlFinal = useCallback(() => {
     requestAnimationFrame(() =>
       finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
     );
-  }
+  }, []);
 
   useEffect(() => {
     scrollAlFinal();
@@ -109,6 +110,12 @@ export function Tutor({
     setCargando(true);
     setCompacta(true); // primera (y siguientes) respuestas: esfera a la esquina
 
+    const turnosKid = historial.filter((m) => m.de === "nino").length;
+    const duracionMs = Date.now() - inicioSesion.current;
+
+    // Verificar si esta respuesta supera el límite de presupuesto/duración
+    const limiteAlcanzado = turnosKid >= 10 || duracionMs >= 25 * 60 * 1000;
+
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
@@ -122,8 +129,21 @@ export function Tutor({
         }),
       });
       const data = await res.json();
-      agregarRai(data);
-      quizasGuardarHorario(data.horario);
+
+      if (limiteAlcanzado) {
+        setSesionTerminada(true);
+        setMensajes((m) => [
+          ...m,
+          {
+            de: "rai",
+            texto: "¡Hemos aprendido muchísimo hoy y trabajaste excelente! 🌟 Por hoy completamos nuestra meta de estudio. Es hora de descansar un ratito y jugar. ¡Presiona el botón de guardar progreso abajo!",
+            modo: "simulado",
+          },
+        ]);
+      } else {
+        agregarRai(data);
+        quizasGuardarHorario(data.horario);
+      }
     } catch {
       setMensajes((m) => [
         ...m,
@@ -283,29 +303,43 @@ export function Tutor({
       </div>
 
       {/* caja de escribir abajo, discreta */}
-      <div className="flex items-center gap-2.5 py-3">
-        <input
-          type="text"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && enviar()}
-          placeholder={
-            esPrimera
-              ? "Responde a Rai…"
-              : `Escríbele a ${TUTOR.nombre}…`
-          }
-          className="flex-1 border-b border-hair bg-transparent px-1 py-2.5 text-center text-[16px] text-ink outline-none transition-colors focus:border-sage"
-        />
-        <button
-          type="button"
-          onClick={enviar}
-          disabled={!texto.trim() || cargando}
-          aria-label="Enviar"
-          className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-sage-deep transition-opacity hover:opacity-70 disabled:opacity-30"
-        >
-          ↑
-        </button>
-      </div>
+      {sesionTerminada ? (
+        <div className="flex flex-col items-center gap-3 py-4 w-full">
+          <button
+            type="button"
+            onClick={manejarVolver}
+            disabled={cargando}
+            className="cta w-[220px]"
+          >
+            {cargando ? "Guardando Progreso…" : "Terminar y Guardar ✅"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2.5 py-3">
+          <input
+            type="text"
+            value={texto}
+            disabled={cargando}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && enviar()}
+            placeholder={
+              esPrimera
+                ? "Responde a Rai…"
+                : `Escríbele a ${TUTOR.nombre}…`
+            }
+            className="flex-1 border-b border-hair bg-transparent px-1 py-2.5 text-center text-[16px] text-ink outline-none transition-colors focus:border-sage"
+          />
+          <button
+            type="button"
+            onClick={enviar}
+            disabled={!texto.trim() || cargando}
+            aria-label="Enviar"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-sage-deep transition-opacity hover:opacity-70 disabled:opacity-30"
+          >
+            ↑
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -313,7 +347,7 @@ export function Tutor({
 // Una línea de conversación, solo texto. El texto de Rai es más grande que las
 // preguntas del diagnóstico (23px) para que la charla se sienta protagonista.
 // `animar` = revelar por palabras (solo el último mensaje recién llegado).
-function Linea({
+const Linea = memo(function Linea({
   m,
   animar = false,
   onTick,
@@ -350,4 +384,4 @@ function Linea({
       )}
     </div>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 // Revela el texto de Rai por palabras, rápido y con un fade corto, para dar
 // sensación de "está escribiendo" sin desesperar al niño (nada de letra por
@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 // luego queda fija. Lo logramos animando solo la última palabra revelada; las
 // anteriores se renderizan como texto plano ya asentado.
 
-export function TextoRevelado({
+export const TextoRevelado = memo(function TextoRevelado({
   texto,
   onTick,
   velocidadMs = 55, // tiempo entre palabras (bajo = rápido)
@@ -86,7 +86,7 @@ export function TextoRevelado({
       `}</style>
     </>
   );
-}
+});
 
 function usaReduce(): boolean {
   const [reduce, setReduce] = useState(false);
