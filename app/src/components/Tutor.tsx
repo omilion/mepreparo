@@ -34,7 +34,6 @@ export function Tutor({
   const materiasHoy = acuerdo ? materiasDeHoy(acuerdo) : [];
   const materia = materiasHoy[0] ?? perfil.examen.materias[0];
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
-  const [texto, setTexto] = useState("");
   const [cargando, setCargando] = useState(false);
   // la esfera empieza grande y centrada; tras la 1ª respuesta del niño sube a
   // la esquina para dar espacio a la conversación (transición fluida).
@@ -101,12 +100,10 @@ export function Tutor({
     }
   }
 
-  async function enviar() {
-    const pregunta = texto.trim();
+  async function enviar(pregunta: string) {
     if (!pregunta || cargando) return;
     const historial = [...historialPlano(), { de: "nino" as const, texto: pregunta }];
     setMensajes((m) => [...m, { de: "nino", texto: pregunta }]);
-    setTexto("");
     setCargando(true);
     setCompacta(true); // primera (y siguientes) respuestas: esfera a la esquina
 
@@ -315,31 +312,62 @@ export function Tutor({
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2.5 py-3">
-          <input
-            type="text"
-            value={texto}
-            disabled={cargando}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && enviar()}
-            placeholder={
-              esPrimera
-                ? "Responde a Rai…"
-                : `Escríbele a ${TUTOR.nombre}…`
-            }
-            className="flex-1 border-b border-hair bg-transparent px-1 py-2.5 text-center text-[16px] text-ink outline-none transition-colors focus:border-sage"
-          />
-          <button
-            type="button"
-            onClick={enviar}
-            disabled={!texto.trim() || cargando}
-            aria-label="Enviar"
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-sage-deep transition-opacity hover:opacity-70 disabled:opacity-30"
-          >
-            ↑
-          </button>
-        </div>
+        <CajaTexto
+          onEnviar={enviar}
+          cargando={cargando}
+          esPrimera={esPrimera}
+          tutorNombre={TUTOR.nombre}
+        />
       )}
+    </div>
+  );
+}
+
+// Componente de entrada aislado para evitar re-renderizados del chat durante la escritura (flickering bug fix)
+function CajaTexto({
+  onEnviar,
+  cargando,
+  esPrimera,
+  tutorNombre,
+}: {
+  onEnviar: (texto: string) => void;
+  cargando: boolean;
+  esPrimera: boolean;
+  tutorNombre: string;
+}) {
+  const [texto, setTexto] = useState("");
+
+  function enviar() {
+    const pregunta = texto.trim();
+    if (!pregunta || cargando) return;
+    onEnviar(pregunta);
+    setTexto("");
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 py-3">
+      <input
+        type="text"
+        value={texto}
+        disabled={cargando}
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && enviar()}
+        placeholder={
+          esPrimera
+            ? "Responde a Rai…"
+            : `Escríbele a ${tutorNombre}…`
+        }
+        className="flex-1 border-b border-hair bg-transparent px-1 py-2.5 text-center text-[16px] text-ink outline-none transition-colors focus:border-sage"
+      />
+      <button
+        type="button"
+        onClick={enviar}
+        disabled={!texto.trim() || cargando}
+        aria-label="Enviar"
+        className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-sage-deep transition-opacity hover:opacity-70 disabled:opacity-30"
+      >
+        ↑
+      </button>
     </div>
   );
 }

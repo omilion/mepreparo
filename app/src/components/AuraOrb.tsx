@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { Materia } from "@/lib/profile";
 
 // Esfera de aura: gradiente radial difuminado, suave, tipo "presencia".
@@ -16,7 +17,7 @@ const COLORES: Record<Materia, [string, string]> = {
   ingles: ["#F58AB0", "#9AB8FF"], // rosa → azul (como la referencia)
 };
 
-export function AuraOrb({
+export const AuraOrb = memo(function AuraOrb({
   materia,
   activa,
   size = 120,
@@ -121,4 +122,4 @@ export function AuraOrb({
       `}</style>
     </div>
   );
-}
+});

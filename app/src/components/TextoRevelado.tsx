@@ -1,101 +1,83 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo } from "react";
 
-// Revela el texto de Rai por palabras, rápido y con un fade corto, para dar
-// sensación de "está escribiendo" sin desesperar al niño (nada de letra por
-// letra lento). Respeta prefers-reduced-motion.
-//
-// Clave para que NO parpadee: cada palabra se anima UNA sola vez al entrar y
-// luego queda fija. Lo logramos animando solo la última palabra revelada; las
-// anteriores se renderizan como texto plano ya asentado.
+// Revela el texto del tutor en un efecto "staggered fade-in" (palabra por palabra en cascada).
+// Para lograr el estilo Zen y evitar saltos de texto o parpadeos:
+// 1. Todo el texto se inyecta inmediatamente en el DOM para que el contenedor calcule su altura final al instante.
+// 2. Cada palabra se anima por separado mediante CSS usando un retraso (animationDelay) progresivo por palabra.
+// 3. El navegador renderiza la animación de forma extremadamente fluida en la GPU (will-change) usando
+//    una curva de desaceleración suave (easeOutExpo), lo que simula una ola de lectura muy tranquila.
 
 export const TextoRevelado = memo(function TextoRevelado({
   texto,
   onTick,
-  velocidadMs = 55, // tiempo entre palabras (bajo = rápido)
 }: {
   texto: string;
   onTick?: () => void;
-  velocidadMs?: number;
 }) {
-  // tokens: palabras y espacios por separado (para conservar el espaciado)
-  const tokensRef = useRef<string[]>([]);
-  const [n, setN] = useState(0);
-  const reduce = usaReduce();
-  const onTickRef = useRef(onTick);
-  onTickRef.current = onTick;
-
   useEffect(() => {
-    tokensRef.current = texto.split(/(\s+)/);
-    const total = tokensRef.current.length;
+    // Al inyectarse todo el texto en el DOM, la altura final es instantánea.
+    // Hacemos scroll al final una única vez de forma precisa.
+    onTick?.();
+  }, [texto, onTick]);
 
-    if (reduce) {
-      setN(total);
-      return;
-    }
+  // Dividimos el texto en palabras y espacios
+  const tokens = useMemo(() => texto.split(/(\s+)/), [texto]);
 
-    setN(0);
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setN(i);
-      onTickRef.current?.();
-      if (i >= total) clearInterval(id);
-    }, velocidadMs);
-    return () => clearInterval(id);
-  }, [texto, reduce, velocidadMs]);
-
-  const tokens = tokensRef.current;
-  // texto ya asentado (sin animación) + la última palabra recién revelada
-  const asentado = tokens.slice(0, Math.max(0, n - 1)).join("");
-  const entrando = n > 0 ? tokens[n - 1] : "";
+  // Contador para asignar retrasos solo a las palabras visibles, no a los espacios
+  let wordIndex = 0;
 
   return (
-    <>
-      {asentado}
-      {entrando &&
-        (/^\s+$/.test(entrando) ? (
-          entrando
-        ) : (
-          // key ligada al índice de palabra => se monta (y anima) una vez por palabra
-          <span key={n} className="palabra-fade">
-            {entrando}
-          </span>
-        ))}
-      <style jsx>{`
-        .palabra-fade {
-          display: inline-block;
-          animation: aparecer 0.32s ease both;
+    <div className="texto-contenedor-zen">
+      {tokens.map((token, idx) => {
+        if (/^\s+$/.test(token)) {
+          return <span key={idx}>{token}</span>;
         }
-        @keyframes aparecer {
-          from {
-            opacity: 0;
-            transform: translateY(2px);
-          }
+
+        const currentDelayIndex = wordIndex;
+        wordIndex++;
+
+        return (
+          <span
+            key={idx}
+            className="palabra-zen-fade"
+            style={{
+              animationDelay: `${currentDelayIndex * 0.09}s`,
+            }}
+          >
+            {token}
+          </span>
+        );
+      })}
+
+      <style jsx>{`
+        .texto-contenedor-zen {
+          display: inline-block;
+          text-align: center;
+          line-height: 1.5;
+        }
+        .palabra-zen-fade {
+          display: inline-block;
+          opacity: 0;
+          transform: translateY(3px);
+          animation: palabraZenFadeIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: opacity, transform;
+        }
+        @keyframes palabraZenFadeIn {
           to {
             opacity: 1;
-            transform: none;
+            transform: translateY(0);
           }
         }
         @media (prefers-reduced-motion: reduce) {
-          .palabra-fade {
+          .palabra-zen-fade {
+            opacity: 1;
+            transform: none;
             animation: none;
           }
         }
       `}</style>
-    </>
+    </div>
   );
 });
-
-function usaReduce(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduce(mq.matches);
-    const h = (e: MediaQueryListEvent) => setReduce(e.matches);
-    mq.addEventListener("change", h);
-    return () => mq.removeEventListener("change", h);
-  }, []);
-  return reduce;
-}
