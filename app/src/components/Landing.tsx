@@ -18,11 +18,85 @@ export function Landing({
   return (
     <div className="mx-auto max-w-zen px-[22px] pb-28">
       <Hero onComenzar={onComenzar} onProbar={onProbar} />
+      <RumboAlExamen />
       <Valor />
       <ComoFunciona />
       <Precios onComenzar={onComenzar} />
       <CierreCTA onComenzar={onComenzar} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Rumbo al examen
+// El examen libre ES la meta: esta sección organiza la promesa alrededor de
+// la fecha y los temarios oficiales, no del producto.
+const RUMBO = [
+  {
+    titulo: "La fecha del examen manda",
+    texto:
+      "Ingresas la fecha en que tu hijo rinde y el plan calcula cuántas horas necesita por materia para llegar a tiempo. Si el tiempo aprieta, te lo decimos altiro.",
+    urgente: true,
+  },
+  {
+    titulo: "Se estudia lo que el examen evalúa",
+    texto:
+      "Trabajamos sobre los temarios oficiales de los exámenes de validación de estudios y las bases curriculares de cada curso. Nada de contenido de relleno.",
+    urgente: false,
+  },
+  {
+    titulo: "Primero, cerrar las brechas",
+    texto:
+      "Un diagnóstico corto detecta exactamente qué le falta a tu hijo para el examen, y el estudio parte por ahí: lo urgente primero.",
+    urgente: false,
+  },
+];
+
+function RumboAlExamen() {
+  return (
+    <section className="border-t border-hair py-16">
+      <Reveal delay={80}>
+        <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-clay">
+          La meta
+        </div>
+      </Reveal>
+      <Reveal delay={140}>
+        <h2 className="mb-10 max-w-[22ch] text-[28px]">
+          Todo apunta a un solo día: el del examen
+        </h2>
+      </Reveal>
+
+      <div className="flex flex-col gap-8">
+        {RUMBO.map((r, i) => (
+          <Reveal key={r.titulo} delay={220 + i * 100}>
+            <div className="flex gap-4">
+              <div
+                className={
+                  "mt-1.5 h-[10px] w-[10px] flex-none rounded-full " +
+                  (r.urgente ? "bg-clay" : "bg-sage")
+                }
+                aria-hidden
+              />
+              <div>
+                <h3 className="text-[18px]">{r.titulo}</h3>
+                <p className="mt-1.5 max-w-[52ch] text-[14.5px] leading-[1.5] text-ink-soft">
+                  {r.texto}
+                </p>
+              </div>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+
+      {/* franja de datos duros del examen */}
+      <Reveal delay={560}>
+        <div className="mt-10 flex flex-wrap gap-x-7 gap-y-2 border-t border-hair pt-6 text-[13px] text-ink-soft">
+          <span>· 5 materias del examen</span>
+          <span>· 1° a 8° básico</span>
+          <span>· Temarios oficiales de validación de estudios</span>
+          <span>· Plan calculado según tu fecha</span>
+        </div>
+      </Reveal>
+    </section>
   );
 }
 
@@ -38,17 +112,21 @@ function Hero({
     <section className="flex flex-col items-center pt-14 pb-20 text-center">
       <Reveal variant="lead" delay={60}>
         <div className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.16em] text-sage-deep">
-          Preparación para exámenes libres en Chile · Educación básica 2026
+          Exámenes libres · Educación básica 1° a 8° · Chile 2026
         </div>
       </Reveal>
       <Reveal variant="lead" delay={120}>
-        <h1 className="max-w-[16ch] text-[40px] leading-[1.08] sm:text-[52px]">
-          Un tutor inteligente que conoce a tu hijo
+        <h1 className="max-w-[15ch] text-[40px] leading-[1.08] sm:text-[52px]">
+          Que tu hijo apruebe su examen libre
         </h1>
       </Reveal>
       <Reveal delay={480}>
         <p className="mt-6 max-w-[46ch] text-[16.5px] leading-[1.5] text-ink-soft">
-          Rai acompaña a cada estudiante con un plan a la medida diseñado para preparar con éxito sus <strong>exámenes libres en Chile</strong>. Con el respaldo de bases curriculares vigentes y temarios oficiales, tu hijo estudiará en casa con rumbo, calma y confianza.
+          Con Rai, un tutor inteligente que lo conoce y lo acompaña con un plan
+          a la medida hasta el día del examen. Con el respaldo de las bases
+          curriculares vigentes y los temarios oficiales de los{" "}
+          <strong>exámenes libres en Chile</strong>, tu hijo estudiará en casa
+          con rumbo, calma y confianza.
         </p>
       </Reveal>
       <Reveal delay={640}>
@@ -99,8 +177,9 @@ function Valor() {
   return (
     <section className="border-t border-hair py-16">
       <Reveal delay={80}>
-        <h2 className="mb-10 max-w-[20ch] text-[28px]">
-          No es una app de ejercicios. Es alguien que estudia con tu hijo.
+        <h2 className="mb-10 max-w-[22ch] text-[28px]">
+          No es una app de ejercicios. Es alguien que estudia con tu hijo hasta
+          el examen.
         </h2>
       </Reveal>
       <div className="grid gap-x-8 gap-y-9 sm:grid-cols-2">
@@ -312,7 +391,7 @@ function CierreCTA({ onComenzar }: { onComenzar: () => void }) {
     <section className="border-t border-hair py-16 text-center">
       <Reveal delay={80}>
         <h2 className="mx-auto max-w-[22ch] text-[30px]">
-          Que tu hijo llegue al examen preparado y con confianza.
+          El examen tiene fecha. La preparación empieza hoy.
         </h2>
       </Reveal>
       <Reveal delay={220}>
