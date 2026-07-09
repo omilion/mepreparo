@@ -1,0 +1,16 @@
+# dependencias
+/node_modules
+
+# builds
+/.next
+/out
+
+# entorno — NUNCA subir claves
+.env
+.env.local
+.env*.local
+
+# sistema
+.DS_Store
+*.pem
+npm-debug.log*

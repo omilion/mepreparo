@@ -1,0 +1,22 @@
+{
+  "fecha_procesamiento": "2026-07-08",
+  "total_documentos_procesados": 46,
+  "total_chunks_generados": 9899,
+  "modelo_embeddings": "local-hashing-bag-of-words (Fallback)",
+  "dimension_embeddings": 768,
+  "distribucion_por_materia": {
+    "lenguaje": 2332,
+    "ciencias": 2167,
+    "historia": 1964,
+    "matematica": 2267,
+    "ingles": 1043,
+    "_temarios_examenes_libres": 111,
+    "revisar": 15
+  },
+  "distribucion_por_tipo": {
+    "bases_curriculares": 739,
+    "temario_examen_libre": 111,
+    "programa_estudio": 9049
+  },
+  "ruta_almacenamiento": "base-documental/_rag/chunks.jsonl (Opción B)"
+}

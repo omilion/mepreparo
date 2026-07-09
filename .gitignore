@@ -1,0 +1,22 @@
+# --- dependencias y builds ---
+node_modules/
+.next/
+out/
+dist/
+
+# --- secretos: NUNCA subir claves ---
+.env
+.env.*
+!.env.example
+
+# --- binarios pesados (respaldados en OneDrive, re-descargables) ---
+# PDFs oficiales MINEDUC: URLs de origen documentadas en base-documental/indice.json
+base-documental/**/*.pdf
+# chunks derivados de los PDFs (80MB; se regeneran con los scripts de _rag/)
+base-documental/_rag/chunks.jsonl
+base-documental/_rag/*.jsonl
+
+# --- sistema ---
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,441 @@
+<style>
+  :root{
+    --paper:#F5F3EE; --surface:#FFFFFF; --ink:#1E2422; --ink-soft:#5A635E;
+    --sage:#5B8A72; --sage-deep:#436B57; --clay:#C97B5A; --mist:#E4E8E2; --line:#DDE1DB;
+    --good:#5B8A72; --warn:#C99A4A; --crit:#C05B4D;
+    --shadow:none;
+    --r:18px; --maxw:560px;
+    --hair:color-mix(in srgb,var(--ink) 9%,transparent);
+    --serif:"Fraunces","Iowan Old Style","Palatino Linotype",Georgia,serif;
+    --sans:"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:"SF Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#14181A; --surface:#1B2123; --ink:#EAEEE9; --ink-soft:#9BA6A0;
+      --sage:#7FB394; --sage-deep:#9BC7AC; --clay:#DB9576; --mist:#28302F; --line:#2A3230;
+      --shadow:none;
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#F5F3EE; --surface:#FFFFFF; --ink:#1E2422; --ink-soft:#5A635E;
+    --sage:#5B8A72; --sage-deep:#436B57; --mist:#E4E8E2; --line:#DDE1DB;
+    --shadow:none;
+  }
+  :root[data-theme="dark"]{
+    --paper:#14181A; --surface:#1B2123; --ink:#EAEEE9; --ink-soft:#9BA6A0;
+    --sage:#7FB394; --sage-deep:#9BC7AC; --clay:#DB9576; --mist:#28302F; --line:#2A3230;
+    --shadow:none;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+  h1,h2,h3{font-family:var(--serif);font-weight:560;line-height:1.15;text-wrap:balance;margin:0}
+  p{margin:0}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+
+  /* top bar */
+  .top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--paper) 86%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;justify-content:space-between;height:58px}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:19px}
+  .mark{width:22px;height:22px;flex:none}
+  .theme-btn{border:1px solid var(--hair);background:transparent;color:var(--ink-soft);
+    border-radius:100px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-family:var(--sans)}
+  .theme-btn:hover{color:var(--ink)}
+
+  /* stage tabs */
+  .tabs{display:flex;gap:4px;justify-content:center;padding:20px 0 4px}
+  .tab{border:none;background:none;font-family:var(--sans);font-size:13px;color:var(--ink-soft);
+    padding:8px 15px;border-radius:100px;cursor:pointer;display:flex;align-items:center;gap:8px;
+    transition:color .2s,background .2s}
+  .tab .n{font-variant-numeric:tabular-nums;font-size:11px;width:19px;height:19px;border-radius:50%;
+    display:grid;place-items:center;border:1px solid var(--hair);color:var(--ink-soft)}
+  .tab[aria-selected="true"]{color:var(--ink);background:transparent}
+  .tab[aria-selected="true"] .n{background:var(--sage);color:#fff;border-color:transparent}
+  :root[data-theme="dark"] .tab[aria-selected="true"] .n,
+  @media (prefers-color-scheme:dark){.tab[aria-selected="true"] .n{color:#10201a}}
+
+  .view{display:none;padding:26px 0 90px;animation:rise .5s ease both}
+  .view.on{display:block}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.view.on,.view{animation:none}}
+
+  .eyebrow{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage-deep);
+    font-weight:600;margin-bottom:12px}
+  .lede{color:var(--ink-soft);font-size:15px;line-height:1.4;margin-top:12px;max-width:44ch}
+
+  .card{background:transparent;border:1px solid var(--hair);border-radius:var(--r);
+    box-shadow:var(--shadow);padding:22px 20px}
+  .stack{display:flex;flex-direction:column;gap:22px}
+  .stack-lg{display:flex;flex-direction:column;gap:30px}
+
+  label.field{display:flex;flex-direction:column;gap:10px}
+  .flabel{font-size:13px;font-weight:560;color:var(--ink);line-height:1.4}
+  .fhint{font-size:12px;color:var(--ink-soft);line-height:1.25}
+  /* el hint es continuación del label: van pegados */
+  .flabel + .fhint{margin-top:-5px}
+  /* aire generoso entre el encabezado y el grupo de selectores */
+  .field .chips{margin-top:8px}
+  .field .slider-row{margin-top:8px}
+  input[type=text],input[type=date],select{font-family:var(--sans);font-size:16px;color:var(--ink);
+    background:transparent;border:none;border-bottom:1px solid var(--hair);border-radius:0;
+    padding:8px 2px;width:100%;transition:border-color .2s}
+  input:focus,select:focus{outline:none;border-bottom-color:var(--sage);border-bottom-width:1.5px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{font-size:13px;border:1px solid var(--hair);background:transparent;color:var(--ink-soft);
+    padding:8px 14px;border-radius:100px;cursor:pointer;user-select:none;transition:.15s}
+  .chip[aria-pressed="true"]{background:transparent;
+    color:var(--sage-deep);border-color:color-mix(in srgb,var(--sage) 55%,transparent);font-weight:560}
+  .chip:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+
+  .slider-row{display:flex;align-items:center;gap:14px}
+  input[type=range]{flex:1;accent-color:var(--sage)}
+  .slider-val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;
+    min-width:74px;text-align:right;color:var(--ink)}
+
+  .cta{width:100%;border:none;background:var(--sage-deep);color:#fff;font-family:var(--sans);
+    font-size:15px;font-weight:560;padding:14px;border-radius:13px;cursor:pointer;transition:.15s}
+  .cta:hover{background:var(--sage)}
+  .cta:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+
+  /* diagnostic */
+  .qmeta{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-soft)}
+  .dots{display:flex;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--mist)}
+  .dot.done{background:var(--sage)} .dot.now{background:var(--clay);transform:scale(1.25)}
+  .question{font-family:var(--serif);font-size:22px;margin:16px 0 4px}
+  .opts{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+  .opts{gap:11px}
+  .opt{text-align:left;border:1px solid var(--hair);background:transparent;color:var(--ink);
+    font-family:var(--sans);font-size:15px;padding:14px 16px;border-radius:12px;cursor:pointer;
+    display:flex;align-items:center;gap:12px;transition:.15s}
+  .opt:hover{border-color:var(--sage)}
+  .opt .k{font-family:var(--mono);font-size:12px;color:var(--ink-soft);border:1px solid var(--hair);
+    border-radius:6px;width:22px;height:22px;display:grid;place-items:center;flex:none}
+  .adaptive-note{display:flex;gap:10px;align-items:flex-start;margin-top:20px;font-size:12.5px;
+    color:var(--ink-soft);background:transparent;
+    border:1px solid var(--hair);border-radius:12px;padding:12px 14px}
+
+  /* home / tutor */
+  .exam-banner{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:var(--r);
+    background:transparent;border:1px solid color-mix(in srgb,var(--clay) 34%,transparent)}
+  .exam-days{font-family:var(--serif);font-size:34px;line-height:1;color:var(--clay);font-variant-numeric:tabular-nums}
+  .exam-days small{font-size:12px;font-family:var(--sans);color:var(--ink-soft);display:block;letter-spacing:.02em}
+  .plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:460px){.plan-grid{grid-template-columns:1fr}}
+  .stat{background:transparent;border:1px solid var(--hair);border-radius:14px;padding:16px 17px;box-shadow:var(--shadow)}
+  .stat .lab{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+  .stat .big{font-family:var(--serif);font-size:26px;margin-top:5px;font-variant-numeric:tabular-nums}
+  .stat .sub{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+    padding:3px 10px;border-radius:100px}
+  .pill.good{background:color-mix(in srgb,var(--good) 16%,var(--surface));color:var(--sage-deep)}
+  .bar{height:6px;border-radius:100px;background:var(--mist);overflow:hidden;margin-top:11px}
+  .bar>i{display:block;height:100%;background:var(--sage);border-radius:100px}
+
+  .today{display:flex;flex-direction:column;gap:12px}
+  .task{display:flex;align-items:center;gap:14px;padding:14px 16px;background:transparent;
+    border:1px solid var(--hair);border-radius:14px;box-shadow:var(--shadow)}
+  .task .ic{width:38px;height:38px;border-radius:10px;flex:none;display:grid;place-items:center;
+    background:transparent;border:1px solid var(--hair);font-size:11.5px;font-weight:600;
+    letter-spacing:.02em;color:var(--sage-deep)}
+  .task .t{font-size:14.5px;font-weight:560}
+  .task .m{font-size:12px;color:var(--ink-soft)}
+  .task .go{margin-left:auto;color:var(--ink-soft)}
+
+  /* tutor chat */
+  .tutor{margin-top:6px;background:transparent;border:1px solid var(--hair);border-radius:var(--r);
+    box-shadow:var(--shadow);overflow:hidden}
+  .tutor .hd{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--hair)}
+  .avatar{width:34px;height:34px;border-radius:50%;flex:none}
+  .tutor .hd .nm{font-family:var(--serif);font-size:16px}
+  .tutor .hd .st{font-size:11.5px;color:var(--sage-deep);display:flex;align-items:center;gap:5px}
+  .live{width:6px;height:6px;border-radius:50%;background:var(--sage);box-shadow:0 0 0 0 var(--sage);animation:pulse 2.2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--sage) 60%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  @media (prefers-reduced-motion:reduce){.live{animation:none}}
+  .msgs{padding:18px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:82%;font-size:14px;padding:11px 14px;border-radius:14px;line-height:1.5}
+  .msg.them{background:color-mix(in srgb,var(--ink) 4%,transparent);border:1px solid var(--hair);border-bottom-left-radius:5px;align-self:flex-start}
+  .msg.me{background:var(--sage-deep);color:#fff;border-bottom-right-radius:5px;align-self:flex-end}
+  .srcline{font-size:11px;color:var(--ink-soft);margin-top:7px;display:flex;align-items:center;gap:6px}
+  .layer-tag{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:5px;
+    border:1px solid color-mix(in srgb,var(--sage) 35%,transparent);color:var(--sage-deep)}
+  .composer{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--hair);align-items:center}
+  .composer input{border-bottom:none}
+  .composer input{flex:1}
+  .send{border:none;background:var(--sage-deep);color:#fff;border-radius:11px;width:44px;flex:none;cursor:pointer}
+
+  .foot{color:var(--ink-soft);font-size:12px;text-align:center;padding:8px 0 30px}
+</style>
+
+<div class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 6.5C4 5 5 4 6.5 4H12v15H6.5C5 19 4 18 4 16.5V6.5Z" fill="var(--sage)"/>
+        <path d="M20 6.5C20 5 19 4 17.5 4H12v15h5.5C19 19 20 18 20 16.5V6.5Z" fill="var(--clay)"/>
+        <path d="M12 4v15" stroke="var(--paper)" stroke-width="1.3"/>
+      </svg>
+      mepreparo
+    </div>
+    <button class="theme-btn" id="soundBtn" type="button" style="margin-right:8px">🔊 Sonido zen: Apagado</button>
+    <button class="theme-btn" id="themeBtn" type="button">Modo oscuro</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs" role="tablist" aria-label="Etapas">
+    <button class="tab" role="tab" aria-selected="true"  data-v="setup"><span class="n">1</span>Configuración</button>
+    <button class="tab" role="tab" aria-selected="false" data-v="diag"><span class="n">2</span>Diagnóstico</button>
+    <button class="tab" role="tab" aria-selected="false" data-v="home"><span class="n">3</span>Tutor</button>
+  </div>
+</div>
+
+<!-- VIEW 1: SETUP -->
+<section class="view on" id="setup">
+  <div class="wrap stack-lg">
+    <header>
+      <div class="eyebrow">Para el apoderado</div>
+      <h1 style="font-size:30px">Preparemos a Sofía con calma.</h1>
+      <p class="lede">Mientras más precisa sea esta configuración, más certero será el diagnóstico y más personal será su tutor. Toma un minuto.</p>
+    </header>
+
+    <div class="card stack">
+      <label class="field">
+        <span class="flabel">¿Quién va a estudiar?</span>
+        <input type="text" value="Sofía" aria-label="Nombre del niño">
+      </label>
+      <label class="field">
+        <span class="flabel">Curso que rinde</span>
+        <select><option>5° básico</option><option>6° básico</option><option>4° básico</option></select>
+      </label>
+      <div class="field">
+        <span class="flabel">Materias del examen</span>
+        <span class="fhint">Elige solo las que dará. No tienen que ser todas.</span>
+        <div class="chips" role="group" aria-label="Materias">
+          <button class="chip" aria-pressed="true"  type="button">Matemática</button>
+          <button class="chip" aria-pressed="true"  type="button">Lenguaje</button>
+          <button class="chip" aria-pressed="true"  type="button">Ciencias</button>
+          <button class="chip" aria-pressed="false" type="button">Historia</button>
+          <button class="chip" aria-pressed="false" type="button">Inglés</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <label class="field">
+        <span class="flabel">Fecha del examen</span>
+        <span class="fhint">Con esto calculamos cuántas horas necesita.</span>
+        <input type="date" value="2026-11-20">
+      </label>
+      <div class="field">
+        <span class="flabel">Tiempo real de estudio por semana</span>
+        <span class="fhint">Sé honesto: el plan se ajusta a la vida real, no al revés.</span>
+        <div class="slider-row">
+          <input type="range" min="1" max="15" value="6" id="hrs" aria-label="Horas por semana">
+          <span class="slider-val" id="hrsv">6 h / sem</span>
+        </div>
+      </div>
+      <div class="field">
+        <span class="flabel">¿Qué le gusta y cómo aprende mejor?</span>
+        <span class="fhint">Esto le da personalidad al tutor. Opcional pero vale la pena.</span>
+        <div class="chips" role="group" aria-label="Contexto">
+          <button class="chip" aria-pressed="true"  type="button">Animales</button>
+          <button class="chip" aria-pressed="true"  type="button">Dibujo</button>
+          <button class="chip" aria-pressed="false" type="button">Deportes</button>
+          <button class="chip" aria-pressed="true"  type="button">Ejemplos visuales</button>
+          <button class="chip" aria-pressed="false" type="button">Paso a paso</button>
+        </div>
+      </div>
+      <button class="cta" type="button" data-goto="diag">Comenzar el diagnóstico de Sofía →</button>
+    </div>
+    <p class="foot">Los datos de tu hijo se guardan en tu dispositivo. Tú eres el dueño de la cuenta.</p>
+  </div>
+</section>
+
+<!-- VIEW 2: DIAGNOSTIC -->
+<section class="view" id="diag">
+  <div class="wrap stack-lg">
+    <header>
+      <div class="eyebrow">Etapa de diagnóstico · Matemática</div>
+      <h1 style="font-size:27px">Veamos qué ya domina Sofía.</h1>
+      <p class="lede">Son pocas preguntas. Se vuelven más fáciles o más difíciles según cómo responde, para encontrar su nivel exacto sin aburrirla.</p>
+    </header>
+
+    <div class="card">
+      <div class="qmeta">
+        <span>Pregunta 4 de ~8</span>
+        <div class="dots" aria-hidden="true">
+          <span class="dot done"></span><span class="dot done"></span><span class="dot done"></span>
+          <span class="dot now"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+      </div>
+      <p class="question">Sofía repartió una pizza en 8 partes iguales y se comió 3. ¿Qué fracción se comió?</p>
+      <div class="opts">
+        <button class="opt" type="button"><span class="k">A</span> 3⁄8 de la pizza</button>
+        <button class="opt" type="button"><span class="k">B</span> 8⁄3 de la pizza</button>
+        <button class="opt" type="button"><span class="k">C</span> 3⁄5 de la pizza</button>
+        <button class="opt" type="button"><span class="k">D</span> No estoy segura</button>
+      </div>
+      <div class="adaptive-note">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:1px"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6 6l1.5 1.5M18 6l-1.5 1.5" stroke="var(--sage-deep)" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" stroke="var(--sage-deep)" stroke-width="1.6"/></svg>
+        <span>Preguntas preparadas de antemano desde el currículum oficial — el diagnóstico no consume tu cuota de IA.</span>
+      </div>
+    </div>
+
+    <button class="cta" type="button" data-goto="home">Ver el resultado y el plan →</button>
+  </div>
+</section>
+
+<!-- VIEW 3: HOME / TUTOR -->
+<section class="view" id="home">
+  <div class="wrap stack-lg">
+    <header>
+      <div class="eyebrow">Hoy, martes</div>
+      <h1 style="font-size:27px">Buenos días, Sofía</h1>
+      <p class="lede">Vas en buen camino. Hoy tienes dos cosas breves y tu tutor está aquí si te trabas.</p>
+    </header>
+
+    <div class="exam-banner">
+      <div class="exam-days">136<small>días para el examen</small></div>
+      <div style="font-size:13.5px;color:var(--ink-soft)">
+        3 materias · <strong style="color:var(--ink)">20 nov</strong><br>
+        Con tus 6 h/semana, llegas <strong style="color:var(--sage-deep)">con holgura</strong>.
+      </div>
+    </div>
+
+    <div class="plan-grid">
+      <div class="stat">
+        <div class="lab">Preparación general</div>
+        <div class="big">58%</div>
+        <div class="bar"><i style="width:58%"></i></div>
+        <div class="sub">+6% esta semana</div>
+      </div>
+      <div class="stat">
+        <div class="lab">Horas del plan</div>
+        <div class="big">18<span style="font-size:15px;color:var(--ink-soft)"> / 48</span></div>
+        <div class="sub" style="margin-top:9px"><span class="pill good">● En ritmo</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="eyebrow" style="margin-bottom:10px">Lo de hoy · 25 min</div>
+      <div class="today">
+        <div class="task">
+          <div class="ic">Mat</div>
+          <div><div class="t">Fracciones: repaso guiado</div><div class="m">Tu punto débil del diagnóstico · 15 min</div></div>
+          <span class="go">→</span>
+        </div>
+        <div class="task">
+          <div class="ic" style="border-color:color-mix(in srgb,var(--clay) 34%,transparent);color:var(--clay)">Len</div>
+          <div><div class="t">Lectura: encontrar la idea principal</div><div class="m">Lenguaje · 10 min</div></div>
+          <span class="go">→</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tutor">
+      <div class="hd">
+        <svg class="avatar" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="var(--sage)"/><circle cx="20" cy="16" r="6" fill="var(--paper)"/><path d="M8 34c1-7 6-10 12-10s11 3 12 10" fill="var(--paper)"/></svg>
+        <div>
+          <div class="nm">Rai, tu tutor</div>
+          <div class="st"><span class="live"></span>Te conoce · sabe que te gustan los animales</div>
+        </div>
+      </div>
+      <div class="msgs">
+        <div class="msg them">Hola Sofía. Vi que las fracciones te costaron un poquito. ¿Te muestro con algo de animales?</div>
+        <div class="msg me">ya, no entiendo eso de 3 octavos</div>
+        <div class="msg them">
+          Imagina una jauría de 8 perritos. Si 3 se van a comer, esos 3 de los 8 son <strong>3⁄8</strong>. El de abajo es cuántos hay en total; el de arriba, cuántos tomamos.
+          <div class="srcline"><span class="layer-tag">RAG · OA 5° Mat</span> apoyado en el programa oficial</div>
+        </div>
+      </div>
+      <div class="composer">
+        <input type="text" placeholder="Pregúntale a Rai…" aria-label="Escribe a tu tutor">
+        <button class="send" type="button" aria-label="Enviar">↑</button>
+      </div>
+    </div>
+    <p class="foot">Prototipo de interfaz · contenido de demostración</p>
+  </div>
+</section>
+
+<script>
+  const root=document.documentElement, tb=document.getElementById('themeBtn');
+  function setTheme(t){root.setAttribute('data-theme',t);tb.textContent=t==='dark'?'Modo claro':'Modo oscuro';}
+  setTheme(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+  tb.onclick=()=>setTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');
+
+  // Web Audio Lyre Synthesizer
+  let audioCtx = null, isPlaying = false, intervalId = null;
+  const sb = document.getElementById('soundBtn');
+  const scale = [220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+
+  function playLyreNote(frequency, duration) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    const t = audioCtx.currentTime;
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(frequency, t);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1000, t);
+    filter.frequency.exponentialRampToValueAtTime(150, t + duration);
+
+    gainNode.gain.setValueAtTime(0, t);
+    gainNode.gain.linearRampToValueAtTime(0.12, t + 0.015);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    osc.start(t);
+    osc.stop(t + duration);
+  }
+
+  function playSparseMelody() {
+    if (Math.random() < 0.6) {
+      const note = scale[Math.floor(Math.random() * scale.length)];
+      const octave = Math.random() < 0.25 ? 2 : 1;
+      playLyreNote(note * octave, 5.0);
+    }
+  }
+
+  sb.onclick = () => {
+    if (isPlaying) {
+      clearInterval(intervalId);
+      isPlaying = false;
+      sb.textContent = '🔊 Sonido zen: Apagado';
+    } else {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      isPlaying = true;
+      sb.textContent = '🔊 Sonido zen: Encendido';
+      playLyreNote(329.63, 5.0);
+      intervalId = setInterval(playSparseMelody, 3200);
+    }
+  };
+
+  const tabs=[...document.querySelectorAll('.tab')], views=[...document.querySelectorAll('.view')];
+  function show(v){
+    tabs.forEach(t=>t.setAttribute('aria-selected',t.dataset.v===v));
+    views.forEach(s=>s.classList.toggle('on',s.id===v));
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  tabs.forEach(t=>t.onclick=()=>show(t.dataset.v));
+  document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>show(b.dataset.goto));
+
+  const hrs=document.getElementById('hrs'), hrsv=document.getElementById('hrsv');
+  hrs.oninput=()=>hrsv.textContent=hrs.value+' h / sem';
+
+  document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>c.setAttribute('aria-pressed',c.getAttribute('aria-pressed')!=='true'));
+</script>

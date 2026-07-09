@@ -1,0 +1,12 @@
+{
+  "name": "mepreparo",
+  "short_name": "mepreparo",
+  "description": "Estudia con calma y prepara tu examen libre con un tutor que te conoce.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#5b8a72",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

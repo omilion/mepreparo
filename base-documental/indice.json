@@ -1,0 +1,502 @@
+[
+  {
+    "materia": "_bases_curriculares",
+    "curso": "1a6basico",
+    "tipo": "bases_curriculares",
+    "titulo_oficial": "Bases Curriculares Educación Básica 1° a 6° básico",
+    "anio": "2012",
+    "archivo_local": "_bases_curriculares/bases_1a6basico.pdf",
+    "url_oficial": "https://www.curriculumnacional.cl/614/articles-22394_bases.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_bases_curriculares",
+    "curso": "7basico_2medio",
+    "tipo": "bases_curriculares",
+    "titulo_oficial": "Bases Curriculares 7° básico a 2° medio",
+    "anio": "2015",
+    "archivo_local": "_bases_curriculares/bases_7basico_2medio.pdf",
+    "url_oficial": "https://www.curriculumnacional.cl/614/articles-34949_Bases.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "1basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 1basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_1basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_1deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "2basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 2basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_2basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_2deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "3basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 3basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_3basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_3deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "4basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 4basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_4basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_4deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "5basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 5basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_5basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_5deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "6basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 6basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_6basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_6deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "7basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 7basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_7basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_7deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "_temarios_examenes_libres",
+    "curso": "8basico",
+    "tipo": "temario_examen_libre",
+    "titulo_oficial": "Temario Exámenes de Validación de Estudios Básica 8basico",
+    "anio": "2026",
+    "archivo_local": "_temarios_examenes_libres/temario_8basico.pdf",
+    "url_oficial": "https://ayudamineduc.cl/sites/default/files/temario_basica_8deg_basico_uce_0.pdf",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "1basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Primer Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_1basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/363/MONO-60.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "2basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Segundo Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_2basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/374/MONO-90.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "3basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Tercer Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_3basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/385/MONO-91.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "4basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Cuarto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_4basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/396/MONO-92.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "5basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Quinto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_5basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/407/MONO-93.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "6basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Sexto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_6basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/418/MONO-94.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "7basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Septimo Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_7basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/429/MONO-95.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ciencias",
+    "curso": "8basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ciencias Naturales: Programa de estudio Octavo Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ciencias/programa_ciencias_8basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/440/MONO-96.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "1basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Primer Año Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_1basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/539/MONO-105.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "2basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Segundo Año Basico: Programas de Estudio Nivel Basico 1.",
+    "anio": "2016",
+    "archivo_local": "_bases_curriculares/programa_consolidado_2basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/14712/Basico_02.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "3basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Tercer Año Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_3basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/561/MONO-107.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "4basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Cuarto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_4basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/573/MONO-108.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "5basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Quinto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_5basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/584/MONO-109.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "6basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Sexto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_6basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/593/MONO-110.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "7basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Septimo Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_7basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/604/MONO-131.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "historia",
+    "curso": "8basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Historia, Geografia y Ciencias Sociales: Programa de estudio Octavo Basico.",
+    "anio": "2016",
+    "archivo_local": "historia/programa_historia_8basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/615/MONO-132.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ingles",
+    "curso": "1basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Programa de Estudio Ingles 1basico",
+    "anio": "Vigente",
+    "archivo_local": "ingles/programa_ingles_1basico.pdf",
+    "url_oficial": "https://www.curriculumnacional.cl",
+    "estado": "PENDIENTE-MANUAL"
+  },
+  {
+    "materia": "ingles",
+    "curso": "2basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Programa de Estudio Ingles 2basico",
+    "anio": "Vigente",
+    "archivo_local": "ingles/programa_ingles_2basico.pdf",
+    "url_oficial": "https://www.curriculumnacional.cl",
+    "estado": "PENDIENTE-MANUAL"
+  },
+  {
+    "materia": "ingles",
+    "curso": "3basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Programa de Estudio Ingles 3basico",
+    "anio": "Vigente",
+    "archivo_local": "ingles/programa_ingles_3basico.pdf",
+    "url_oficial": "https://www.curriculumnacional.cl",
+    "estado": "PENDIENTE-MANUAL"
+  },
+  {
+    "materia": "ingles",
+    "curso": "4basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Programa de Estudio Ingles 4basico",
+    "anio": "Vigente",
+    "archivo_local": "ingles/programa_ingles_4basico.pdf",
+    "url_oficial": "https://www.curriculumnacional.cl",
+    "estado": "PENDIENTE-MANUAL"
+  },
+  {
+    "materia": "ingles",
+    "curso": "5basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Idioma Extranjero: Ingles: Programa de estudio Quinto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "ingles/programa_ingles_5basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/624/MONO-133.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ingles",
+    "curso": "6basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Ingles: Programa de estudio Sexto Año Basico / NB4.",
+    "anio": "2016",
+    "archivo_local": "ingles/programa_ingles_6basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/421/MONO-350.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ingles",
+    "curso": "7basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Idioma Extranjero: Ingles: Programa de estudio Septimo Basico.",
+    "anio": "2016",
+    "archivo_local": "ingles/programa_ingles_7basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/629/MONO-135.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "ingles",
+    "curso": "8basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Idioma Extranjero: Ingles: Programa de estudio Octavo Basico.",
+    "anio": "2016",
+    "archivo_local": "ingles/programa_ingles_8basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/630/MONO-136.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "1basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Primer Año Basico: Programas de Estudio Nivel Basico 1.",
+    "anio": "2016",
+    "archivo_local": "_bases_curriculares/programa_consolidado_1basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/14711/Basico_01.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "2basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Lenguaje y Comunicacion: Programa de estudio Segundo Año Basico.",
+    "anio": "2016",
+    "archivo_local": "lenguaje/programa_lenguaje_2basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/633/MONO-138.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "3basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Lenguaje y Comunicacion: Programa de estudio Tercer Año Basico.",
+    "anio": "2016",
+    "archivo_local": "lenguaje/programa_lenguaje_3basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/634/MONO-139.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "4basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Cuarto Año Basico: Programas de Estudio Nivel Basico 2.",
+    "anio": "2016",
+    "archivo_local": "_bases_curriculares/programa_consolidado_4basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/14714/Basico_04.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "5basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Lenguaje y Comunicacion: Programa de estudio Quinto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "lenguaje/programa_lenguaje_5basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/636/MONO-141.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "6basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Lenguaje y Comunicacion: Programa de estudio Sexto Año Basico / NB4.",
+    "anio": "2016",
+    "archivo_local": "lenguaje/programa_lenguaje_6basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/411/MONO-341.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "7basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Lengua y Literatura: Programa de estudio Septimo Basico.",
+    "anio": "2016",
+    "archivo_local": "lenguaje/programa_lenguaje_7basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/638/MONO-143.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "lenguaje",
+    "curso": "8basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Lengua y Literatura: Programa de estudio Octavo Basico.",
+    "anio": "2016",
+    "archivo_local": "lenguaje/programa_lenguaje_8basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/639/MONO-144.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "1basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Primer Año Basico: Programas de Estudio Nivel Basico 1.",
+    "anio": "2016",
+    "archivo_local": "_bases_curriculares/programa_consolidado_1basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/14711/Basico_01.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "2basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Matematica: Programa de estudio Segundo Año Basico.",
+    "anio": "2016",
+    "archivo_local": "matematica/programa_matematica_2basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/641/MONO-146.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "3basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Matematica: Programa de estudio Tercer Año Basico.",
+    "anio": "2016",
+    "archivo_local": "matematica/programa_matematica_3basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/642/MONO-147.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "4basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Cuarto Año Basico: Programas de Estudio Nivel Basico 2.",
+    "anio": "2016",
+    "archivo_local": "_bases_curriculares/programa_consolidado_4basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/14714/Basico_04.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "5basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Matematica: Programa de estudio Quinto Año Basico.",
+    "anio": "2016",
+    "archivo_local": "matematica/programa_matematica_5basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/645/MONO-149.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "6basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Educacion Matematica: Programa de Estudio Sexto Año Basico / NB4.",
+    "anio": "2016",
+    "archivo_local": "matematica/programa_matematica_6basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/14715/6B_Matematicas.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "7basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Matematica: Programa de estudio Septimo Basico.",
+    "anio": "2016",
+    "archivo_local": "matematica/programa_matematica_7basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/647/MONO-151.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  },
+  {
+    "materia": "matematica",
+    "curso": "8basico",
+    "tipo": "programa_estudio",
+    "titulo_oficial": "Matematica: Programa de estudio Octavo Basico.",
+    "anio": "2016",
+    "archivo_local": "matematica/programa_matematica_8basico.pdf",
+    "url_oficial": "https://bibliotecadigital.mineduc.cl/bitstream/handle/20.500.12365/648/MONO-152.pdf?sequence=1&isAllowed=y",
+    "estado": "OK"
+  }
+]
