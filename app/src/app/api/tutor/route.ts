@@ -15,7 +15,7 @@ import {
 } from "@/lib/tutor/personaje";
 import { generar, tieneClave } from "@/lib/tutor/gemini";
 import { recuperar } from "@/lib/tutor/rag";
-import type { Curso, Materia } from "@/lib/profile";
+import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
 
 export const runtime = "nodejs"; // necesitamos fs para leer los chunks
@@ -23,8 +23,8 @@ export const runtime = "nodejs"; // necesitamos fs para leer los chunks
 type Turno = { de: "rai" | "nino"; texto: string };
 
 interface Body {
-  // "saludo" = Rai inicia (sin pregunta). "chat" = responde al niño.
-  accion: "saludo" | "chat";
+  // "saludo" = Rai inicia (sin pregunta). "chat" = responde al niño. "cerrar" = resume la tutoría.
+  accion: "saludo" | "chat" | "cerrar";
   // primera charla si no hay acuerdo; sesión recurrente si lo hay
   acuerdo?: AcuerdoTutoria | null;
   resumenPerfil: string;
@@ -48,6 +48,63 @@ export async function POST(req: NextRequest) {
 
   const esPrimera = !body.acuerdo;
   const accion = body.accion ?? "chat";
+
+  if (accion === "cerrar") {
+    const historialText = (body.historial || [])
+      .map((t) => `${t.de === "rai" ? "Rai" : "Niño"}: ${t.texto}`)
+      .join("\n");
+
+    const sistemaPrompt = `Eres un asistente del currículum escolar. Se te proporciona una conversación entre el tutor de estudio "Rai" y un niño.
+Debes generar un resumen de la sesión de estudio y extraer información clave del niño.
+Retorna un objeto JSON con el siguiente formato exacto:
+{
+  "titulo": "Título corto y descriptivo del tema principal de estudio (ej: Suma de fracciones, Comprensión lectora de fábulas, etc.)",
+  "resumen": "Resumen breve (1 a 3 frases en tercera persona y español simple) de lo que se trabajó, dónde se quedó y qué se debe reforzar.",
+  "nuevasNotas": "Información nueva descubierta sobre el niño (ej. le cuestan los denominadores, se distrae con facilidad, le gustan los dinosaurios, etc.). Si no hay nada nuevo, déjalo vacío. Máximo 150 caracteres."
+}`;
+
+    const defaultResp = {
+      titulo: `Sesión de ${body.materia ? (MATERIAS.find(m => m.id === body.materia)?.label ?? body.materia) : "estudio"}`,
+      resumen: "Se realizó una sesión de tutoría y repaso de materias.",
+      notasNino: body.acuerdo?.notasNino || "",
+    };
+
+    if (tieneClave()) {
+      try {
+        const cruda = await generar({
+          sistema: sistemaPrompt,
+          usuario: `Conversación de estudio:\n${historialText}`,
+          maxTokens: 400,
+          json: true,
+        });
+
+        const parsed = JSON.parse(cruda);
+        const nuevasNotas = parsed.nuevasNotas || "";
+        let notasFusionadas = body.acuerdo?.notasNino || "";
+        if (nuevasNotas.trim()) {
+          if (notasFusionadas) {
+            notasFusionadas = `${notasFusionadas} ${nuevasNotas.trim()}`;
+          } else {
+            notasFusionadas = nuevasNotas.trim();
+          }
+          if (notasFusionadas.length > 400) {
+            notasFusionadas = notasFusionadas.slice(0, 397) + "...";
+          }
+        }
+
+        return NextResponse.json({
+          titulo: parsed.titulo || defaultResp.titulo,
+          resumen: parsed.resumen || defaultResp.resumen,
+          notasNino: notasFusionadas,
+        });
+      } catch (e) {
+        console.error("Fallo al resumir sesión con Gemini:", e);
+        return NextResponse.json(defaultResp);
+      }
+    }
+
+    return NextResponse.json(defaultResp);
+  }
 
   if (accion === "chat" && !(body.pregunta || "").trim()) {
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
@@ -77,7 +134,7 @@ export async function POST(req: NextRequest) {
   let fuentes: string[] = [];
   let contexto = "";
   if (accion === "chat" && body.materia) {
-    const fragmentos = recuperar(body.pregunta!.trim(), {
+    const fragmentos = await recuperar(body.pregunta!.trim(), {
       materia: body.materia,
       curso: body.curso,
       k: 3,

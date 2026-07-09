@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { type PerfilNino } from "@/lib/profile";
 import { TUTOR } from "@/lib/tutor/personaje";
 import { resumenPerfil } from "@/lib/tutor/resumenPerfil";
-import { materiasDeHoy, type AcuerdoTutoria } from "@/lib/tutor/acuerdo";
+import { materiasDeHoy, diaDeHoy, type AcuerdoTutoria } from "@/lib/tutor/acuerdo";
 import { AuraOrb } from "./AuraOrb";
 import { TextoRevelado } from "./TextoRevelado";
 
@@ -41,6 +41,7 @@ export function Tutor({
   const [compacta, setCompacta] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
+  const inicioSesion = useRef(Date.now());
 
   function scrollAlFinal() {
     requestAnimationFrame(() =>
@@ -161,13 +162,87 @@ export function Tutor({
     onGuardarPerfil?.({ ...perfil, tutoria: nuevo });
   }
 
+  // Al salir de la tutoría, cerramos sesión de forma estructurada si hubo interacción
+  async function manejarVolver() {
+    const turnosNino = mensajes.filter((m) => m.de === "nino").length;
+    // Si no hay acuerdo o el niño conversó menos de 2 turnos, no guardamos sesión
+    if (turnosNino < 2 || !acuerdo) {
+      onVolver();
+      return;
+    }
+
+    setCargando(true);
+    const duracionMin = Math.max(1, Math.round((Date.now() - inicioSesion.current) / 60000));
+    const nMensajes = mensajes.length;
+
+    try {
+      const res = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...cuerpoBase(),
+          accion: "cerrar",
+          materia,
+          historial: historialPlano(),
+        }),
+      });
+
+      const data = await res.json();
+      const nuevaSesion = {
+        fecha: new Date().toISOString(),
+        duracionMin,
+        dia: diaDeHoy(),
+        materia,
+        titulo: data.titulo || `Sesión de ${materia}`,
+        resumen: data.resumen || "Se realizó una sesión de tutoría.",
+        nMensajes,
+      };
+
+      const nuevasSesiones = [...(acuerdo.sesiones || []), nuevaSesion];
+      const tutoriaActualizada = {
+        ...acuerdo,
+        notasNino: data.notasNino || acuerdo.notasNino,
+        sesiones: nuevasSesiones,
+      };
+
+      onGuardarPerfil?.({
+        ...perfil,
+        tutoria: tutoriaActualizada,
+      });
+    } catch (e) {
+      console.error("Error al cerrar la sesión:", e);
+      // Fallback: guardar la sesión localmente con datos genéricos
+      const nuevaSesion = {
+        fecha: new Date().toISOString(),
+        duracionMin,
+        dia: diaDeHoy(),
+        materia,
+        titulo: `Sesión de ${materia}`,
+        resumen: "Se realizó una sesión de tutoría.",
+        nMensajes,
+      };
+      const nuevasSesiones = [...(acuerdo.sesiones || []), nuevaSesion];
+      const tutoriaActualizada = {
+        ...acuerdo,
+        sesiones: nuevasSesiones,
+      };
+      onGuardarPerfil?.({
+        ...perfil,
+        tutoria: tutoriaActualizada,
+      });
+    } finally {
+      setCargando(false);
+      onVolver();
+    }
+  }
+
   return (
     <div className="mx-auto flex h-screen max-w-zen flex-col px-[22px]">
       {/* barra mínima: solo volver. Pantalla inmersiva, sin logo ni ajustes. */}
       <div className="flex items-center py-2">
         <button
           type="button"
-          onClick={onVolver}
+          onClick={manejarVolver}
           aria-label="Volver"
           className="flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink"
         >

@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Curso, Materia } from "@/lib/profile";
+import { obtenerEmbedding } from "./gemini";
 
 interface Chunk {
   id: string;
@@ -18,7 +19,14 @@ interface Chunk {
   fuente_archivo: string;
   pagina: number;
   texto: string;
+  embedding?: number[];
+  // Solo los chunks migrados por upgrade_embeddings.py traen este marcador.
+  // Los antiguos (bag-of-words) tienen embedding pero NO sirven para coseno
+  // contra text-embedding-004: son espacios vectoriales distintos.
+  modeloEmbedding?: string;
 }
+
+const MODELO_REAL = "text-embedding-004";
 
 let CHUNKS: Chunk[] | null = null;
 
@@ -27,7 +35,7 @@ function rutaChunks(): string {
   return path.join(process.cwd(), "..", "base-documental", "_rag", "chunks.jsonl");
 }
 
-// Carga perezosa y cacheada. Ignora el campo embedding (no lo necesitamos aquí).
+// Carga perezosa y cacheada.
 function cargarChunks(): Chunk[] {
   if (CHUNKS) return CHUNKS;
   const ruta = rutaChunks();
@@ -46,6 +54,8 @@ function cargarChunks(): Chunk[] {
           fuente_archivo: o.fuente_archivo,
           pagina: o.pagina,
           texto: o.texto,
+          embedding: Array.isArray(o.embedding) ? o.embedding : undefined,
+          modeloEmbedding: o.modelo_embedding,
         });
       } catch {
         /* línea corrupta: se ignora */
@@ -75,6 +85,20 @@ function terminos(texto: string): string[] {
     .filter((t) => t.length > 2 && !STOP.has(t));
 }
 
+function similitudCoseno(a: number[], b: number[]): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 export interface FragmentoRag {
   texto: string;
   fuente: string; // p.ej. "Programa Matemática 5° · pág 12"
@@ -84,33 +108,67 @@ export interface FragmentoRag {
 
 // Devuelve hasta `k` fragmentos relevantes para la consulta, priorizando la
 // materia/curso del niño y los temarios de examen (lo que se evalúa).
-export function recuperar(
+// Ahora es asíncrona porque realiza una consulta a la API de embeddings de Gemini.
+export async function recuperar(
   consulta: string,
   opts: { materia?: Materia; curso?: Curso; k?: number } = {}
-): FragmentoRag[] {
+): Promise<FragmentoRag[]> {
   const chunks = cargarChunks();
   if (chunks.length === 0) return [];
 
   const k = opts.k ?? 3;
-  const q = new Set(terminos(consulta));
-  if (q.size === 0) return [];
+  const q = terminos(consulta);
+  if (q.length === 0) return [];
+
+  // Solo cuentan como vectoriales los chunks MIGRADOS al modelo real. Los
+  // embeddings antiguos (bag-of-words) no son comparables con el vector de la
+  // consulta: usarlos rompería el RAG (similitudes ≈ ruido → 0 resultados).
+  const hayVectoresReales = chunks.some(
+    (c) => c.modeloEmbedding === MODELO_REAL && c.embedding && c.embedding.length > 0
+  );
+
+  // No gastamos la llamada de embedding si aún no hay chunks migrados.
+  let queryVector: number[] | null = null;
+  if (hayVectoresReales) {
+    try {
+      queryVector = await obtenerEmbedding(consulta);
+    } catch (e) {
+      console.error("Fallo al obtener embedding para RAG, cayendo a búsqueda de texto:", e);
+    }
+  }
+
+  const usarVectores = queryVector !== null;
 
   const puntuados = chunks.map((c) => {
-    // filtro suave: fuera de materia puntúa mucho menos, pero no se descarta
-    let bonus = 0;
-    if (opts.materia && c.materia === opts.materia) bonus += 3;
-    if (opts.curso && c.curso === opts.curso) bonus += 2;
-    if (c.tipo === "temario_examen_libre") bonus += 1; // lo evaluado pesa más
-
-    const t = terminos(c.texto);
+    let score = 0;
     let hits = 0;
-    for (const term of t) if (q.has(term)) hits++;
-    const score = hits + bonus;
+
+    // Filtros de materia/curso/temario (boosts)
+    let bonus = 0;
+    if (opts.materia && c.materia === opts.materia) bonus += 0.3;
+    if (opts.curso && c.curso === opts.curso) bonus += 0.2;
+    if (c.tipo === "temario_examen_libre") bonus += 0.1;
+
+    if (usarVectores && c.modeloEmbedding === MODELO_REAL && c.embedding && c.embedding.length > 0) {
+      const sim = similitudCoseno(queryVector!, c.embedding);
+      score = sim + bonus;
+      hits = sim > 0.35 ? 1 : 0;
+    } else {
+      // Fallback a solapamiento de términos
+      const setQ = new Set(q);
+      const t = terminos(c.texto);
+      let localHits = 0;
+      for (const term of t) if (setQ.has(term)) localHits++;
+      const matchScore = localHits / Math.max(1, setQ.size);
+      score = matchScore + bonus * 3;
+      hits = localHits;
+    }
+
     return { c, score, hits };
   });
 
   return puntuados
-    .filter((p) => p.hits > 0) // debe compartir al menos un término real
+    .filter((p) => p.hits > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, k)
     .map(({ c }) => ({

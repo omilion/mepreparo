@@ -20,3 +20,6 @@ base-documental/_rag/*.jsonl
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# artefactos de build de TS
+*.tsbuildinfo

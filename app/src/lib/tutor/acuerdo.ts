@@ -20,10 +20,13 @@ export const DIAS: { id: Dia; label: string; corto: string }[] = [
 
 // Resumen de UNA sesión, para que Rai recuerde de qué hablaron la vez pasada.
 export interface SesionTutoria {
-  fecha: string; // ISO date-time del inicio de la sesión
-  dia: Dia;
-  materia?: Materia; // ramo trabajado ese día, si aplica
-  resumen: string; // 1-2 frases: qué hicieron, dónde quedaron, qué reforzar
+  fecha: string;        // ISO datetime de inicio
+  duracionMin: number;  // duración real de la sesión
+  dia: Dia;             // lun..dom
+  materia: Materia;     // asignatura trabajada
+  titulo: string;       // ej. "Suma de fracciones con distinto denominador"
+  resumen: string;      // 1-3 frases: qué se hizo, dónde quedó, qué reforzar
+  nMensajes: number;    // largo de la interacción (métrica de costo/uso)
 }
 
 export interface AcuerdoTutoria {

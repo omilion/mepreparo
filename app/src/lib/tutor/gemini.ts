@@ -17,6 +17,7 @@ export async function generar(opts: {
   sistema: string;
   usuario: string;
   maxTokens?: number;
+  json?: boolean;
 }): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("SIN_CLAVE");
@@ -29,6 +30,7 @@ export async function generar(opts: {
       // respuestas concisas => menos tokens (cap del "middle")
       maxOutputTokens: opts.maxTokens ?? 300,
       temperature: 0.6,
+      ...(opts.json ? { responseMimeType: "application/json" } : {}),
       // gemini-2.5-flash es "thinking": sin límite, el razonamiento se come el
       // presupuesto y el texto sale truncado. Para un tutor breve no hace falta
       // pensar mucho: dejamos un presupuesto pequeño y fijo.
@@ -64,4 +66,44 @@ export async function generar(opts: {
     "";
   if (!texto) throw new Error("GEMINI_RESPUESTA_VACIA");
   return texto.trim();
+}
+
+// Obtiene el embedding vectorial de un texto usando el modelo text-embedding-004.
+export async function obtenerEmbedding(texto: string): Promise<number[]> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("SIN_CLAVE");
+
+  const url = `${BASE}/text-embedding-004:embedContent?key=${key}`;
+  const body = {
+    content: {
+      parts: [{ text: texto }]
+    }
+  };
+
+  let res: Response | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) break;
+    if (res.status === 503 || res.status === 429) {
+      await new Promise((r) => setTimeout(r, 500 * (intento + 1)));
+      continue;
+    }
+    break;
+  }
+
+  if (!res || !res.ok) {
+    const detalle = res ? await res.text().catch(() => "") : "sin respuesta";
+    throw new Error(`GEMINI_EMBEDDING_${res?.status ?? "NA"}: ${detalle.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const values = data?.embedding?.values;
+  if (!values || !Array.isArray(values)) {
+    throw new Error("GEMINI_EMBEDDING_FORMAT_ERROR");
+  }
+  return values;
 }

@@ -1,19 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
-import BANCO_PREGUNTAS from "@/lib/diagnostico/banco.json";
 import {
   iniciarDiag,
-  siguientePregunta,
   responder,
   terminado,
   resultado,
 } from "@/lib/diagnostico/motor";
-import type { BancoPreguntas, ResultadoMateria } from "@/lib/diagnostico/tipos";
+import type { Pregunta, ResultadoMateria } from "@/lib/diagnostico/tipos";
 import { Reveal } from "./Reveal";
-
-const banco = BANCO_PREGUNTAS as BancoPreguntas;
 
 const D_TITULO = 80;
 const D_CUERPO = 950;
@@ -31,36 +27,96 @@ export function DiagnosticoMateria({
   onListo: (r: ResultadoMateria) => void;
 }) {
   const [estado, setEstado] = useState(() =>
-    iniciarDiag(banco, materia, curso)
+    iniciarDiag([], materia, curso)
   );
   const [preguntaNo, setPreguntaNo] = useState(1);
+  const [pregunta, setPregunta] = useState<Omit<Pregunta, "correcta"> | null>(null);
+  const [token, setToken] = useState("");
+  const [cargando, setCargando] = useState(true);
 
   const materiaLabel = MATERIAS.find((m) => m.id === materia)?.label ?? materia;
-  const pregunta = useMemo(() => siguientePregunta(estado), [estado]);
   const stepKey = estado.hechas.length;
 
-  function elegir(opcion: number) {
-    if (!pregunta) return;
-    const nuevoEstado = responder(estado, pregunta, opcion);
-    if (terminado(nuevoEstado)) {
-      onListo(resultado(nuevoEstado));
-    } else {
-      setEstado(nuevoEstado);
-      setPreguntaNo((n) => n + 1);
+  useEffect(() => {
+    async function obtenerPregunta() {
+      setCargando(true);
+      try {
+        const excluir = Array.from(estado.usadasIds).join(",");
+        const url = `/api/diagnostico/pregunta?materia=${materia}&curso=${curso}&dificultad=${estado.dificultad}&excluir=${excluir}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.pregunta) {
+          setPregunta(data.pregunta);
+          setToken(data.token);
+        } else {
+          // Si no hay más preguntas, terminar diagnóstico con el estado actual
+          onListo(resultado(estado));
+        }
+      } catch (err) {
+        console.error("Error al obtener la pregunta del diagnóstico:", err);
+      } finally {
+        setCargando(false);
+      }
     }
+
+    obtenerPregunta();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado.usadasIds.size]);
+
+  async function elegir(opcion: number) {
+    if (!pregunta || !token || cargando) return;
+    setCargando(true);
+
+    try {
+      const res = await fetch("/api/diagnostico/responder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preguntaId: pregunta.id,
+          indice: opcion,
+          token,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const nuevoEstado = responder(estado, pregunta, data.acierto);
+        if (terminado(nuevoEstado)) {
+          onListo(resultado(nuevoEstado));
+        } else {
+          setEstado(nuevoEstado);
+          setPreguntaNo((n) => n + 1);
+        }
+      } else {
+        console.error("Error del servidor al evaluar respuesta:", data.error);
+      }
+    } catch (err) {
+      console.error("Error de red al enviar respuesta:", err);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  if (cargando && !pregunta) {
+    return (
+      <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen items-center justify-center px-[22px]">
+        <p className="text-ink-soft">Preparando pregunta…</p>
+      </div>
+    );
   }
 
   if (!pregunta) {
     return (
       <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen items-center justify-center px-[22px]">
-        <p className="text-ink-soft">Preparando…</p>
+        <p className="text-ink-soft">Finalizando diagnóstico…</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col px-[22px] pb-20">
-      {/* avance dentro de la materia (aprox, sin delatar dificultad) */}
+      {/* avance dentro de la materia */}
       <div className="flex h-12 items-center justify-center gap-1.5" aria-hidden>
         {Array.from({ length: 8 }).map((_, i) => (
           <span
@@ -101,7 +157,8 @@ export function DiagnosticoMateria({
                 key={i}
                 type="button"
                 onClick={() => elegir(i)}
-                className="flex items-center gap-3 rounded-xl border border-hair bg-transparent px-4 py-3.5 text-[15px] text-ink transition-colors hover:border-sage"
+                disabled={cargando}
+                className="flex items-center gap-3 rounded-xl border border-hair bg-transparent px-4 py-3.5 text-[15px] text-ink transition-colors hover:border-sage disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="flex h-6 w-6 flex-none items-center justify-center rounded-md border border-hair font-mono text-[12px] text-ink-soft">
                   {String.fromCharCode(65 + i)}

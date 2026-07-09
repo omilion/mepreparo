@@ -91,27 +91,26 @@ export function barajarOpciones(p: Pregunta): Pregunta {
 // Registra la respuesta y ajusta la dificultad. Devuelve el estado nuevo.
 export function responder(
   e: EstadoDiag,
-  pregunta: Pregunta,
-  opcionElegida: number
+  pregunta: Omit<Pregunta, "correcta">,
+  acierto: boolean
 ): EstadoDiag {
-  const acierto = opcionElegida === pregunta.correcta;
   const usadasIds = new Set(e.usadasIds);
   usadasIds.add(pregunta.id);
 
   return {
     ...e,
     dificultad: clampDificultad(e.dificultad + (acierto ? 1 : -1)),
-    hechas: [...e.hechas, pregunta],
+    hechas: [...e.hechas, { ...pregunta, correcta: -1 } as Pregunta],
     aciertos: [...e.aciertos, acierto],
     usadasIds,
   };
 }
 
 // ¿Terminó el diagnóstico de esta materia?
-export function terminado(e: EstadoDiag): boolean {
+export function terminado(e: EstadoDiag, sinMasPreguntas = false): boolean {
   const n = e.hechas.length;
   if (n >= MAX_PREGUNTAS) return true;
-  if (siguientePregunta(e) === null) return true; // sin más preguntas
+  if (sinMasPreguntas) return true;
   if (n < MIN_PREGUNTAS) return false;
 
   // Estabilización: si las últimas 3 respuestas alternan (acierto/fallo),
