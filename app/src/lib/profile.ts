@@ -81,6 +81,7 @@ export interface PerfilNino {
     intereses: string[];
     estilos: string[]; // cómo aprende mejor
     notas?: string;
+    pin?: string; // PIN de 3 dígitos para acceso rápido del alumno
   };
   // Se llena en Fase 2 (diagnóstico). Vacío al crear el perfil.
   diagnostico?: Partial<Record<Materia, DiagnosticoMateria>>;

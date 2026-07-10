@@ -31,6 +31,9 @@ import {
   guardarPupilo,
   borrarCuenta,
   sincronizarConServidor,
+  leerSesionAlumno,
+  borrarSesionAlumno,
+  type SesionAlumno,
 } from "@/lib/storage";
 import {
   nuevaCuenta,
@@ -40,6 +43,7 @@ import {
   type PerfilNino,
 } from "@/lib/profile";
 import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
+import { PinScreen } from "@/components/PinScreen";
 
 type Etapa =
   | "cargando"
@@ -70,6 +74,10 @@ export default function Home() {
   const [modoAuth, setModoAuth] = useState<"login" | "registro">("registro");
   // etapa del camino en foco (para la lección con Rai o la prueba)
   const [foco, setFoco] = useState<{ materia: Materia; tema: string } | null>(null);
+  
+  // Estado para el modo alumno
+  const [sesionAlumno, setSesionAlumno] = useState<SesionAlumno | null>(null);
+  const [pinBloqueado, setPinBloqueado] = useState(false);
 
   // Escuchar eventos de sincronización en segundo plano para actualizar el estado React
   useEffect(() => {
@@ -87,6 +95,29 @@ export default function Home() {
   useEffect(() => {
     if (isPending) {
       setEtapa("cargando");
+      return;
+    }
+
+    // Priorizar sesión de alumno si está activa localmente (Modo Alumno)
+    const alumno = leerSesionAlumno();
+    if (alumno) {
+      setSesionAlumno(alumno);
+      const c = leerCuenta();
+      if (c && c.pupilos.length > 0) {
+        setCuenta(c);
+        setEnfocado(0);
+        const p = c.pupilos[0];
+        setPinBloqueado(!!alumno.pin);
+        
+        // Redirigir a la etapa adecuada del alumno
+        if (!configuracionCompleta(p)) setEtapa("wizard");
+        else if (!tieneDiagnostico(p)) setEtapa("diagnostico");
+        else setEtapa("plan");
+      } else {
+        // Fallback si la cuenta simulada se perdió
+        borrarSesionAlumno();
+        setEtapa("landing");
+      }
       return;
     }
 
@@ -208,6 +239,14 @@ export default function Home() {
     setEtapa("auth");
   }
 
+  function alSalirModoAlumno() {
+    borrarSesionAlumno();
+    borrarCuenta();
+    setSesionAlumno(null);
+    setCuenta(null);
+    setEtapa("landing");
+  }
+
   // --- modo desarrollo: carga de datos de prueba y saltos directos ---
   function cargarPrueba() {
     const c = cuentaDePrueba();
@@ -243,12 +282,26 @@ export default function Home() {
     etapa !== "demo" &&
     etapa !== "cargando";
 
+  // Si el alumno tiene PIN y la sesión está bloqueada, renderizar SÓLO la pantalla del PIN
+  if (sesionAlumno && pinBloqueado) {
+    return (
+      <PinScreen
+        nombre={sesionAlumno.nombre}
+        pinCorrecto={sesionAlumno.pin || ""}
+        onUnlock={() => setPinBloqueado(false)}
+        onSalir={alSalirModoAlumno}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen">
       {mostrarTopBar && (
         <TopBar
-          onHome={irAlPanel}
-          onCuenta={() => setEtapa("cuenta")}
+          onHome={sesionAlumno ? undefined : irAlPanel}
+          onCuenta={sesionAlumno ? undefined : () => setEtapa("cuenta")}
+          onLock={sesionAlumno && sesionAlumno.pin ? () => setPinBloqueado(true) : undefined}
+          nombreAlumno={sesionAlumno ? sesionAlumno.nombre : undefined}
         />
       )}
 
@@ -319,6 +372,10 @@ export default function Home() {
           cuenta={cuenta}
           onEntrar={entrarAPupilo}
           onAgregar={agregarHijo}
+          onActualizarPupilo={(p) => {
+            const actualizada = guardarPupilo(cuenta, p);
+            setCuenta(actualizada);
+          }}
         />
       )}
 

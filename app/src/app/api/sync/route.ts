@@ -3,19 +3,40 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db/db";
 import { pupilos as pupilosTable, sesiones as sesionesTable } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { PerfilNino } from "@/lib/profile";
+import { verifyStudentToken } from "@/lib/auth-student";
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  let isStudentMode = false;
+  let studentPupiloId: string | null = null;
+
+  // 1. Intentar obtener sesión del apoderado
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (session) {
+    userId = session.user.id;
+  } else {
+    // 2. Si no hay apoderado, verificar token de alumno
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const payload = verifyStudentToken(token);
+      if (payload) {
+        userId = payload.cuentaId;
+        studentPupiloId = payload.pupiloId;
+        isStudentMode = true;
+      } else {
+        return NextResponse.json({ error: "Token de alumno inválido o expirado" }, { status: 401 });
+      }
+    } else {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
   }
 
-  const userId = session.user.id;
   let body: { pupilos: PerfilNino[] };
 
   try {
@@ -25,6 +46,13 @@ export async function POST(req: NextRequest) {
   }
 
   const clientPupilos = body.pupilos || [];
+
+  // En modo alumno, validar que solo se sincronice a sí mismo
+  if (isStudentMode && studentPupiloId) {
+    if (clientPupilos.length !== 1 || clientPupilos[0].id !== studentPupiloId) {
+      return NextResponse.json({ error: "Acceso denegado: modo alumno restringido" }, { status: 403 });
+    }
+  }
 
   try {
     // 1. Obtener todos los pupilos existentes en la BD para este usuario
@@ -102,11 +130,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Obtener lista actualizada definitiva de pupilos de este usuario en la BD
-    const listFinal = await db
-      .select()
-      .from(pupilosTable)
-      .where(eq(pupilosTable.cuentaId, userId));
+    // 2. Obtener lista actualizada definitiva de pupilos en la BD
+    const listFinal = isStudentMode && studentPupiloId
+      ? await db
+          .select()
+          .from(pupilosTable)
+          .where(and(eq(pupilosTable.cuentaId, userId), eq(pupilosTable.id, studentPupiloId)))
+      : await db
+          .select()
+          .from(pupilosTable)
+          .where(eq(pupilosTable.cuentaId, userId));
 
     const finalPupilos: PerfilNino[] = listFinal.map((p) => ({
       id: p.id,

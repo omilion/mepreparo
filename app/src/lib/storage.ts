@@ -6,6 +6,36 @@
 import type { Cuenta, PerfilNino } from "./profile";
 
 const KEY = "mp-cuenta";
+const ALUMNO_KEY = "mp-alumno-sesion";
+
+export interface SesionAlumno {
+  token: string;
+  cuentaId: string;
+  pupiloId: string;
+  nombre: string;
+  pin?: string;
+}
+
+export function leerSesionAlumno(): SesionAlumno | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(ALUMNO_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SesionAlumno;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarSesionAlumno(sesion: SesionAlumno): void {
+  if (!disponible()) return;
+  window.localStorage.setItem(ALUMNO_KEY, JSON.stringify(sesion));
+}
+
+export function borrarSesionAlumno(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(ALUMNO_KEY);
+}
 
 function disponible(): boolean {
   return typeof window !== "undefined" && !!window.localStorage;
@@ -40,16 +70,38 @@ export function borrarCuenta(): void {
 export async function sincronizarConServidor(cuenta: Cuenta): Promise<Cuenta> {
   if (!disponible()) return cuenta;
   try {
+    const headersInit: Record<string, string> = { "Content-Type": "application/json" };
+    
+    // Si estamos en sesión de alumno, añadir el token en el Header
+    const sesionAlumno = leerSesionAlumno();
+    if (sesionAlumno?.token) {
+      headersInit["Authorization"] = `Bearer ${sesionAlumno.token}`;
+    }
+
     const res = await fetch("/api/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headersInit,
       body: JSON.stringify({ pupilos: cuenta.pupilos }),
     });
+
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.pupilos)) {
-        const cuentaActualizada = { ...cuenta, pupilos: data.pupilos };
+        let nuevosPupilos = data.pupilos;
+        
+        // Si es alumno, mezclar con cuidado para no pisar hermanos en el storage local
+        if (sesionAlumno?.token) {
+          const actual = cuenta.pupilos;
+          const nuevos = data.pupilos as PerfilNino[];
+          nuevosPupilos = actual.map((p) => {
+            const upd = nuevos.find((n) => n.id === p.id);
+            return upd ? upd : p;
+          });
+        }
+        
+        const cuentaActualizada = { ...cuenta, pupilos: nuevosPupilos };
         guardarCuenta(cuentaActualizada);
+        
         // Notificar a las pantallas que se completó una sincronización de fondo
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("sync-completed"));
