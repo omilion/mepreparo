@@ -4,7 +4,15 @@ import { useCallback, useEffect, useRef, useState, memo } from "react";
 import { type PerfilNino } from "@/lib/profile";
 import { TUTOR } from "@/lib/tutor/personaje";
 import { resumenPerfil } from "@/lib/tutor/resumenPerfil";
-import { materiasDeHoy, diaDeHoy, type AcuerdoTutoria } from "@/lib/tutor/acuerdo";
+import {
+  materiasDeHoy,
+  diaDeHoy,
+  aplicarCierre,
+  sembrarTemasDesdeDiagnostico,
+  type AcuerdoTutoria,
+  type TemaTrabajado,
+  type RecuerdoNino,
+} from "@/lib/tutor/acuerdo";
 import { AuraOrb } from "./AuraOrb";
 import { TextoRevelado } from "./TextoRevelado";
 
@@ -168,14 +176,17 @@ export function Tutor({
   }
 
   // Si Rai cerró el acuerdo de horario, lo guardamos en el perfil.
+  // Al crearlo, sembramos la memoria por tema desde el diagnóstico: así Rai
+  // sabe desde el día 1 qué le cuesta al niño ("brecha detectada").
   function quizasGuardarHorario(horario?: AcuerdoTutoria["horario"]) {
     if (!horario || perfil.tutoria) return; // solo la primera vez
-    const nuevo: AcuerdoTutoria = {
+    const base: AcuerdoTutoria = {
       creadoEn: new Date().toISOString(),
       horario,
       notasNino: "",
       sesiones: [],
     };
+    const nuevo = sembrarTemasDesdeDiagnostico(base, perfil.diagnostico);
     onGuardarPerfil?.({ ...perfil, tutoria: nuevo });
   }
 
@@ -215,11 +226,16 @@ export function Tutor({
         nMensajes,
       };
 
-      const nuevasSesiones = [...(acuerdo.sesiones || []), nuevaSesion];
-      const tutoriaActualizada = {
-        ...acuerdo,
+      // fusiona la memoria por tema + recuerdos que reportó el cierre
+      const conMemoria = aplicarCierre(acuerdo, {
+        temasTrabajados: (data.temasTrabajados ?? []) as TemaTrabajado[],
+        recuerdos: (data.recuerdos ?? []) as Omit<RecuerdoNino, "fecha">[],
+      });
+
+      const tutoriaActualizada: AcuerdoTutoria = {
+        ...conMemoria,
         notasNino: data.notasNino || acuerdo.notasNino,
-        sesiones: nuevasSesiones,
+        sesiones: [...(acuerdo.sesiones || []), nuevaSesion],
       };
 
       onGuardarPerfil?.({

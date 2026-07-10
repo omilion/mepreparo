@@ -2,7 +2,7 @@
 // Vive aquí para tenerlo en un solo lugar (fácil de ajustar).
 
 import { CURSOS, MATERIAS, type Materia } from "@/lib/profile";
-import { DIAS, type AcuerdoTutoria } from "./acuerdo";
+import { DIAS, memoriaParaHoy, textoMemoria, type AcuerdoTutoria } from "./acuerdo";
 
 export const TUTOR = {
   nombre: "Rai",
@@ -83,6 +83,9 @@ export function sistemaSesion(
       ? `Hoy toca: ${materiasHoy.map(nombreMateria).join(" y ")}.`
       : "Hoy no hay ramo asignado en el horario; puedes proponerle repasar algo pendiente o descansar.";
 
+  // memoria selectiva: temas y recuerdos relevantes para la materia de hoy
+  const memoria = textoMemoria(memoriaParaHoy(acuerdo, materiasHoy));
+
   return (
     TUTOR.sistema +
     "\n\nYA CONOCES a este niño y tienen un horario acordado. " +
@@ -92,7 +95,15 @@ export function sistemaSesion(
       ? `La vez pasada (${ultima.fecha.slice(0, 10)}) quedaron así: ${ultima.resumen}. ` +
         "Retoma desde ahí. "
       : "") +
-    (acuerdo.notasNino ? `Recuerda sobre él: ${acuerdo.notasNino}. ` : "") +
+    (memoria
+      ? `\nMEMORIA del niño (temas con su estado y cosas que él mismo dijo): ${memoria}. ` +
+        "Usa esta memoria con cariño y naturalidad: si el tema de hoy se relaciona con algo " +
+        "que ya superó, recuérdaselo citando sus propias palabras para darle confianza " +
+        "(ej: 'recuerdas que las fracciones te costaban y las lograste; esto es parecido'). " +
+        "Si un tema le cuesta, retómalo con paciencia y sin presión. No inventes recuerdos " +
+        "que no estén en la memoria. "
+      : "") +
+    (acuerdo.notasNino ? `Notas previas: ${acuerdo.notasNino}. ` : "") +
     "Saluda recordando de qué hablaron la última vez y propón con cariño empezar con lo que " +
     "toca hoy, pero sé flexible si prefiere otro ramo. Frases cortas. " +
     `Contexto: ${resumen}`

@@ -66,19 +66,29 @@ export async function POST(req: NextRequest) {
       .map((t) => `${t.de === "rai" ? "Rai" : "Niño"}: ${t.texto}`)
       .join("\n");
 
+    const materiaSesion = body.materia || "matematica";
     const sistemaPrompt = `Eres un asistente del currículum escolar. Se te proporciona una conversación entre el tutor de estudio "Rai" y un niño.
-Debes generar un resumen de la sesión de estudio y extraer información clave del niño.
+Debes generar un resumen de la sesión y extraer la MEMORIA pedagógica del niño.
+REGLA DE PRIVACIDAD ESTRICTA: las frases del niño que registres deben ser SOLO sobre el estudio (qué le cuesta, qué le gusta aprender, cómo se sintió estudiando). NUNCA registres datos de familia, salud, ubicación ni vida personal.
 Retorna un objeto JSON con el siguiente formato exacto:
 {
-  "titulo": "Título corto y descriptivo del tema principal de estudio (ej: Suma de fracciones, Comprensión lectora de fábulas, etc.)",
-  "resumen": "Resumen breve (1 a 3 frases en tercera persona y español simple) de lo que se trabajó, dónde se quedó y qué se debe reforzar.",
-  "nuevasNotas": "Información nueva descubierta sobre el niño (ej. le cuestan los denominadores, se distrae con facilidad, le gustan los dinosaurios, etc.). Si no hay nada nuevo, déjalo vacío. Máximo 150 caracteres."
-}`;
+  "titulo": "Título corto del tema principal (ej: Suma de fracciones)",
+  "resumen": "1 a 3 frases en tercera persona: qué se trabajó, dónde se quedó, qué reforzar.",
+  "temasTrabajados": [
+    { "tema": "nombre corto del tema en minúsculas (ej: fracciones)", "materia": "${materiaSesion}", "resultado": "avanzo | le_costo | supero", "fraseDelNino": "frase TEXTUAL del niño sobre ese tema si dijo algo revelador, si no omítela" }
+  ],
+  "recuerdos": [
+    { "tipo": "gusto | dificultad | logro | emocional", "texto": "observación breve con las palabras del niño si las hay (ej: dijo 'las fracciones se me hacen difíciles')", "tema": "tema relacionado o omitir" }
+  ]
+}
+Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (solo si hubo algo memorable).`;
 
     const defaultResp = {
       titulo: `Sesión de ${body.materia ? (MATERIAS.find(m => m.id === body.materia)?.label ?? body.materia) : "estudio"}`,
       resumen: "Se realizó una sesión de tutoría y repaso de materias.",
       notasNino: body.acuerdo?.notasNino || "",
+      temasTrabajados: [],
+      recuerdos: [],
     };
 
     if (tieneClave()) {
@@ -87,29 +97,44 @@ Retorna un objeto JSON con el siguiente formato exacto:
         const cruda = await generar({
           sistema: sistemaPrompt,
           usuario: `Conversación de estudio:\n${historialText}`,
-          maxTokens: 400,
+          maxTokens: 520,
           json: true,
           model: MODELO_LITE,
         });
 
         const parsed = JSON.parse(cruda);
-        const nuevasNotas = parsed.nuevasNotas || "";
-        let notasFusionadas = body.acuerdo?.notasNino || "";
-        if (nuevasNotas.trim()) {
-          if (notasFusionadas) {
-            notasFusionadas = `${notasFusionadas} ${nuevasNotas.trim()}`;
-          } else {
-            notasFusionadas = nuevasNotas.trim();
-          }
-          if (notasFusionadas.length > 400) {
-            notasFusionadas = notasFusionadas.slice(0, 397) + "...";
-          }
-        }
+
+        // saneo: solo resultados válidos y materia conocida
+        const temasTrabajados = (Array.isArray(parsed.temasTrabajados) ? parsed.temasTrabajados : [])
+          .filter(
+            (t: { tema?: string; resultado?: string }) =>
+              t?.tema && ["avanzo", "le_costo", "supero"].includes(t.resultado || "")
+          )
+          .map((t: { tema: string; materia?: string; resultado: string; fraseDelNino?: string }) => ({
+            tema: String(t.tema).toLowerCase().trim(),
+            materia: MATERIAS.some((m) => m.id === t.materia) ? t.materia : materiaSesion,
+            resultado: t.resultado,
+            fraseDelNino: t.fraseDelNino ? String(t.fraseDelNino).slice(0, 140) : undefined,
+          }));
+
+        const recuerdos = (Array.isArray(parsed.recuerdos) ? parsed.recuerdos : [])
+          .filter(
+            (r: { tipo?: string; texto?: string }) =>
+              r?.texto && ["gusto", "dificultad", "logro", "emocional"].includes(r.tipo || "")
+          )
+          .map((r: { tipo: string; texto: string; tema?: string }) => ({
+            tipo: r.tipo,
+            texto: String(r.texto).slice(0, 180),
+            tema: r.tema ? String(r.tema).toLowerCase().trim() : undefined,
+          }));
 
         return NextResponse.json({
           titulo: parsed.titulo || defaultResp.titulo,
           resumen: parsed.resumen || defaultResp.resumen,
-          notasNino: notasFusionadas,
+          // notasNino se conserva tal cual (legado, sin truncados destructivos)
+          notasNino: body.acuerdo?.notasNino || "",
+          temasTrabajados,
+          recuerdos,
         });
       } catch (e) {
         console.error("Fallo al resumir sesión con Gemini:", e);
