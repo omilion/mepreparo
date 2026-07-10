@@ -128,26 +128,38 @@ export function PlanEstudio({
 
       {/* Meta del día (D1) */}
       <Reveal delay={250}>
-        <div className="rounded-zen border border-hair p-5 flex flex-col gap-3.5 bg-white/40">
-          <div className="flex justify-between items-baseline border-b border-hair pb-2">
-            <h3 className="font-serif text-[18px] text-ink">Objetivo de hoy</h3>
-            <span className="text-[12px] text-ink-soft font-semibold uppercase tracking-wider">
-              {yaEstudioHoy ? "¡Completado! 🎉" : "Pendiente"}
-            </span>
-          </div>
-          <div className="flex items-start gap-3">
-            <input 
-              type="checkbox" 
-              checked={yaEstudioHoy} 
-              readOnly 
-              className="mt-0.5 h-4.5 w-4.5 rounded border-hair text-sage-deep focus:ring-sage"
-            />
-            <div className="flex flex-col text-left">
-              <span className="text-[14.5px] font-medium text-ink">Realizar una sesión de estudio con Rai</span>
-              <span className="text-[12.5px] text-ink-soft">Repasa la materia asignada hoy por 20-25 minutos.</span>
+        {(() => {
+          const tieneAcuerdo = !!perfil.tutoria;
+          const textoObjetivo = tieneAcuerdo
+            ? "Realizar una sesión de estudio con Rai"
+            : "Presentarte con Rai, tu tutor personal";
+          const descObjetivo = tieneAcuerdo
+            ? "Repasa la materia asignada hoy por 20-25 minutos."
+            : "Ten tu primera conversación con Rai para conocerse y armar tu horario de estudio.";
+
+          return (
+            <div className="rounded-zen border border-hair p-5 flex flex-col gap-3.5 bg-surface/30">
+              <div className="flex justify-between items-baseline border-b border-hair pb-2">
+                <h3 className="font-serif text-[18px] text-ink">Objetivo de hoy</h3>
+                <span className="text-[12px] text-ink-soft font-semibold uppercase tracking-wider">
+                  {yaEstudioHoy ? "¡Completado! 🎉" : "Pendiente"}
+                </span>
+              </div>
+              <div className="flex items-start gap-3">
+                <input 
+                  type="checkbox" 
+                  checked={yaEstudioHoy} 
+                  readOnly 
+                  className="mt-0.5 h-4.5 w-4.5 rounded border-hair text-sage-deep focus:ring-sage"
+                />
+                <div className="flex flex-col text-left">
+                  <span className="text-[14.5px] font-medium text-ink">{textoObjetivo}</span>
+                  <span className="text-[12.5px] text-ink-soft">{descObjetivo}</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
       </Reveal>
 
       {/* resumen de tiempo */}
