@@ -2,6 +2,18 @@
 
 import { useState, useEffect, useRef } from "react";
 
+// Conmutador de audio para concentración. Genera música ambiental infinita,
+// relajante y orgánica al vuelo utilizando la API Web Audio nativa del navegador.
+// Evita descargas de MP3 y no consume cuotas ni ancho de banda.
+//
+// Modelo de Cuerda Pulsada (Harp/Lyre):
+// - Síntesis mediante Tabla de Ondas Periódicas (PeriodicWave) configurada con
+//   los armónicos reales y cálidos de una lira.
+// - Transitorio de ataque físico simulado con un golpe de ruido blanco filtrado
+//   en paso banda de 15ms.
+// - Filtro de paso bajo que decae rápido para simular la amortiguación natural.
+// - Paneo estéreo aleatorio leve para dar espacialidad y profundidad.
+
 export function SoundToggle() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -9,132 +21,113 @@ export function SoundToggle() {
 
   const scale = [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25];
 
-  // Nota de cuerda pulsada (lira/arpa) sintetizada: en vez de un solo
-  // oscilador "digital", sumamos varios parciales (armónicos) con amplitudes
-  // decrecientes y un ataque casi instantáneo + decaimiento largo. Eso es lo
-  // que hace que "suene" a una cuerda que se pulsa y se apaga, no a un pitido.
-  // Algoritmo Karplus-Strong: modelado físico de cuerda pulsada (lira/arpa)
-  // mediante un bucle de retardo filtrado que responde a un ataque de ruido.
-  // Evita osciladores artificiales y logra timbre, resonancia y decay orgánicos.
-  function playKarplusStrong(frequency: number, duration: number, isSympathetic = false) {
+  function playLyreNote(frequency: number, duration: number) {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     const t = ctx.currentTime;
 
-    // 1. Variaciones microscópicas de entrada (caos natural de pulsación)
-    const factorVolumen = isSympathetic ? 0.08 : (0.85 + Math.random() * 0.3); // volumen variable
-    const factorFiltro = 0.9 + Math.random() * 0.2; // rango de brillo
-    const detuneCents = (Math.random() * 2 - 1) * 3; // desfinación muy leve (-3 a +3 cents)
-    const freqAfinada = frequency * Math.pow(2, detuneCents / 1200);
+    // 1. Ola armónica personalizada (PeriodicWave) para timbre cálido (sin zumbidos de armónicos altos)
+    const real = new Float32Array([0, 1.0, 0.35, 0.15, 0.07, 0.03, 0.01, 0.005]);
+    const imag = new Float32Array(real.length);
+    const wave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
 
-    // Período de retardo para la frecuencia fundamental
-    const period = 1 / freqAfinada;
+    // 2. Generador armónico (Cuerpo de la cuerda)
+    const osc = ctx.createOscillator();
+    osc.setPeriodicWave(wave);
+    
+    // Microdesafinación humana sutil para dar calidez natural
+    const detune = (Math.random() * 2 - 1) * 3; // -3 a +3 cents
+    osc.frequency.setValueAtTime(frequency, t);
+    osc.detune.setValueAtTime(detune, t);
 
-    // 2. Creación de nodos del bucle de realimentación
-    const delayNode = ctx.createDelay(1.0);
-    delayNode.delayTime.setValueAtTime(period, t);
-
-    const feedbackGain = ctx.createGain();
-    // Coeficiente de feedback (decay). Las notas más graves resuenan más tiempo.
-    const feedbackValue = Math.min(0.996, Math.pow(0.991, period * 100));
-    feedbackGain.gain.setValueAtTime(feedbackValue, t);
-
-    // Filtro de atenuación de armónicos dentro del bucle
+    // 3. Amortiguación acústica (Filtro paso bajo dinámico)
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.setValueAtTime(3200 * factorFiltro, t);
-    filter.frequency.exponentialRampToValueAtTime(280 * factorFiltro, t + duration * 0.45);
+    const startFreq = 1000 + Math.random() * 200; // ~1100 Hz inicial
+    const endFreq = 160 + Math.random() * 40;     // ~180 Hz de sustain
+    filter.frequency.setValueAtTime(startFreq, t);
+    filter.frequency.exponentialRampToValueAtTime(endFreq, t + duration * 0.45);
+    filter.Q.setValueAtTime(0.8, t);
 
-    // Conexión del loop de realimentación: Delay -> Filter -> Feedback -> Delay
-    delayNode.connect(filter);
-    filter.connect(feedbackGain);
-    feedbackGain.connect(delayNode);
+    // Envolvente de decaimiento largo
+    const ampEnv = ctx.createGain();
+    const volumeFactor = 0.85 + Math.random() * 0.3; // pequeña variación de fuerza
+    ampEnv.gain.setValueAtTime(0, t);
+    ampEnv.gain.linearRampToValueAtTime(0.12 * volumeFactor, t + 0.005); // 5ms de ataque suave
+    ampEnv.gain.exponentialRampToValueAtTime(0.0001, t + duration);
 
-    // 3. Excitación: Ruido de ataque muy corto (roce de dedo y uña)
-    const bufferSize = ctx.sampleRate * 0.018; // ~18ms de ruido
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
+    osc.connect(filter);
+    filter.connect(ampEnv);
+
+    // 4. Excitación del ataque (Simula el roce del dedo o uña)
+    // Ruido blanco muy corto y filtrado
+    const noiseBufferSize = ctx.sampleRate * 0.015; // 15ms
+    const noiseBuffer = ctx.createBuffer(1, noiseBufferSize, ctx.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseBufferSize; i++) {
+      noiseData[i] = Math.random() * 2 - 1;
     }
 
     const noiseSource = ctx.createBufferSource();
     noiseSource.buffer = noiseBuffer;
 
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.4, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = "bandpass";
+    noiseFilter.frequency.setValueAtTime(550, t);
+    noiseFilter.Q.setValueAtTime(1.8, t);
 
-    noiseSource.connect(noiseGain);
-    noiseGain.connect(delayNode);
+    const noiseEnv = ctx.createGain();
+    noiseEnv.gain.setValueAtTime(0.07 * volumeFactor, t);
+    noiseEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
 
-    // 4. Vibrato natural tardío (inicia a los 250ms)
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.setValueAtTime(4.2 + Math.random() * 0.8, t); // frecuencia LFO ~4.6Hz
-    lfoGain.gain.setValueAtTime(0, t);
-    lfoGain.gain.setValueAtTime(0, t + 0.25);
-    lfoGain.gain.linearRampToValueAtTime(period * 0.008, t + 0.8); // modulación del 0.8% del periodo
+    noiseSource.connect(noiseFilter);
+    noiseFilter.connect(noiseEnv);
 
-    lfo.connect(lfoGain);
-    lfoGain.connect(delayNode.delayTime);
+    // 5. Mezclador y Paneo Espacial
+    const mixer = ctx.createGain();
+    ampEnv.connect(mixer);
+    noiseEnv.connect(mixer);
 
-    // 5. Ganancia global de la nota
-    const globalGain = ctx.createGain();
-    globalGain.gain.setValueAtTime(0, t);
-    globalGain.gain.linearRampToValueAtTime(0.12 * factorVolumen, t + 0.004);
-    globalGain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-
-    filter.connect(globalGain);
-
-    // 6. Espacialización Estéreo (Paneo aleatorio)
-    let lastNode: AudioNode = globalGain;
+    let lastNode: AudioNode = mixer;
     let panner: StereoPannerNode | null = null;
     if (ctx.createStereoPanner) {
       panner = ctx.createStereoPanner();
-      const panVal = (Math.random() * 2 - 1) * 0.18; // paneo entre -0.18 y 0.18
+      const panVal = (Math.random() * 2 - 1) * 0.16; // ligero paneo estéreo
       panner.pan.setValueAtTime(panVal, t);
-      globalGain.connect(panner);
+      mixer.connect(panner);
       lastNode = panner;
     }
 
     lastNode.connect(ctx.destination);
 
-    // Iniciar osciladores y fuentes
+    // Encendido
+    osc.start(t);
+    osc.stop(t + duration + 0.1);
     noiseSource.start(t);
-    noiseSource.stop(t + 0.04);
-    lfo.start(t);
-    lfo.stop(t + duration);
+    noiseSource.stop(t + 0.05);
 
-    // Limpieza de nodos al finalizar
+    // Limpieza
     setTimeout(() => {
       try {
-        noiseSource.disconnect();
-        noiseGain.disconnect();
-        lfo.disconnect();
-        lfoGain.disconnect();
-        delayNode.disconnect();
+        osc.disconnect();
         filter.disconnect();
-        feedbackGain.disconnect();
-        globalGain.disconnect();
+        ampEnv.disconnect();
+        noiseSource.disconnect();
+        noiseFilter.disconnect();
+        noiseEnv.disconnect();
+        mixer.disconnect();
         if (panner) panner.disconnect();
       } catch {
-        // Ignorar si ya se desconectó
+        // seguro
       }
     }, duration * 1000 + 100);
-
-    // 7. Resonancia Simpática (12% de probabilidad, excepto si ya es una nota simpática)
-    if (!isSympathetic && Math.random() < 0.12) {
-      const freqSimpatica = frequency * (Math.random() < 0.5 ? 2 : 1.5); // octava o quinta justa
-      playKarplusStrong(freqSimpatica, duration * 0.7, true);
-    }
   }
 
   function playSparseMelody() {
     if (Math.random() < 0.6) {
       const note = scale[Math.floor(Math.random() * scale.length)];
       const octave = Math.random() < 0.25 ? 2 : 1;
-      playKarplusStrong(note * octave, 5.0);
+      playLyreNote(note * octave, 5.0);
     }
   }
 
@@ -162,7 +155,7 @@ export function SoundToggle() {
   function start() {
     ensureCtx();
     setIsPlaying(true);
-    playKarplusStrong(329.63, 5.0);
+    playLyreNote(329.63, 5.0);
     scheduleNext();
   }
 
