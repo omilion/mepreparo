@@ -15,6 +15,9 @@ import {
 } from "@/lib/tutor/acuerdo";
 import { AuraOrb } from "./AuraOrb";
 import { TextoRevelado } from "./TextoRevelado";
+import { HomeButton } from "./HomeButton";
+import { SoundToggle } from "./SoundToggle";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Mensaje {
   de: "rai" | "nino";
@@ -274,28 +277,30 @@ export function Tutor({
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-zen flex-col px-[22px] relative">
-      {/* Botón de volver absoluto arriba a la derecha */}
-      <button
-        type="button"
-        onClick={manejarVolver}
-        aria-label="Volver"
-        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink z-10"
-      >
-        ←
-      </button>
+    <div className="mx-auto flex h-screen max-w-zen flex-col px-[22px]">
+      {/* Barra superior de herramientas idéntica a otras vistas */}
+      <div className="flex h-[58px] items-center justify-end gap-2.5">
+        <HomeButton onHome={manejarVolver} />
+        <SoundToggle />
+        <ThemeToggle />
+      </div>
 
       {/* la presencia: esfera centrada+grande al inicio; tras la 1ª respuesta
           del niño se encoge y sube a la esquina para abrir espacio al texto. */}
       <div
         className={
-          "flex transition-all duration-700 ease-in-out " +
+          "flex items-center gap-3 transition-all duration-700 ease-in-out " +
           (compacta
-            ? "justify-start pt-4 pb-2"
-            : "justify-center pt-6 pb-4")
+            ? "justify-start pt-0 pb-2"
+            : "justify-center pt-4 pb-4")
         }
       >
         <AuraOrb materia={materia} activa={cargando} size={compacta ? 60 : 128} />
+        {cargando && (
+          <span className="text-[14px] italic text-ink-soft animate-pulse">
+            Rai está escribiendo…
+          </span>
+        )}
       </div>
 
       {/* conversación: solo texto centrado, sin burbujas */}
@@ -309,11 +314,7 @@ export function Tutor({
             onTick={scrollAlFinal}
           />
         ))}
-        {cargando && (
-          <p className="text-[15px] italic text-ink-soft">
-            {TUTOR.nombre} está escribiendo…
-          </p>
-        )}
+
         <div ref={finRef} />
       </div>
 
