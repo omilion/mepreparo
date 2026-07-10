@@ -362,7 +362,16 @@ export default function Home() {
                 ? () => setEtapa("resultado")
                 : irAlPanel
             }
-            onTutor={() => setEtapa("mapa")}
+            onTutor={() => {
+              if (!pupilo.tutoria) {
+                // Si no hay tutoría inicial, va directo a la presentación de Rai
+                setFoco(null);
+                setEtapa("tutor");
+              } else {
+                // Si ya tiene acuerdo, va al mapa de rutas de estudio
+                setEtapa("mapa");
+              }
+            }}
           />
         </StepFade>
       )}
@@ -402,8 +411,17 @@ export default function Home() {
         <Tutor
           perfil={pupilo}
           temaFoco={foco?.tema}
-          onVolver={() => setEtapa("mapa")}
-          onGuardarPerfil={(p) => setCuenta(guardarPupilo(cuenta!, p))}
+          onVolver={() => {
+            if (!pupilo.tutoria) {
+              setEtapa("plan");
+            } else {
+              setEtapa("mapa");
+            }
+          }}
+          onGuardarPerfil={(p) => {
+            setCuenta(guardarPupilo(cuenta!, p));
+            setEtapa("mapa");
+          }}
         />
       )}
 
