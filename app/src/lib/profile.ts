@@ -81,7 +81,9 @@ export interface PerfilNino {
     intereses: string[];
     estilos: string[]; // cómo aprende mejor
     notas?: string;
-    pin?: string; // PIN de 3 dígitos para acceso rápido del alumno
+    // ¿el acceso del alumno está protegido por PIN? El PIN nunca se guarda en
+    // el perfil (solo su hash en la BD del servidor). Ver auth-student.ts.
+    tienePin?: boolean;
   };
   // Se llena en Fase 2 (diagnóstico). Vacío al crear el perfil.
   diagnostico?: Partial<Record<Materia, DiagnosticoMateria>>;

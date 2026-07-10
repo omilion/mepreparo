@@ -4,36 +4,54 @@ import { useState, useEffect } from "react";
 
 interface PinScreenProps {
   nombre: string;
-  pinCorrecto: string;
+  // el token del alumno: el PIN se valida EN EL SERVIDOR contra él
+  token: string;
   onUnlock: () => void;
   onSalir: () => void;
 }
 
-export function PinScreen({ nombre, pinCorrecto, onUnlock, onSalir }: PinScreenProps) {
+export function PinScreen({ nombre, token, onUnlock, onSalir }: PinScreenProps) {
   const [pin, setPin] = useState("");
   const [shake, setShake] = useState(false);
+  const [verificando, setVerificando] = useState(false);
 
   useEffect(() => {
-    if (pin.length === 3) {
-      if (pin === pinCorrecto) {
-        // Reproducir un sonido sutil de éxito si está disponible, luego desbloquear
-        onUnlock();
-      } else {
-        // Error de PIN: activar animación de shake y limpiar después de 500ms
-        setShake(true);
-        if (typeof window !== "undefined" && window.navigator?.vibrate) {
-          window.navigator.vibrate(100);
-        }
-        setTimeout(() => {
-          setShake(false);
-          setPin("");
-        }, 500);
-      }
+    if (pin.length === 3 && !verificando) {
+      void verificar(pin);
     }
-  }, [pin, pinCorrecto, onUnlock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
+
+  async function verificar(intento: string) {
+    setVerificando(true);
+    try {
+      const res = await fetch("/api/alumno/verificar-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, pin: intento }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        onUnlock();
+        return;
+      }
+    } catch {
+      /* red caída: tratamos como intento fallido */
+    }
+    // PIN incorrecto (o error): shake + limpiar
+    setShake(true);
+    if (typeof window !== "undefined" && window.navigator?.vibrate) {
+      window.navigator.vibrate(100);
+    }
+    setTimeout(() => {
+      setShake(false);
+      setPin("");
+      setVerificando(false);
+    }, 500);
+  }
 
   function presionarDigito(num: string) {
-    if (pin.length < 3 && !shake) {
+    if (pin.length < 3 && !shake && !verificando) {
       setPin((prev) => prev + num);
     }
   }

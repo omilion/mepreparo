@@ -13,7 +13,9 @@ export interface SesionAlumno {
   cuentaId: string;
   pupiloId: string;
   nombre: string;
-  pin?: string;
+  // ¿el acceso está protegido por PIN? El PIN en sí NUNCA se guarda en el
+  // cliente: se verifica contra el servidor con el token.
+  tienePin?: boolean;
 }
 
 export function leerSesionAlumno(): SesionAlumno | null {

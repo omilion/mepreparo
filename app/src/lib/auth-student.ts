@@ -34,3 +34,20 @@ export function verifyStudentToken(token: string): StudentTokenPayload | null {
     return null;
   }
 }
+
+// --- PIN del alumno: hash + comparación en TIEMPO CONSTANTE (solo servidor) ---
+// El PIN NUNCA se guarda ni se compara en texto plano. Guardamos un HMAC del PIN
+// ligado al pupilo (evita que el mismo PIN dé el mismo hash entre niños).
+export function hashPin(pin: string, pupiloId: string): string {
+  return crypto.createHmac("sha256", SECRET).update(`${pupiloId}:${pin}`).digest("base64url");
+}
+
+// Comparación resistente a timing attacks.
+export function verificarPin(pin: string, pupiloId: string, hashGuardado: string): boolean {
+  if (!hashGuardado) return false;
+  const calculado = hashPin(pin, pupiloId);
+  const a = Buffer.from(calculado);
+  const b = Buffer.from(hashGuardado);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}

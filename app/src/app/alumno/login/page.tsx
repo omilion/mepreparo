@@ -36,13 +36,13 @@ function LoginAlumnoContent() {
 
         setEstado("¡Listo! Conectando...");
 
-        // Guardar la sesión específica del alumno
+        // Guardar la sesión específica del alumno (SIN el PIN: solo si aplica)
         guardarSesionAlumno({
           token: tokenStr,
           cuentaId: data.cuentaId,
           pupiloId: data.perfil.id,
           nombre: data.perfil.nombre,
-          pin: data.perfil.contexto.pin || undefined,
+          tienePin: !!data.tienePin,
         });
 
         // Guardar una "cuenta" simulada con solo este pupilo para que el flujo existente funcione directo

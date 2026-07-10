@@ -304,8 +304,9 @@ function ModalAccesoAlumno({
   onActualizarPupilo?: (p: PerfilNino) => void;
 }) {
   const [cargando, setCargando] = useState(false);
-  const [tokenInfo, setTokenInfo] = useState<{ pin: string; loginUrl: string } | null>(null);
-  const [pinTemp, setPinTemp] = useState(pupilo.contexto.pin || "");
+  // el servidor ya NO devuelve el PIN (seguridad); solo si el acceso quedó protegido
+  const [tokenInfo, setTokenInfo] = useState<{ tienePin: boolean; loginUrl: string } | null>(null);
+  const [pinTemp, setPinTemp] = useState(""); // lo escribe el padre; no se precarga del perfil
   const [error, setError] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
@@ -330,16 +331,13 @@ function ModalAccesoAlumno({
       if (!res.ok) {
         setError(data.error || "No se pudo obtener el código de acceso.");
       } else {
-        setTokenInfo({ pin: data.pin || "", loginUrl: data.loginUrl });
-        
-        // Si se guardó un nuevo PIN con éxito, actualizamos localmente el perfil del niño
+        setTokenInfo({ tienePin: !!data.tienePin, loginUrl: data.loginUrl });
+
+        // Reflejamos localmente SOLO si el acceso tiene PIN (nunca el PIN mismo).
         if (nuevoPin !== undefined && onActualizarPupilo) {
           const perfilActualizado: PerfilNino = {
             ...pupilo,
-            contexto: {
-              ...pupilo.contexto,
-              pin: nuevoPin || undefined,
-            },
+            contexto: { ...pupilo.contexto, tienePin: !!nuevoPin },
           };
           onActualizarPupilo(perfilActualizado);
         }

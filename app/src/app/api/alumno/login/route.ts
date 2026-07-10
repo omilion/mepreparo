@@ -34,6 +34,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Estudiante no encontrado" }, { status: 404 });
     }
 
+    // el contexto puede tener el hash del PIN: NUNCA sale al cliente
+    const contextoBruto = (p.contexto ?? {}) as Record<string, unknown>;
+    const { pinHash: _h, pin: _p, ...contextoSeguro } = contextoBruto;
+    const tienePin = !!contextoBruto.pinHash;
+
     const perfil: PerfilNino = {
       id: p.id,
       nombre: p.nombre,
@@ -45,17 +50,20 @@ export async function POST(req: NextRequest) {
       disponibilidad: {
         horasSemana: p.horasSemana,
       },
-      contexto: p.contexto as any,
+      contexto: contextoSeguro as any,
       diagnostico: (p.diagnostico || undefined) as any,
       tutoria: (p.tutoria || undefined) as any,
       creadoEn: p.creadoEn.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
     };
 
+    // tienePin le dice al cliente si debe mostrar la pantalla de PIN (sin revelarlo)
     return NextResponse.json({
       ok: true,
       perfil,
       cuentaId: payload.cuentaId,
+      tienePin,
+      token,
     });
   } catch (err) {
     console.error("Error en /api/alumno/login:", err);

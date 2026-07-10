@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db/db";
 import { pupilos as pupilosTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { generateStudentToken } from "@/lib/auth-student";
+import { generateStudentToken, hashPin } from "@/lib/auth-student";
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({
@@ -44,9 +44,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    let finalContexto = pupilo.contexto as any;
+    let finalContexto = pupilo.contexto as Record<string, unknown>;
+    // ¿el niño quedará protegido con PIN? (para informar al padre, sin exponer el PIN)
+    let tienePin = !!finalContexto.pinHash;
 
-    // 2. Si se proporciona PIN, validarlo y actualizar el campo contexto.pin
+    // 2. Si el apoderado define/actualiza el PIN, guardamos SOLO su hash.
+    //    El PIN en texto plano nunca se persiste ni se devuelve.
     if (pin !== undefined) {
       if (pin !== "" && !/^\d{3}$/.test(pin)) {
         return NextResponse.json(
@@ -54,34 +57,28 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      
-      finalContexto = {
-        ...finalContexto,
-        pin: pin || undefined,
-      };
+
+      // pin vacío = quitar la protección; pin válido = guardar su hash
+      const { pin: _legacyPlano, ...resto } = finalContexto; // limpia PIN plano legado
+      finalContexto = pin
+        ? { ...resto, pinHash: hashPin(pin, pupiloId) }
+        : { ...resto, pinHash: undefined };
+      tienePin = !!pin;
 
       await db
         .update(pupilosTable)
-        .set({
-          contexto: finalContexto,
-          updatedAt: new Date(),
-        })
+        .set({ contexto: finalContexto, updatedAt: new Date() })
         .where(eq(pupilosTable.id, pupiloId));
     }
 
     // 3. Generar token firmado
     const token = generateStudentToken(userId, pupiloId);
-    
-    // Obtener la URL base de la aplicación
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3008";
     const loginUrl = `${appUrl}/alumno/login?token=${token}`;
 
-    return NextResponse.json({
-      ok: true,
-      token,
-      pin: finalContexto.pin || null,
-      loginUrl,
-    });
+    // Nunca devolvemos el PIN; solo si el acceso queda protegido por PIN.
+    return NextResponse.json({ ok: true, token, tienePin, loginUrl });
   } catch (err) {
     console.error("Error en /api/alumno/token:", err);
     return NextResponse.json({ error: "Fallo en la base de datos" }, { status: 500 });

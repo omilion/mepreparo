@@ -107,7 +107,7 @@ export default function Home() {
         setCuenta(c);
         setEnfocado(0);
         const p = c.pupilos[0];
-        setPinBloqueado(!!alumno.pin);
+        setPinBloqueado(!!alumno.tienePin);
         
         // Redirigir a la etapa adecuada del alumno
         if (!configuracionCompleta(p)) setEtapa("wizard");
@@ -287,7 +287,7 @@ export default function Home() {
     return (
       <PinScreen
         nombre={sesionAlumno.nombre}
-        pinCorrecto={sesionAlumno.pin || ""}
+        token={sesionAlumno.token}
         onUnlock={() => setPinBloqueado(false)}
         onSalir={alSalirModoAlumno}
       />
@@ -300,7 +300,7 @@ export default function Home() {
         <TopBar
           onHome={sesionAlumno ? undefined : irAlPanel}
           onCuenta={sesionAlumno ? undefined : () => setEtapa("cuenta")}
-          onLock={sesionAlumno && sesionAlumno.pin ? () => setPinBloqueado(true) : undefined}
+          onLock={sesionAlumno && sesionAlumno.tienePin ? () => setPinBloqueado(true) : undefined}
           nombreAlumno={sesionAlumno ? sesionAlumno.nombre : undefined}
         />
       )}
