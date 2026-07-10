@@ -66,9 +66,27 @@
   --mist: #28302f;
 }
 
+/* Estilo Zen para barra de scroll global (Chile 2026) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hair);
+  border-radius: 9px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sage);
+}
+
 html {
   background: var(--paper);
   color: var(--ink);
+  scrollbar-width: thin;
+  scrollbar-color: var(--hair) transparent;
 }
 
 body {

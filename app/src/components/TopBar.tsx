@@ -26,10 +26,24 @@ export function TopBar({ onHome, onCuenta }: { onHome?: () => void; onCuenta?: (
           <button
             type="button"
             onClick={onCuenta}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink transition-colors font-mono text-[14px]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-hair text-ink-soft transition-colors hover:text-ink"
             title="Mi Cuenta"
+            aria-label="Mi Cuenta"
           >
-            👤
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
           </button>
         )}
         <SoundToggle />

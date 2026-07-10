@@ -274,18 +274,16 @@ export function Tutor({
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-zen flex-col px-[22px]">
-      {/* barra mínima: solo volver. Pantalla inmersiva, sin logo ni ajustes. */}
-      <div className="flex items-center py-2">
-        <button
-          type="button"
-          onClick={manejarVolver}
-          aria-label="Volver"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink"
-        >
-          ←
-        </button>
-      </div>
+    <div className="mx-auto flex h-screen max-w-zen flex-col px-[22px] relative">
+      {/* Botón de volver absoluto arriba a la derecha */}
+      <button
+        type="button"
+        onClick={manejarVolver}
+        aria-label="Volver"
+        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink z-10"
+      >
+        ←
+      </button>
 
       {/* la presencia: esfera centrada+grande al inicio; tras la 1ª respuesta
           del niño se encoge y sube a la esquina para abrir espacio al texto. */}
@@ -293,7 +291,7 @@ export function Tutor({
         className={
           "flex transition-all duration-700 ease-in-out " +
           (compacta
-            ? "justify-start pt-0 pb-2"
+            ? "justify-start pt-4 pb-2"
             : "justify-center pt-6 pb-4")
         }
       >
