@@ -6,6 +6,41 @@ import { etapasDeMateria, progresoDeMateria, type Etapa } from "@/lib/plan/etapa
 import { materiasDeHoy } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 
+// Temas cromáticos por asignatura (tonos pastel desaturados en armonía con el diseño Zen)
+interface ColorTheme {
+  primary: string;
+  primaryDeep: string;
+  bgSoft: string;
+}
+
+const TEMAS_MATERIAS: Record<Materia, ColorTheme> = {
+  matematica: {
+    primary: "var(--sage)",
+    primaryDeep: "var(--sage-deep)",
+    bgSoft: "color-mix(in srgb, var(--sage) 12%, transparent)",
+  },
+  lenguaje: {
+    primary: "var(--clay)",
+    primaryDeep: "var(--color-lenguaje-deep, var(--clay))",
+    bgSoft: "color-mix(in srgb, var(--clay) 12%, transparent)",
+  },
+  ciencias: {
+    primary: "var(--color-ciencias)",
+    primaryDeep: "var(--color-ciencias-deep)",
+    bgSoft: "color-mix(in srgb, var(--color-ciencias) 12%, transparent)",
+  },
+  historia: {
+    primary: "var(--color-historia)",
+    primaryDeep: "var(--color-historia-deep)",
+    bgSoft: "color-mix(in srgb, var(--color-historia) 12%, transparent)",
+  },
+  ingles: {
+    primary: "var(--color-ingles)",
+    primaryDeep: "var(--color-ingles-deep)",
+    bgSoft: "color-mix(in srgb, var(--color-ingles) 12%, transparent)",
+  },
+};
+
 // El HOME del alumno: el camino de etapas de una materia (mapa lineal zen).
 // Cada etapa = un tema del banco; su estado viene de la memoria de Rai.
 // Tocar la etapa actual ofrece: estudiar con Rai o rendir la prueba.
@@ -30,11 +65,20 @@ export function MapaEtapas({
   const dias = diasHastaExamen(perfil.examen.fecha);
   const nombre = perfil.nombre.trim() || "tú";
 
+  const theme = TEMAS_MATERIAS[materia] || TEMAS_MATERIAS.matematica;
+
   return (
-    <div className="mx-auto flex max-w-zen flex-col gap-7 px-[22px] pb-24 pt-8">
+    <div
+      className="mx-auto flex max-w-zen flex-col gap-7 px-[22px] pb-24 pt-8"
+      style={{
+        "--materia-primary": theme.primary,
+        "--materia-primary-deep": theme.primaryDeep,
+        "--materia-bg-soft": theme.bgSoft,
+      } as React.CSSProperties}
+    >
       <Reveal variant="lead" delay={60}>
         <header className="text-center">
-          <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
+          <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--materia-primary-deep)" }}>
             Tu camino, {nombre}
           </div>
           <h1 className="text-[26px]">
@@ -43,7 +87,7 @@ export function MapaEtapas({
           <p className="mt-1.5 text-[13px] text-ink-soft">
             {progreso.superadas} de {progreso.total} etapas superadas
             {dias !== null && dias >= 0 && (
-              <span className="text-clay"> · examen en {dias} días</span>
+              <span className="text-clay font-medium"> · examen en {dias} días</span>
             )}
           </p>
         </header>
@@ -58,10 +102,18 @@ export function MapaEtapas({
                 key={m}
                 onClick={() => setMateria(m)}
                 className={
-                  "rounded-full border px-3.5 py-1.5 text-[12.5px] transition-colors " +
+                  "rounded-full border px-3.5 py-1.5 text-[12.5px] transition-colors tab-materia " +
                   (m === materia
-                    ? "border-sage-deep bg-sage-deep text-white"
-                    : "border-hair text-ink-soft hover:border-sage")
+                    ? "text-white"
+                    : "border-hair text-ink-soft tab-materia-unselected")
+                }
+                style={
+                  m === materia
+                    ? {
+                        borderColor: "var(--materia-primary-deep)",
+                        backgroundColor: "var(--materia-primary-deep)",
+                      }
+                    : {}
                 }
               >
                 {MATERIAS.find((x) => x.id === m)?.label}
@@ -99,12 +151,21 @@ export function MapaEtapas({
         <div className="text-center">
           <button
             onClick={onTutorLibre}
-            className="text-[13px] text-sage-deep underline underline-offset-4 hover:opacity-80"
+            className="text-[13px] underline underline-offset-4 hover:opacity-80"
+            style={{ color: "var(--materia-primary-deep)" }}
           >
             o conversa libre con Rai →
           </button>
         </div>
       </Reveal>
+
+      {/* Estilos locales para los hover y dinámicas de tabs */}
+      <style jsx>{`
+        .tab-materia-unselected:hover {
+          border-color: var(--materia-primary) !important;
+          color: var(--ink) !important;
+        }
+      `}</style>
     </div>
   );
 }
@@ -130,11 +191,11 @@ function NodoEtapa({
         {!esUltima && (
           <span
             aria-hidden
-            className={
-              "w-[1.5px] flex-1 " +
-              (etapa.estado === "superada" ? "bg-sage" : "bg-hair")
-            }
-            style={{ minHeight: 26 }}
+            className="w-[1.5px] flex-1"
+            style={{
+              minHeight: 26,
+              backgroundColor: etapa.estado === "superada" ? "var(--materia-primary)" : "var(--hair)",
+            }}
           />
         )}
       </div>
@@ -161,19 +222,31 @@ function NodoEtapa({
           <div className="mt-3 flex flex-wrap gap-2.5">
             <button
               onClick={onEstudiar}
-              className="rounded-full bg-sage-deep px-4 py-2 text-[13px] font-[560] text-white transition-colors hover:bg-sage"
+              className="btn-estudiar rounded-full px-4 py-2 text-[13px] font-[560] text-white transition-colors"
+              style={{
+                backgroundColor: "var(--materia-primary-deep)",
+              }}
             >
               Estudiar con Rai
             </button>
             <button
               onClick={onPrueba}
-              className="rounded-full border border-hair px-4 py-2 text-[13px] text-ink transition-colors hover:border-sage"
+              className="btn-prueba rounded-full border border-hair px-4 py-2 text-[13px] text-ink transition-colors"
             >
               Rendir la prueba
             </button>
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        .btn-estudiar:hover {
+          background-color: var(--materia-primary) !important;
+        }
+        .btn-prueba:hover {
+          border-color: var(--materia-primary) !important;
+        }
+      `}</style>
     </li>
   );
 }
@@ -181,14 +254,23 @@ function NodoEtapa({
 function NodoCirculo({ etapa }: { etapa: Etapa }) {
   if (etapa.estado === "superada") {
     return (
-      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-sage text-[14px] text-white">
+      <span
+        className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[14px] text-white"
+        style={{ backgroundColor: "var(--materia-primary)" }}
+      >
         ✓
       </span>
     );
   }
   if (etapa.estado === "actual") {
     return (
-      <span className="nodo-actual flex h-11 w-11 flex-none items-center justify-center rounded-full border-[1.5px] border-sage-deep font-serif text-[16px] text-sage-deep">
+      <span
+        className="nodo-actual flex h-11 w-11 flex-none items-center justify-center rounded-full border-[1.5px] font-serif text-[16px]"
+        style={{
+          borderColor: "var(--materia-primary-deep)",
+          color: "var(--materia-primary-deep)",
+        }}
+      >
         {etapa.numero}
         <style jsx>{`
           .nodo-actual {
@@ -197,10 +279,10 @@ function NodoCirculo({ etapa }: { etapa: Etapa }) {
           @keyframes respira-nodo {
             0%,
             100% {
-              box-shadow: 0 0 0 0 color-mix(in srgb, var(--sage) 35%, transparent);
+              box-shadow: 0 0 0 0 color-mix(in srgb, var(--materia-primary) 35%, transparent);
             }
             50% {
-              box-shadow: 0 0 0 7px color-mix(in srgb, var(--sage) 12%, transparent);
+              box-shadow: 0 0 0 7px color-mix(in srgb, var(--materia-primary) 12%, transparent);
             }
           }
           @media (prefers-reduced-motion: reduce) {

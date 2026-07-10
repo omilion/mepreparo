@@ -26,6 +26,15 @@
   --mist: #e4e8e2;
   --hair: color-mix(in srgb, var(--ink) 9%, transparent);
 
+  /* Asignaturas - Tonos poco saturados */
+  --color-ciencias: #5e7a8c;
+  --color-ciencias-deep: #415b6d;
+  --color-historia: #9c7b4c;
+  --color-historia-deep: #785d37;
+  --color-lenguaje-deep: #ad623f;
+  --color-ingles: #7a668c;
+  --color-ingles-deep: #5d4d6d;
+
   --font-serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-sans: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "SF Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
@@ -41,6 +50,14 @@
     --sage-deep: #9bc7ac;
     --clay: #db9576;
     --mist: #28302f;
+
+    --color-ciencias: #8cb1c7;
+    --color-ciencias-deep: #afd2e6;
+    --color-historia: #c09e6c;
+    --color-historia-deep: #dfbe8c;
+    --color-lenguaje-deep: #e3ab91;
+    --color-ingles: #ac9ac0;
+    --color-ingles-deep: #cebddf;
   }
 }
 
@@ -53,6 +70,14 @@
   --sage-deep: #436b57;
   --clay: #c97b5a;
   --mist: #e4e8e2;
+
+  --color-ciencias: #5e7a8c;
+  --color-ciencias-deep: #415b6d;
+  --color-historia: #9c7b4c;
+  --color-historia-deep: #785d37;
+  --color-lenguaje-deep: #ad623f;
+  --color-ingles: #7a668c;
+  --color-ingles-deep: #5d4d6d;
 }
 
 :root[data-theme="dark"] {
@@ -64,6 +89,14 @@
   --sage-deep: #9bc7ac;
   --clay: #db9576;
   --mist: #28302f;
+
+  --color-ciencias: #8cb1c7;
+  --color-ciencias-deep: #afd2e6;
+  --color-historia: #c09e6c;
+  --color-historia-deep: #dfbe8c;
+  --color-lenguaje-deep: #e3ab91;
+  --color-ingles: #ac9ac0;
+  --color-ingles-deep: #cebddf;
 }
 
 /* Estilo Zen para barra de scroll global (Chile 2026) */

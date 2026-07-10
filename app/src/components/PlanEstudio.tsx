@@ -236,7 +236,7 @@ export function PlanEstudio({
 
       <Reveal delay={860}>
         <div className="flex flex-col gap-3">
-          <button type="button" className="cta" onClick={onTutor}>
+          <button type="button" className="premium-glow-button animate-moving-border" onClick={onTutor}>
             Empezar a estudiar con el tutor
           </button>
           <button
@@ -247,6 +247,59 @@ export function PlanEstudio({
             Volver
           </button>
         </div>
+
+        <style jsx>{`
+          .premium-glow-button {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            font-size: 17px;
+            font-weight: 580;
+            padding: 16px 24px;
+            color: white;
+            background: var(--sage-deep);
+            border-radius: 14px;
+            border: 1px solid transparent;
+            background-clip: padding-box;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+          }
+          .premium-glow-button::before {
+            content: "";
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            z-index: -1;
+            margin: -1.5px;
+            border-radius: inherit;
+            background: linear-gradient(
+              90deg,
+              var(--sage),
+              var(--clay),
+              var(--sage-deep),
+              var(--sage)
+            );
+            background-size: 300% 300%;
+            animation: move-border-kf 6s ease infinite;
+          }
+          .premium-glow-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(91, 138, 114, 0.15);
+          }
+          .premium-glow-button:active {
+            transform: translateY(0.5px);
+          }
+          @keyframes move-border-kf {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .premium-glow-button::before {
+              animation: none;
+            }
+          }
+        `}</style>
       </Reveal>
     </div>
   );
