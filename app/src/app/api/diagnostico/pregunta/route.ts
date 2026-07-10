@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
   const curso = searchParams.get("curso") as Curso | null;
   const dificultadParam = searchParams.get("dificultad");
   const excluirParam = searchParams.get("excluir") || "";
+  // opcional: acotar a UN tema (lo usa la prueba de etapa del camino)
+  const tema = searchParams.get("tema");
 
   if (!materia || !curso || !dificultadParam) {
     return NextResponse.json({ error: "Faltan parámetros requeridos" }, { status: 400 });
@@ -23,9 +25,12 @@ export async function GET(req: NextRequest) {
 
   // Filtrado de preguntas idéntico a iniciarDiag del motor
   const delCurso = banco.filter((p) => p.materia === materia && p.curso === curso);
-  const pool = delCurso.length > 0
+  let pool = delCurso.length > 0
     ? delCurso
     : banco.filter((p) => p.materia === materia);
+
+  // la prueba de etapa evalúa SOLO su tema (si no hay preguntas, devuelve null)
+  if (tema) pool = pool.filter((p) => p.tema === tema);
 
   const candidatas = pool.filter((p) => !excluidas.has(p.id));
   if (candidatas.length === 0) {

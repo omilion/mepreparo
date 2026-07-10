@@ -1,0 +1,271 @@
+{
+ "matematica|1basico": [
+  "conteo",
+  "geometria",
+  "patrones",
+  "comparacion",
+  "adicion",
+  "resolucion_problemas",
+  "tiempo"
+ ],
+ "matematica|2basico": [
+  "numeros",
+  "comparacion",
+  "patrones",
+  "geometria",
+  "tiempo",
+  "adicion",
+  "medida",
+  "resolucion_problemas"
+ ],
+ "matematica|3basico": [
+  "multiplicacion",
+  "numeros",
+  "geometria",
+  "adicion",
+  "division",
+  "fracciones",
+  "medida",
+  "resolucion_problemas",
+  "tiempo"
+ ],
+ "matematica|4basico": [
+  "numeros",
+  "multiplicacion",
+  "division",
+  "fracciones",
+  "decimales",
+  "ecuaciones",
+  "medida",
+  "geometria",
+  "resolucion_problemas"
+ ],
+ "matematica|5basico": [
+  "division",
+  "multiplicacion",
+  "numeros",
+  "decimales",
+  "fracciones",
+  "algebra",
+  "geometria",
+  "resolucion_problemas"
+ ],
+ "matematica|6basico": [
+  "numeros",
+  "razones",
+  "multiplicacion",
+  "porcentajes",
+  "datos_azar",
+  "geometria",
+  "algebra",
+  "fracciones",
+  "resolucion_problemas"
+ ],
+ "matematica|7basico": [
+  "numeros",
+  "razones",
+  "porcentajes",
+  "geometria",
+  "probabilidad",
+  "algebra",
+  "datos_azar",
+  "resolucion_problemas"
+ ],
+ "matematica|8basico": [
+  "algebra",
+  "numeros",
+  "geometria",
+  "funciones",
+  "probabilidad",
+  "resolucion_problemas"
+ ],
+ "lenguaje|1basico": [
+  "letras",
+  "silabas",
+  "comprension_lectora",
+  "vocabulario",
+  "gramatica"
+ ],
+ "lenguaje|2basico": [
+  "gramatica",
+  "comprension_lectora",
+  "ortografia",
+  "vocabulario",
+  "inferencias"
+ ],
+ "lenguaje|3basico": [
+  "gramatica",
+  "comprension_lectora",
+  "ortografia",
+  "vocabulario",
+  "inferencias"
+ ],
+ "lenguaje|4basico": [
+  "vocabulario",
+  "comprension_lectora",
+  "gramatica",
+  "ortografia",
+  "inferencias"
+ ],
+ "lenguaje|5basico": [
+  "vocabulario",
+  "comprension_lectora",
+  "gramatica",
+  "ortografia",
+  "inferencias"
+ ],
+ "lenguaje|6basico": [
+  "vocabulario",
+  "comprension_lectora",
+  "gramatica",
+  "ortografia",
+  "inferencias"
+ ],
+ "lenguaje|7basico": [
+  "vocabulario",
+  "comprension_lectora",
+  "gramatica",
+  "ortografia",
+  "inferencias"
+ ],
+ "lenguaje|8basico": [
+  "vocabulario",
+  "comprension_lectora",
+  "gramatica",
+  "ortografia",
+  "inferencias"
+ ],
+ "ciencias|1basico": [
+  "estaciones",
+  "seres_vivos",
+  "habits",
+  "organos_sentidos",
+  "cuerpo_humano",
+  "resolucion_problemas"
+ ],
+ "ciencias|2basico": [
+  "cuerpo_humano",
+  "materia",
+  "seres_vivos",
+  "resolucion_problemas"
+ ],
+ "ciencias|3basico": [
+  "plantas",
+  "sistema_solar",
+  "luz",
+  "sonido",
+  "resolucion_problemas"
+ ],
+ "ciencias|4basico": [
+  "cuerpo_humano",
+  "ecosistemas",
+  "fuerzas",
+  "placas_tectonicas",
+  "resolucion_problemas"
+ ],
+ "ciencias|5basico": [
+  "nutricion",
+  "agua",
+  "celulas",
+  "cuerpo_humano",
+  "microorganismos",
+  "resolucion_problemas"
+ ],
+ "ciencias|6basico": [
+  "materia",
+  "reproduccion",
+  "energia",
+  "fotosintesis",
+  "electricidad",
+  "resolucion_problemas"
+ ],
+ "ciencias|7basico": [
+  "fisica",
+  "biologia",
+  "quimica",
+  "resolucion_problemas"
+ ],
+ "ciencias|8basico": [
+  "fisica",
+  "biologia",
+  "quimica",
+  "resolucion_problemas"
+ ],
+ "historia|1basico": [
+  "simbolos_patrios",
+  "geografia",
+  "instituciones",
+  "tiempo",
+  "identidad",
+  "convivencia",
+  "resolucion_problemas"
+ ],
+ "historia|2basico": [
+  "geografia",
+  "pueblos_originarios",
+  "mestizaje",
+  "resolucion_problemas"
+ ],
+ "historia|3basico": [
+  "geografia",
+  "civilizaciones_antiguas",
+  "resolucion_problemas"
+ ],
+ "historia|4basico": [
+  "geografia",
+  "civilizaciones_americanas",
+  "resolucion_problemas"
+ ],
+ "historia|5basico": [
+  "derechos_deberes",
+  "descubrimiento_conquista",
+  "zonas_naturales",
+  "periodo_colonial",
+  "institucionalidad",
+  "resolucion_problemas"
+ ],
+ "historia|6basico": [
+  "independencia",
+  "derechos_ciudadanos",
+  "organizacion_republica",
+  "quiebre_democracia",
+  "retorno_democracia",
+  "resolucion_problemas"
+ ],
+ "historia|7basico": [
+  "prehistoria",
+  "civilizaciones_antiguas",
+  "edad_media",
+  "resolucion_problemas"
+ ],
+ "historia|8basico": [
+  "edad_moderna",
+  "ilustracion",
+  "revolucion_industrial",
+  "revolucion_francesa",
+  "resolucion_problemas"
+ ],
+ "ingles|5basico": [
+  "colores",
+  "numeros",
+  "vocabulario",
+  "gramatica",
+  "comprension"
+ ],
+ "ingles|6basico": [
+  "numeros",
+  "vocabulario",
+  "gramatica",
+  "comprension"
+ ],
+ "ingles|7basico": [
+  "vocabulario",
+  "gramatica",
+  "comprension"
+ ],
+ "ingles|8basico": [
+  "vocabulario",
+  "gramatica",
+  "comprension"
+ ]
+}

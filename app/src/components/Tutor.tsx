@@ -27,11 +27,14 @@ export function Tutor({
   perfil,
   onVolver,
   onGuardarPerfil,
+  temaFoco,
 }: {
   perfil: PerfilNino;
   onVolver: () => void;
   // guarda cambios en el perfil (p.ej. el acuerdo de tutoría recién creado)
   onGuardarPerfil?: (p: PerfilNino) => void;
+  // si viene del mapa de etapas: la lección se centra en este tema
+  temaFoco?: string;
 }) {
   const nombre = perfil.nombre.trim() || "tú";
   const acuerdo = perfil.tutoria ?? null;
@@ -78,6 +81,7 @@ export function Tutor({
       horasSemana: perfil.disponibilidad.horasSemana,
       curso: perfil.curso,
       nombre: perfil.nombre,
+      temaFoco, // si viene del mapa: la lección se centra en esta etapa
     };
   }
 

@@ -15,6 +15,14 @@ import { AuthForm } from "@/components/AuthForm";
 import { MiCuenta } from "@/components/MiCuenta";
 import { Landing } from "@/components/Landing";
 import { Demo } from "@/components/Demo";
+import { MapaEtapas } from "@/components/MapaEtapas";
+import { PruebaEtapa } from "@/components/PruebaEtapa";
+import {
+  registrarEjercicios,
+  sembrarTemasDesdeDiagnostico,
+  type AcuerdoTutoria,
+} from "@/lib/tutor/acuerdo";
+import type { Materia } from "@/lib/profile";
 import { authClient } from "@/lib/auth-client";
 import { cuentaDePrueba } from "@/lib/dev/seed";
 import {
@@ -45,6 +53,8 @@ type Etapa =
   | "resultado"
   | "diagnostico"
   | "plan"
+  | "mapa"
+  | "prueba"
   | "tutor";
 
 export default function Home() {
@@ -58,6 +68,8 @@ export default function Home() {
   const [wizIdx, setWizIdx] = useState(0);
   // con qué modo abrir el formulario de auth (según de dónde venga el clic)
   const [modoAuth, setModoAuth] = useState<"login" | "registro">("registro");
+  // etapa del camino en foco (para la lección con Rai o la prueba)
+  const [foco, setFoco] = useState<{ materia: Materia; tema: string } | null>(null);
 
   // Escuchar eventos de sincronización en segundo plano para actualizar el estado React
   useEffect(() => {
@@ -166,6 +178,28 @@ export default function Home() {
 
   function irAlPanel() {
     setEtapa("panel");
+  }
+
+  // Al terminar la prueba de una etapa: registra la evidencia dura en la
+  // memoria (≥80% con 4+ = superado; ≤40% = refuerzo) y vuelve al mapa.
+  function alTerminarPrueba(correctos: number, total: number) {
+    const p = cuenta?.pupilos[enfocado];
+    if (!cuenta || !p || !foco) {
+      setEtapa("mapa");
+      return;
+    }
+    // si aún no existe acuerdo (no ha tenido primera charla), creamos la base
+    // sembrada con el diagnóstico para que la evidencia no se pierda
+    const base: AcuerdoTutoria =
+      p.tutoria ??
+      sembrarTemasDesdeDiagnostico(
+        { creadoEn: new Date().toISOString(), horario: {}, notasNino: "", sesiones: [] },
+        p.diagnostico
+      );
+    const tutoria = registrarEjercicios(base, foco.tema, foco.materia, correctos, total);
+    setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
+    setFoco(null);
+    setEtapa("mapa");
   }
 
   function alCerrarSesionAuth() {
@@ -328,15 +362,47 @@ export default function Home() {
                 ? () => setEtapa("resultado")
                 : irAlPanel
             }
-            onTutor={() => setEtapa("tutor")}
+            onTutor={() => setEtapa("mapa")}
           />
         </StepFade>
+      )}
+
+      {/* el HOME del alumno: su camino de etapas */}
+      {etapa === "mapa" && pupilo && (
+        <StepFade stepKey={`mapa-${pupilo.id}`} direction="next">
+          <MapaEtapas
+            perfil={pupilo}
+            onEstudiar={(materia, tema) => {
+              setFoco({ materia, tema });
+              setEtapa("tutor");
+            }}
+            onPrueba={(materia, tema) => {
+              setFoco({ materia, tema });
+              setEtapa("prueba");
+            }}
+            onTutorLibre={() => {
+              setFoco(null);
+              setEtapa("tutor");
+            }}
+          />
+        </StepFade>
+      )}
+
+      {etapa === "prueba" && pupilo && foco && (
+        <PruebaEtapa
+          materia={foco.materia}
+          curso={pupilo.curso}
+          tema={foco.tema}
+          onTerminar={alTerminarPrueba}
+          onSalir={() => setEtapa("mapa")}
+        />
       )}
 
       {etapa === "tutor" && pupilo && (
         <Tutor
           perfil={pupilo}
-          onVolver={() => setEtapa("plan")}
+          temaFoco={foco?.tema}
+          onVolver={() => setEtapa("mapa")}
           onGuardarPerfil={(p) => setCuenta(guardarPupilo(cuenta!, p))}
         />
       )}

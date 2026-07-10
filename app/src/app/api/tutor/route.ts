@@ -39,6 +39,8 @@ interface Body {
   nombre?: string;
   pregunta?: string; // solo en accion "chat"
   historial?: Turno[]; // conversación previa (para dar continuidad)
+  // si el niño entró desde el mapa de etapas: la lección se centra en este tema
+  temaFoco?: string;
 }
 
 function normalizarPregunta(texto: string): string {
@@ -195,6 +197,15 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       body.materiasHoy || [],
       fechaHoraLegible()
     );
+  }
+
+  // Lección de etapa: el niño tocó una etapa del camino → foco en ese tema.
+  if (body.temaFoco?.trim()) {
+    sistema +=
+      `\nFOCO DE HOY: el niño eligió la etapa "${body.temaFoco.trim()}" de su camino. ` +
+      "Centra la lección en ese tema: explícalo paso a paso con ejemplos cercanos, " +
+      "proponle mini-desafíos mentales y, cuando lo notes listo, anímalo a rendir " +
+      "la prueba de la etapa desde su camino. No cambies de tema salvo que él lo pida.";
   }
 
   // --- RAG solo cuando hay una pregunta concreta ---

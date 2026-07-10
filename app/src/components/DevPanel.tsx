@@ -12,6 +12,7 @@ export type EtapaDev =
   | "diagnostico"
   | "resultado"
   | "plan"
+  | "mapa"
   | "tutor";
 
 export function DevPanel({
@@ -32,6 +33,7 @@ export function DevPanel({
     { id: "diagnostico", label: "Diagnóstico" },
     { id: "resultado", label: "Resultado", requiereDiag: true },
     { id: "plan", label: "Plan", requiereDiag: true },
+    { id: "mapa", label: "Mapa", requiereDiag: true },
     { id: "tutor", label: "Tutor", requiereDiag: true },
   ];
 
