@@ -1,0 +1,8 @@
+# Caddy: TLS automático (Let's Encrypt) + proxy inverso a la app Next.
+# {$DOMINIO} viene del entorno (docker-compose.prod.yml → environment DOMINIO).
+# Requiere que el dominio apunte por DNS (A record) a la IP del VPS.
+
+{$DOMINIO} {
+	encode gzip zstd
+	reverse_proxy app:3000
+}

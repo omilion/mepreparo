@@ -32,7 +32,10 @@ const MODELO_REAL = "gemini-embedding-2";
 let CHUNKS: Chunk[] | null = null;
 
 function rutaChunks(): string {
-  // el cwd al correr Next es la carpeta app/
+  // En producción (Docker) el archivo de chunks (~125MB) NO va en la imagen:
+  // se monta como volumen y su ruta se pasa por RAG_CHUNKS_PATH. En desarrollo
+  // cae a la ubicación relativa habitual (app/ es el cwd de Next).
+  if (process.env.RAG_CHUNKS_PATH) return process.env.RAG_CHUNKS_PATH;
   return path.join(process.cwd(), "..", "base-documental", "_rag", "chunks.jsonl");
 }
 

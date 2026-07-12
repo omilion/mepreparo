@@ -1,0 +1,100 @@
+# Producción en el VPS: app Next + Postgres (pgvector) + Caddy (HTTPS auto).
+# Uso:  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Requisitos previos en el VPS (ver docs/PLAN-deploy-vps.md):
+#  - archivo .env.prod con los secretos (NUNCA se commitea)
+#  - el archivo de chunks del RAG copiado a ./base-documental/_rag/chunks.jsonl
+#  - un dominio apuntando (A record) a la IP del VPS
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: mepreparo_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Postgres NO se expone a internet: solo lo alcanza la app por la red interna
+    networks:
+      - interna
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ./app
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    container_name: mepreparo_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      DIAG_HMAC_SECRET: ${DIAG_HMAC_SECRET}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${NEXT_PUBLIC_APP_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      # el archivo de chunks va montado como volumen (abajo)
+      RAG_CHUNKS_PATH: /data/rag/chunks.jsonl
+    volumes:
+      - ./base-documental/_rag/chunks.jsonl:/data/rag/chunks.jsonl:ro
+    networks:
+      - interna
+
+  caddy:
+    image: caddy:2
+    container_name: mepreparo_caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - interna
+
+  # backup diario de la BD a ./backups (montar/rotar según prefieras)
+  backup:
+    image: postgres:16
+    container_name: mepreparo_backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - interna
+    entrypoint: >
+      sh -c 'while true; do
+        pg_dump -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB} > /backups/mepreparo_$$(date +%Y%m%d_%H%M%S).sql;
+        find /backups -name "*.sql" -mtime +7 -delete;
+        sleep 86400;
+      done'
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  interna:
