@@ -1,0 +1,85 @@
+# Deploy AISLADO para un VPS COMPARTIDO (otras apps/dominios ya corren ahí).
+# NO toca los puertos 80/443, NO levanta Caddy, NO usa un proxy central.
+# mepreparo queda accesible por  http://IP_DEL_VPS:${APP_PORT}  (puerto alto libre).
+#
+# Uso:  docker compose -f docker-compose.vps.yml --env-file .env.vps up -d --build
+#
+# ⚠️ ANTES de levantar, verificar que el puerto elegido esté libre (ver
+#    docs/PLAN-deploy-vps.md §1). Todos los nombres llevan prefijo mepreparo_
+#    y hay una red propia para no colisionar con lo existente.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: mepreparo_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - mepreparo_pgdata:/var/lib/postgresql/data
+    # Postgres SOLO en la red interna: no se publica ningún puerto al host,
+    # así no choca con otro Postgres que pueda existir en el VPS.
+    networks:
+      - mepreparo_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ./app
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    container_name: mepreparo_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      DIAG_HMAC_SECRET: ${DIAG_HMAC_SECRET}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${NEXT_PUBLIC_APP_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      RAG_CHUNKS_PATH: /data/rag/chunks.jsonl
+    # publicamos SOLO este puerto alto al host (elegir uno libre en .env.vps)
+    ports:
+      - "${APP_PORT}:3000"
+    volumes:
+      - ./base-documental/_rag/chunks.jsonl:/data/rag/chunks.jsonl:ro
+    networks:
+      - mepreparo_net
+
+  # backup diario de la BD a ./backups (aislado, no interfiere con otras apps)
+  backup:
+    image: postgres:16
+    container_name: mepreparo_backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - mepreparo_net
+    entrypoint: >
+      sh -c 'while true; do
+        pg_dump -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB} > /backups/mepreparo_$$(date +%Y%m%d_%H%M%S).sql;
+        find /backups -name "*.sql" -mtime +7 -delete;
+        sleep 86400;
+      done'
+
+volumes:
+  mepreparo_pgdata:
+
+networks:
+  mepreparo_net:

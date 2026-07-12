@@ -5,6 +5,11 @@ import * as schema from "./db/schema";
 
 // URL pública de la app (en producción: https://tu-dominio). En dev cae a :3008.
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3008";
+// ¿Estamos sirviendo sobre HTTP (deploy de prueba por IP, sin dominio)? Entonces
+// las cookies no pueden ser "Secure" o el navegador las descarta y el login no
+// persiste. Detectamos por la URL. SOLO para staging: en producción real la URL
+// es https y las cookies vuelven a ser Secure automáticamente.
+const esHttp = APP_URL.startsWith("http://");
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -19,5 +24,10 @@ export const auth = betterAuth({
   trustedOrigins: [APP_URL],
   emailAndPassword: {
     enabled: true,
+  },
+  advanced: {
+    // en http (staging por IP) las cookies no llevan Secure para poder probar
+    // el login; con dominio+https esto es false y vuelven a ser seguras.
+    useSecureCookies: !esHttp,
   },
 });
