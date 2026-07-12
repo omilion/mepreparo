@@ -253,10 +253,20 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         model: modeloElegido,
       });
 
-      const { texto, horario } = separarHorario(cruda, body.materias || []);
+      const { texto: sinHorario, horario } = separarHorario(cruda, body.materias || []);
+      // extrae el marcador <<EJERCICIO:tema>> si Rai quiso lanzar un ejercicio
+      const { texto, ejercicioTema } = separarEjercicio(sinHorario);
 
-      // C2. Guardar respuesta en la tabla caché si corresponde
-      if (accion === "chat" && preguntaNormalizada.length > 5 && body.materia && body.curso && texto) {
+      // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
+      // No cacheamos respuestas con ejercicio: el ejercicio es dinámico.
+      if (
+        accion === "chat" &&
+        !ejercicioTema &&
+        preguntaNormalizada.length > 5 &&
+        body.materia &&
+        body.curso &&
+        texto
+      ) {
         try {
           await db.insert(cacheRespuestasTable).values({
             id: crypto.randomUUID(),
@@ -274,6 +284,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         respuesta: texto,
         fuentes,
         horario,
+        ejercicioTema, // presente si Rai lanzó un ejercicio
         modo: "gemini",
       });
     } catch (e) {
@@ -293,6 +304,16 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
     fuentes,
     modo: "simulado",
   });
+}
+
+// Extrae el marcador <<EJERCICIO:tema>> del mensaje de Rai. Devuelve el texto
+// limpio y el tema del ejercicio (si lo hubo), para que el front lo pida.
+function separarEjercicio(cruda: string): { texto: string; ejercicioTema?: string } {
+  const m = cruda.match(/<<EJERCICIO:([a-zñáéíóú_ ]+)>>/i);
+  if (!m) return { texto: cruda.trim() };
+  const texto = cruda.replace(m[0], "").trim();
+  const tema = m[1].trim().toLowerCase().replace(/\s+/g, "_");
+  return { texto, ejercicioTema: tema || undefined };
 }
 
 function separarHorario(

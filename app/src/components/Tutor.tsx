@@ -9,6 +9,7 @@ import {
   diaDeHoy,
   aplicarCierre,
   sembrarTemasDesdeDiagnostico,
+  registrarEjercicios,
   type AcuerdoTutoria,
   type TemaTrabajado,
   type RecuerdoNino,
@@ -19,11 +20,21 @@ import { HomeButton } from "./HomeButton";
 import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
 
+interface EjercicioChat {
+  tema: string;
+  enunciado: string;
+  opciones: string[];
+  respuestaFinal: string;
+  respondido?: "ok" | "no";
+}
+
 interface Mensaje {
   de: "rai" | "nino";
   texto: string;
   fuentes?: string[];
   modo?: "gemini" | "simulado";
+  // si Rai lanzó un ejercicio en este turno, va embebido bajo su texto
+  ejercicio?: EjercicioChat;
 }
 
 export function Tutor({
@@ -170,16 +181,71 @@ export function Tutor({
     respuesta?: string;
     fuentes?: string[];
     modo?: "gemini" | "simulado";
+    ejercicioTema?: string;
   }) {
-    setMensajes((m) => [
-      ...m,
-      {
-        de: "rai",
-        texto: data.respuesta ?? "Ups, no pude responder ahora.",
-        fuentes: data.fuentes,
-        modo: data.modo,
-      },
-    ]);
+    const idx = { current: -1 };
+    setMensajes((m) => {
+      idx.current = m.length;
+      return [
+        ...m,
+        {
+          de: "rai",
+          texto: data.respuesta ?? "Ups, no pude responder ahora.",
+          fuentes: data.fuentes,
+          modo: data.modo,
+        },
+      ];
+    });
+    // si Rai lanzó un ejercicio, lo pedimos a la biblioteca y lo adjuntamos
+    if (data.ejercicioTema) {
+      void cargarEjercicioEnChat(data.ejercicioTema, idx.current);
+    }
+  }
+
+  // Pide un ejercicio del tema a la biblioteca validada y lo adjunta al mensaje.
+  async function cargarEjercicioEnChat(tema: string, msgIdx: number) {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/ejercicios/obtener?${params}`);
+      const data = await res.json();
+      const e = data.ejercicio;
+      if (!e) return;
+      const ejercicio: EjercicioChat = {
+        tema,
+        enunciado: rellenar(e.enunciado, e.datos?.variables),
+        opciones: e.datos?.opciones ?? e.opciones ?? [],
+        respuestaFinal: String(e.respuestaFinal ?? ""),
+      };
+      if (ejercicio.opciones.length < 2) return; // ejercicio inválido: lo omitimos
+      setMensajes((m) =>
+        m.map((msg, i) => (i === msgIdx ? { ...msg, ejercicio } : msg))
+      );
+    } catch {
+      /* si falla, la charla sigue sin ejercicio */
+    }
+  }
+
+  // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
+  function responderEjercicio(msgIdx: number, opcion: string) {
+    setMensajes((m) =>
+      m.map((msg, i) => {
+        if (i !== msgIdx || !msg.ejercicio || msg.ejercicio.respondido) return msg;
+        const ok = opcion === msg.ejercicio.respuestaFinal;
+        return { ...msg, ejercicio: { ...msg.ejercicio, respondido: ok ? "ok" : "no" } };
+      })
+    );
+    const ej = mensajes[msgIdx]?.ejercicio;
+    if (ej && !ej.respondido && acuerdo) {
+      const ok = opcion === ej.respuestaFinal;
+      // evidencia dura de UN ejercicio en la charla (correctos/total)
+      const tutoria = registrarEjercicios(acuerdo, ej.tema, materia, ok ? 1 : 0, 1);
+      onGuardarPerfil?.({ ...perfil, tutoria });
+    }
   }
 
   // Si Rai cerró el acuerdo de horario, lo guardamos en el perfil.
@@ -312,6 +378,7 @@ export function Tutor({
             // solo el último mensaje de Rai se "escribe"; el resto ya está completo
             animar={m.de === "rai" && i === mensajes.length - 1}
             onTick={scrollAlFinal}
+            onResponderEjercicio={(op) => responderEjercicio(i, op)}
           />
         ))}
 
@@ -391,6 +458,14 @@ function CajaTexto({
   );
 }
 
+// rellena "{cajas} cajas" con datos.variables.cajas (ejercicios con plantilla)
+function rellenar(enunciado: string, variables?: Record<string, unknown>): string {
+  if (!variables) return enunciado;
+  return enunciado.replace(/\{(\w+)\}/g, (_, k) =>
+    variables[k] !== undefined ? String(variables[k]) : `{${k}}`
+  );
+}
+
 // Una línea de conversación, solo texto. El texto de Rai es más grande que las
 // preguntas del diagnóstico (23px) para que la charla se sienta protagonista.
 // `animar` = revelar por palabras (solo el último mensaje recién llegado).
@@ -398,10 +473,12 @@ const Linea = memo(function Linea({
   m,
   animar = false,
   onTick,
+  onResponderEjercicio,
 }: {
   m: Mensaje;
   animar?: boolean;
   onTick?: () => void;
+  onResponderEjercicio?: (opcion: string) => void;
 }) {
   if (m.de === "nino") {
     return (
@@ -429,6 +506,67 @@ const Linea = memo(function Linea({
           modo demostración (sin IA conectada)
         </span>
       )}
+      {m.ejercicio && (
+        <TarjetaEjercicioChat
+          ejercicio={m.ejercicio}
+          onResponder={onResponderEjercicio}
+        />
+      )}
     </div>
   );
 });
+
+// Tarjeta de ejercicio embebida en la conversación con Rai.
+function TarjetaEjercicioChat({
+  ejercicio,
+  onResponder,
+}: {
+  ejercicio: EjercicioChat;
+  onResponder?: (opcion: string) => void;
+}) {
+  const resuelto = !!ejercicio.respondido;
+  return (
+    <div className="mt-3 w-full rounded-2xl border border-hair bg-surface/50 p-4 text-center">
+      <p className="mb-3 font-serif text-[17px] leading-[1.3] text-ink">
+        {ejercicio.enunciado}
+      </p>
+      <div className="flex flex-col gap-2">
+        {ejercicio.opciones.map((op, i) => {
+          const esCorrecta = op === ejercicio.respuestaFinal;
+          const marca = resuelto && esCorrecta;
+          const marcaMal =
+            ejercicio.respondido === "no" && !esCorrecta;
+          return (
+            <button
+              key={i}
+              onClick={() => !resuelto && onResponder?.(op)}
+              disabled={resuelto}
+              className={
+                "rounded-xl border px-3 py-2 text-[14px] transition-colors " +
+                (marca
+                  ? "border-sage bg-sage/10 text-ink"
+                  : marcaMal
+                    ? "border-hair text-ink-soft opacity-50"
+                    : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60")
+              }
+            >
+              {op}
+            </button>
+          );
+        })}
+      </div>
+      {resuelto && (
+        <p
+          className={
+            "mt-3 text-[13px] " +
+            (ejercicio.respondido === "ok" ? "text-sage-deep" : "text-clay")
+          }
+        >
+          {ejercicio.respondido === "ok"
+            ? "¡Correcto! 🎉"
+            : `La respuesta era ${ejercicio.respuestaFinal}.`}
+        </p>
+      )}
+    </div>
+  );
+}

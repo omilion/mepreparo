@@ -78,7 +78,9 @@ export async function GET(req: NextRequest) {
   const materia = searchParams.get("materia") || "matematica";
   const curso = searchParams.get("curso") || "5basico";
   const dificultad = parseInt(searchParams.get("dificultad") || "1", 10);
-  const oa = searchParams.get("oa") || "General";
+  // tema del mapa/charla (ej. "fracciones"): acota el RAG y se guarda en oa
+  const tema = searchParams.get("tema") || "";
+  const oa = searchParams.get("oa") || tema || "General";
 
   try {
     // 1. Intentar buscar un ejercicio ya validado y publicado en la BD Postgres
@@ -109,7 +111,9 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Recuperar contexto curricular (RAG) usando embeddings
-    const queryRAG = `Objetivos de aprendizaje y ejercicios de ${materia} para ${curso} dificultad ${dificultad}`;
+    const queryRAG = tema
+      ? `Ejercicios y objetivos de aprendizaje de ${tema} en ${materia} para ${curso}`
+      : `Objetivos de aprendizaje y ejercicios de ${materia} para ${curso} dificultad ${dificultad}`;
     const fragmentos = await recuperar(queryRAG, { materia: materia as Materia, curso: curso as Curso, k: 2 });
     const contextoRAG = fragmentos.map((f, i) => `[${i + 1}] ${f.texto}`).join("\n\n");
 

@@ -106,9 +106,20 @@ export function sistemaSesion(
     (acuerdo.notasNino ? `Notas previas: ${acuerdo.notasNino}. ` : "") +
     "Saluda recordando de qué hablaron la última vez y propón con cariño empezar con lo que " +
     "toca hoy, pero sé flexible si prefiere otro ramo. Frases cortas. " +
+    INSTRUCCION_EJERCICIO +
     `Contexto: ${resumen}`
   );
 }
+
+// Rai puede lanzar un ejercicio interactivo durante la charla: al final de un
+// mensaje escribe el marcador y la app muestra el ejercicio (de la biblioteca).
+// El resultado alimenta la memoria por tema (evidencia dura), igual que la prueba.
+export const INSTRUCCION_EJERCICIO =
+  "\nCuando el niño ya entendió algo y quieras comprobarlo jugando, puedes lanzarle UN " +
+  "ejercicio: termina ese mensaje con el marcador en una línea nueva, EXACTAMENTE así: " +
+  "<<EJERCICIO:tema>> (reemplaza 'tema' por el tema en minúsculas, ej. <<EJERCICIO:fracciones>>). " +
+  "No escribas tú el ejercicio ni las opciones: el marcador hace que aparezca uno real. " +
+  "Úsalo con moderación (no en cada mensaje) y solo cuando venga al caso. ";
 
 // Al cerrar una sesión, pedimos a Gemini un resumen breve para la próxima vez.
 export const PROMPT_RESUMIR_SESION =
