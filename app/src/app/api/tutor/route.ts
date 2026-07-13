@@ -328,13 +328,19 @@ function separarHorario(
   if (!m) return { texto: cruda.trim() };
 
   const texto = cruda.replace(m[0], "").trim();
+  const validas = new Set(materias);
+  const diasValidos: Dia[] = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"];
   try {
     const crudo = JSON.parse(m[1].trim()) as Record<string, unknown>;
-    const validas = new Set(materias);
-    const diasValidos: Dia[] = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"];
+    // el objeto de días puede venir anidado en "dias" (formato nuevo) o plano
+    // (formato viejo {lun:[...]}) — soportamos ambos.
+    const fuenteDias = (crudo.dias && typeof crudo.dias === "object"
+      ? crudo.dias
+      : crudo) as Record<string, unknown>;
+
     const horario: Partial<Record<Dia, Materia[]>> = {};
     for (const d of diasValidos) {
-      const arr = crudo[d];
+      const arr = fuenteDias[d];
       if (Array.isArray(arr)) {
         const limpio = arr.filter(
           (x): x is Materia => typeof x === "string" && validas.has(x as Materia)
@@ -342,10 +348,45 @@ function separarHorario(
         if (limpio.length) horario[d] = limpio;
       }
     }
-    return { texto, horario: Object.keys(horario).length ? horario : undefined };
+
+    // Si no hubo días pero sí un reparto de HORAS por materia, derivamos un
+    // horario repartiendo los ramos en días de la semana según sus horas.
+    const tieneDias = Object.keys(horario).length > 0;
+    if (!tieneDias && crudo.horas && typeof crudo.horas === "object") {
+      const horas = crudo.horas as Record<string, unknown>;
+      const derivado = horarioDesdeHoras(horas, validas, diasValidos);
+      if (Object.keys(derivado).length) return { texto, horario: derivado };
+    }
+
+    return { texto, horario: tieneDias ? horario : undefined };
   } catch {
     return { texto };
   }
+}
+
+// Reparte materias en días de la semana (lun→vie primero) según sus horas
+// acordadas: 1 bloque de estudio = 1 día. Da una base editable; el niño puede
+// ajustarla después. Ej: {matematica:3, ciencias:3, lenguaje:2} → 8 bloques.
+function horarioDesdeHoras(
+  horas: Record<string, unknown>,
+  validas: Set<Materia>,
+  dias: Dia[]
+): Partial<Record<Dia, Materia[]>> {
+  // lista de bloques (una entrada por hora de cada materia)
+  const bloques: Materia[] = [];
+  for (const [k, v] of Object.entries(horas)) {
+    if (!validas.has(k as Materia)) continue;
+    const n = Math.max(0, Math.min(7, Math.round(Number(v) || 0)));
+    for (let i = 0; i < n; i++) bloques.push(k as Materia);
+  }
+  if (bloques.length === 0) return {};
+  // repartir de a uno por día de lun a dom, dando la vuelta si hay más de 7
+  const horario: Partial<Record<Dia, Materia[]>> = {};
+  bloques.forEach((mat, i) => {
+    const dia = dias[i % dias.length];
+    (horario[dia] ??= []).push(mat);
+  });
+  return horario;
 }
 
 function simulada(

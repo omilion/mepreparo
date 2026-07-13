@@ -251,8 +251,8 @@ export function Tutor({
   // Si Rai cerró el acuerdo de horario, lo guardamos en el perfil.
   // Al crearlo, sembramos la memoria por tema desde el diagnóstico: así Rai
   // sabe desde el día 1 qué le cuesta al niño ("brecha detectada").
-  function quizasGuardarHorario(horario?: AcuerdoTutoria["horario"]) {
-    if (!horario || perfil.tutoria) return; // solo la primera vez
+  function guardarHorario(horario: AcuerdoTutoria["horario"]) {
+    if (perfil.tutoria) return; // solo la primera vez
     const base: AcuerdoTutoria = {
       creadoEn: new Date().toISOString(),
       horario,
@@ -262,6 +262,27 @@ export function Tutor({
     const nuevo = sembrarTemasDesdeDiagnostico(base, perfil.diagnostico);
     onGuardarPerfil?.({ ...perfil, tutoria: nuevo });
   }
+
+  function quizasGuardarHorario(horario?: AcuerdoTutoria["horario"]) {
+    if (!horario) return;
+    guardarHorario(horario);
+  }
+
+  // Red de seguridad: si Rai olvidó emitir el bloque de horario, el niño no debe
+  // quedar colgado. Reparte las materias del examen en días de la semana y cierra.
+  function cerrarConHorarioPorDefecto() {
+    const dias = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"] as const;
+    const horario: AcuerdoTutoria["horario"] = {};
+    perfil.examen.materias.forEach((mat, i) => {
+      const d = dias[i % dias.length];
+      (horario[d] ??= []).push(mat);
+    });
+    guardarHorario(horario);
+  }
+
+  // ¿mostrar la red de seguridad? primera charla, ya conversaron, sin horario aún
+  const turnosNinoActual = mensajes.filter((m) => m.de === "nino").length;
+  const mostrarEscapeHorario = esPrimera && !perfil.tutoria && turnosNinoActual >= 4;
 
   // Al salir de la tutoría, cerramos sesión de forma estructurada si hubo interacción
   async function manejarVolver() {
@@ -404,12 +425,26 @@ export function Tutor({
           </button>
         </div>
       ) : (
-        <CajaTexto
-          onEnviar={enviar}
-          cargando={cargando}
-          esPrimera={esPrimera}
-          tutorNombre={TUTOR.nombre}
-        />
+        <>
+          {mostrarEscapeHorario && (
+            <div className="flex justify-center pb-1">
+              <button
+                type="button"
+                onClick={cerrarConHorarioPorDefecto}
+                disabled={cargando}
+                className="text-[13px] text-sage-deep underline underline-offset-4 hover:opacity-80 disabled:opacity-40"
+              >
+                Ya tenemos nuestro horario, ¡a preparar todo! →
+              </button>
+            </div>
+          )}
+          <CajaTexto
+            onEnviar={enviar}
+            cargando={cargando}
+            esPrimera={esPrimera}
+            tutorNombre={TUTOR.nombre}
+          />
+        </>
       )}
     </div>
   );

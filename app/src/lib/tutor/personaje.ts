@@ -48,17 +48,25 @@ export function sistemaPrimeraCharla(
   );
 }
 
-// Cuando el niño confirma el horario, pedimos a Gemini que lo devuelva en JSON
-// para guardarlo. Este texto se agrega como instrucción extra al final.
+// Cuando el niño confirma el plan de estudio, pedimos a Gemini que lo devuelva
+// en JSON para guardarlo. Acepta DOS formas de acuerdo (la que surja natural en
+// la charla): por días de la semana O por horas por materia. Cualquiera de las
+// dos dispara la transición a "preparar los mundos".
 export function instruccionExtraerHorario(materias: Materia[]): string {
   const ids = materias.join(", ");
   const dias = DIAS.map((d) => d.id).join(", ");
   return (
-    "Si en tu último mensaje ya quedó ACORDADO un horario semanal con el niño, " +
-    "termina tu respuesta con un bloque de datos EXACTAMENTE así, en una línea nueva:\n" +
-    "<<HORARIO>>{\"lun\":[],\"mar\":[],...}<<FIN>>\n" +
-    `donde cada día (${dias}) mapea a un arreglo de ramos de esta lista: [${ids}]. ` +
-    "Usa solo esos identificadores. Si el horario aún NO está acordado, no incluyas el bloque."
+    "IMPORTANTE: apenas quede ACORDADO con el niño CÓMO va a repartir su estudio " +
+    "en la semana (ya sea por días o por cantidad de horas por ramo), y él lo " +
+    "confirme, DEBES terminar ESE mensaje con un bloque de datos en una línea nueva, " +
+    "EXACTAMENTE con este formato:\n" +
+    '<<HORARIO>>{"dias":{...},"horas":{...}}<<FIN>>\n' +
+    `- "dias": mapea cada día (${dias}) a un arreglo de ramos de esta lista [${ids}] ` +
+    "(incluye solo los días con estudio; omite el resto).\n" +
+    `- "horas": mapea cada ramo [${ids}] al número de horas semanales acordadas.\n` +
+    "Incluye AL MENOS uno de los dos objetos (el que hayan conversado). Usa solo esos " +
+    "identificadores. Es OBLIGATORIO emitir el bloque cuando el niño confirma el plan; " +
+    "si el plan aún NO está confirmado, no incluyas el bloque."
   );
 }
 
