@@ -10,6 +10,7 @@ import {
 } from "@/lib/profile";
 import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
+import { calcularPlan } from "@/lib/plan/motor";
 
 // Panel del apoderado (admin): ve a sus hijos ya configurados y elige a cuál
 // entrar, o agrega otro. El onboarding solo ocurre la primera vez.
@@ -89,6 +90,8 @@ function TarjetaPupilo({
     .map((id) => MATERIAS.find((m) => m.id === id)?.label ?? id)
     .join(" · ");
   const diagnosticado = tieneDiagnostico(p);
+  const plan = calcularPlan(p);
+  const maxHoras = Math.max(...plan.materias.map((m) => m.horas), 1);
 
   // horario acordado con Rai (si el niño ya lo definió en el tutor) — para el padre
   const horario = p.tutoria?.horario;
@@ -254,6 +257,82 @@ function TarjetaPupilo({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+          {/* Plan de estudio sugerido (Apoderado) */}
+          {diagnosticado && (
+            <div className="border-t border-hair pt-3 flex flex-col gap-3">
+              <div className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
+                Plan de estudio sugerido (Apoderado)
+              </div>
+              
+              <div className="rounded-zen border border-hair p-4 bg-surface/50 flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-hair pb-2">
+                  <span className="text-[13.5px] font-semibold text-ink">
+                    Veredicto del plan:{" "}
+                    <span 
+                      style={{
+                        color: plan.veredicto === "apretado" ? "var(--clay)" : "var(--sage-deep)"
+                      }}
+                      className="font-bold"
+                    >
+                      {plan.veredicto === "holgura" ? "Llega con holgura" : plan.veredicto === "justo" ? "Llega justo / a tiempo" : "Va apretado"}
+                    </span>
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded border border-hair/50 p-2">
+                    <div className="font-serif text-[18px] font-bold leading-none">{plan.horasTotales} h</div>
+                    <div className="mt-1 text-[9.5px] leading-tight text-ink-soft">para preparar temario</div>
+                  </div>
+                  <div className="rounded border border-hair/50 p-2">
+                    <div className="font-serif text-[18px] font-bold leading-none">{dias !== null ? dias : "—"}</div>
+                    <div className="mt-1 text-[9.5px] leading-tight text-ink-soft">días al examen</div>
+                  </div>
+                  <div className="rounded border border-hair/50 p-2">
+                    <div className="font-serif text-[18px] font-bold leading-none">{p.disponibilidad.horasSemana} h</div>
+                    <div className="mt-1 text-[9.5px] leading-tight text-ink-soft">disponibilidad semanal</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2.5 mt-1">
+                  <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-ink-soft">
+                    Distribución de horas sugerida
+                  </div>
+                  {plan.materias
+                    .slice()
+                    .sort((a, b) => a.prioridad - b.prioridad)
+                    .map((m) => {
+                      const label = MATERIAS.find((x) => x.id === m.materia)?.label ?? m.materia;
+                      const pct = Math.round((m.horas / maxHoras) * 100);
+                      const urgente = m.prioridad === 1;
+                      return (
+                        <div key={m.materia} className="text-[12.5px]">
+                          <div className="flex justify-between items-baseline text-[12px] text-ink">
+                            <span className="font-medium">{label}</span>
+                            <span className="font-mono text-ink-soft tabular-nums">{m.horas} h sugeridas</span>
+                          </div>
+                          <div className="mt-1 h-[4px] overflow-hidden rounded-full bg-mist">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${pct}%`,
+                                background: urgente ? "var(--clay)" : "var(--sage)",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {plan.veredicto === "apretado" && plan.horasSemanaSugeridas && (
+                  <p className="text-[11.5px] text-clay leading-[1.4] mt-1 border-t border-hair/30 pt-2">
+                    ⚠️ {p.nombre} debería estudiar alrededor de <strong>{plan.horasSemanaSugeridas} horas por semana</strong> (hoy tiene {p.disponibilidad.horasSemana} h) para llegar con mayor holgura.
+                  </p>
+                )}
               </div>
             </div>
           )}

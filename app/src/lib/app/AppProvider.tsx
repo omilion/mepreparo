@@ -117,6 +117,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("sync-completed", alSincronizar);
   }, []);
 
+  // Persiste la cuenta ante cualquier cambio en el estado
+  useEffect(() => {
+    if (cuenta) {
+      guardarCuenta(cuenta);
+    }
+  }, [cuenta]);
+
   // Arranque: decide a qué RUTA mandar al usuario según sesión/estado. Solo la
   // primera vez que se resuelve la sesión (no re-rutea en cada navegación).
   useEffect(() => {

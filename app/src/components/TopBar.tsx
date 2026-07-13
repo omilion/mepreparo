@@ -1,19 +1,22 @@
 import { ThemeToggle } from "./ThemeToggle";
 import { SoundToggle } from "./SoundToggle";
 import { HomeButton } from "./HomeButton";
+import { useRouter } from "next/navigation";
+import { useApp } from "@/lib/app/AppProvider";
 
 // Header sin contenedor: logo + botones flotando sobre el fondo, sin borde ni blur.
-export function TopBar({
-  onHome,
-  onCuenta,
-  onLock,
-  nombreAlumno,
-}: {
-  onHome?: () => void;
-  onCuenta?: () => void;
-  onLock?: () => void;
-  nombreAlumno?: string;
-}) {
+export function TopBar() {
+  const router = useRouter();
+  const { sesionAlumno, setPinBloqueado } = useApp();
+
+  const handleHome = sesionAlumno ? undefined : () => router.push("/panel");
+  const handleCuenta = sesionAlumno ? undefined : () => router.push("/cuenta");
+  const handleLock =
+    sesionAlumno && sesionAlumno.tienePin
+      ? () => setPinBloqueado(true)
+      : undefined;
+  const nombreAlumno = sesionAlumno ? sesionAlumno.nombre : undefined;
+
   return (
     <div className="mx-auto flex h-[58px] max-w-zen items-center justify-between px-[22px]">
       <div className="flex items-center gap-2.5 font-serif text-[19px]">
@@ -36,11 +39,11 @@ export function TopBar({
         )}
       </div>
       <div className="flex items-center gap-2.5">
-        {onHome && <HomeButton onHome={onHome} />}
-        {onLock && (
+        {handleHome && <HomeButton onHome={handleHome} />}
+        {handleLock && (
           <button
             type="button"
-            onClick={onLock}
+            onClick={handleLock}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-clay/30 text-clay hover:bg-clay/5 transition-colors"
             title="Bloquear pantalla"
             aria-label="Bloquear pantalla"
@@ -48,10 +51,10 @@ export function TopBar({
             🔒
           </button>
         )}
-        {onCuenta && (
+        {handleCuenta && (
           <button
             type="button"
-            onClick={onCuenta}
+            onClick={handleCuenta}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-hair text-ink-soft transition-colors hover:text-ink"
             title="Mi Cuenta"
             aria-label="Mi Cuenta"
