@@ -39,12 +39,12 @@ const PRESETS: Record<Exclude<Ambiente, "silencio">, ConfigAmbiente> = {
   // con el usuario: se ajustan sin tocar nada más, solo estos números).
   concentracion: {
     ruido: true,
-    ruidoGain: 0.1,
+    ruidoGain: 0.015,
     binaural: true,
     beatHz: 40,
     binauralGain: 0.08,
     lira: true,
-    liraGain: 0.12,
+    liraGain: 0.16,
     liraMinMs: 2600,
     liraMaxMs: 4200,
   },
@@ -52,12 +52,12 @@ const PRESETS: Record<Exclude<Ambiente, "silencio">, ConfigAmbiente> = {
   // colchón un poco más presente, lira más espaciada.
   calma: {
     ruido: true,
-    ruidoGain: 0.12,
+    ruidoGain: 0.02,
     binaural: true,
     beatHz: 16,
     binauralGain: 0.07,
     lira: true,
-    liraGain: 0.09,
+    liraGain: 0.12,
     liraMinMs: 4000,
     liraMaxMs: 6500,
   },
@@ -157,26 +157,43 @@ export class MotorAmbiente {
       this.liraTimer = null;
     }
     const t = this.ctx?.currentTime ?? 0;
-    // fade-out corto para no cortar seco (evita clicks)
-    for (const g of [this.ruidoGain, this.binauralGain, this.liraGain]) {
+
+    // CAPTURAR las fuentes ACTUALES ahora, y limpiar las referencias del motor
+    // enseguida. Así el motor queda "vacío" para que las capas NUEVAS que se
+    // creen justo después no sean apagadas por el setTimeout diferido de abajo.
+    const ruidoViejo = this.ruidoNode;
+    const oscLViejo = this.oscL;
+    const oscRViejo = this.oscR;
+    const gainsViejos = [this.ruidoGain, this.binauralGain, this.liraGain];
+    this.ruidoNode = null;
+    this.oscL = null;
+    this.oscR = null;
+    this.ruidoGain = null;
+    this.binauralGain = null;
+    this.liraGain = null;
+
+    // fade-out corto de los gains viejos (evita clicks)
+    for (const g of gainsViejos) {
       if (g && this.ctx) {
-        g.gain.cancelScheduledValues(t);
-        g.gain.setValueAtTime(g.gain.value, t);
-        g.gain.linearRampToValueAtTime(0.0001, t + 0.25);
+        try {
+          g.gain.cancelScheduledValues(t);
+          g.gain.setValueAtTime(g.gain.value, t);
+          g.gain.linearRampToValueAtTime(0.0001, t + 0.25);
+        } catch {
+          /* nodo ya desconectado */
+        }
       }
     }
-    // parar las fuentes tras el fade
+
+    // parar SOLO las fuentes viejas capturadas, tras el fade
     const parar = () => {
-      try {
-        this.ruidoNode?.stop();
-        this.oscL?.stop();
-        this.oscR?.stop();
-      } catch {
-        /* ya parados */
+      for (const src of [ruidoViejo, oscLViejo, oscRViejo]) {
+        try {
+          src?.stop();
+        } catch {
+          /* ya parado */
+        }
       }
-      this.ruidoNode = null;
-      this.oscL = null;
-      this.oscR = null;
     };
     if (this.ctx) setTimeout(parar, 300);
     else parar();
@@ -198,13 +215,15 @@ export class MotorAmbiente {
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     src.loop = true;
-    // filtro paso-bajo extra: aún más suave/cálido
+    // filtro paso-bajo BAJO (~500Hz): quita lo áspero/estridente y deja solo el
+    // rumor grave → colchón tipo "lluvia lejana", no "estática pegada al oído".
     const lp = this.ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.value = 1600;
+    lp.frequency.value = 500;
+    lp.Q.value = 0.5;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, this.ctx.currentTime);
-    g.gain.linearRampToValueAtTime(gain, this.ctx.currentTime + 1.2); // fade-in suave
+    g.gain.linearRampToValueAtTime(gain, this.ctx.currentTime + 2.5); // fade-in lento
     src.connect(lp);
     lp.connect(g);
     g.connect(this.compresor);
