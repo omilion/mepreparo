@@ -23,3 +23,6 @@ desktop.ini
 
 # artefactos de build de TS
 *.tsbuildinfo
+
+# carpeta temporal de trabajo (herramientas de deploy de Gema, secretos)
+app/tmp/
