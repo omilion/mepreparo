@@ -2,28 +2,16 @@
 
 import { useMemo } from "react";
 import { MATERIAS, type PerfilNino } from "@/lib/profile";
-import { calcularPlan, type Veredicto } from "@/lib/plan/motor";
+import { calcularPlan } from "@/lib/plan/motor";
 import { Reveal } from "./Reveal";
+import { etapasDeMateria, progresoDeMateria } from "@/lib/plan/etapas";
 
-const VEREDICTO: Record<
-  Veredicto,
-  { titulo: (n: string) => string; color: string; frase: string }
-> = {
-  holgura: {
-    titulo: (n) => `${n} llega con holgura.`,
-    color: "var(--sage-deep)",
-    frase: "Con tu dedicación actual hay tiempo de sobra. Pueden ir con calma.",
-  },
-  justo: {
-    titulo: (n) => `${n} llega bien, sin apuros.`,
-    color: "var(--sage-deep)",
-    frase: "El tiempo alcanza para cubrir todo antes del examen manteniendo el ritmo.",
-  },
-  apretado: {
-    titulo: (n) => `${n} va apretado.`,
-    color: "var(--clay)",
-    frase: "El tiempo es justo. Conviene enfocarse primero en lo más débil.",
-  },
+const COLOR_MATERIA: Record<string, string> = {
+  matematica: "var(--sage)",
+  lenguaje: "var(--clay)",
+  ciencias: "var(--color-ciencias)",
+  historia: "var(--color-historia)",
+  ingles: "var(--color-ingles)",
 };
 
 // Calcula la racha de días de estudio consecutivos basándose en el historial de sesiones
@@ -74,8 +62,6 @@ export function PlanEstudio({
 }) {
   const nombre = perfil.nombre.trim() || "Tu hijo";
   const plan = useMemo(() => calcularPlan(perfil), [perfil]);
-  const maxHoras = Math.max(...plan.materias.map((m) => m.horas), 1);
-  const v = VEREDICTO[plan.veredicto];
 
   // Gamificación y Objetivos de Hoy (D1)
   const sesiones = perfil.tutoria?.sesiones || [];
@@ -114,19 +100,13 @@ export function PlanEstudio({
 
       <Reveal variant="lead" delay={120}>
         <header>
-          <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
-            Progreso General
-          </div>
-          <h1 className="max-w-[20ch] text-[27px] leading-[1.2]">
-            {v.titulo(nombre)}
+          <h1 className="max-w-[20ch] text-[27px] leading-[1.2] font-serif text-left">
+            ¡Hola, {nombre}! Qué alegría verte hoy. ¿Listo/a para aprender? 😊
           </h1>
-          <p className="mt-3 max-w-[42ch] text-[15px] leading-[1.4] text-ink-soft">
-            {v.frase}
-          </p>
         </header>
       </Reveal>
 
-      {/* Meta del día (D1) */}
+      {/* Misión de hoy */}
       <Reveal delay={250}>
         {(() => {
           const tieneAcuerdo = !!perfil.tutoria;
@@ -134,13 +114,13 @@ export function PlanEstudio({
             ? "Realizar una sesión de estudio con Rai"
             : "Presentarte con Rai, tu tutor personal";
           const descObjetivo = tieneAcuerdo
-            ? "Repasa la materia asignada hoy por 20-25 minutos."
-            : "Ten tu primera conversación con Rai para conocerse y armar tu horario de estudio.";
+            ? "Repasa por 20-25 minutos"
+            : "Para conocerse y armar tu horario";
 
           return (
             <div className="rounded-zen border border-hair p-5 flex flex-col gap-3.5 bg-surface/30">
               <div className="flex justify-between items-baseline border-b border-hair pb-2">
-                <h3 className="font-serif text-[18px] text-ink">Objetivo de hoy</h3>
+                <h3 className="font-serif text-[18px] text-ink">Misión de hoy</h3>
                 <span className="text-[12px] text-ink-soft font-semibold uppercase tracking-wider">
                   {yaEstudioHoy ? "¡Completado! 🎉" : "Pendiente"}
                 </span>
@@ -162,84 +142,72 @@ export function PlanEstudio({
         })()}
       </Reveal>
 
-      {/* resumen de tiempo */}
-      <Reveal delay={480}>
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-3 gap-3">
-            <Metrica
-              valor={`${plan.horasTotales} h`}
-              unidad="para prepararse"
-            />
-            <Metrica
-              valor={plan.diasRestantes !== null ? `${plan.diasRestantes}` : "—"}
-              unidad="días al examen"
-            />
-            <Metrica
-              valor={`${perfil.disponibilidad.horasSemana} h`}
-              unidad="cada semana"
-            />
-          </div>
-          <p className="px-1 text-center text-[12.5px] leading-[1.4] text-ink-soft">
-            En total necesita unas{" "}
-            <strong className="text-ink">{plan.horasTotales} horas</strong> de
-            estudio para cubrir todo el contenido antes del examen.
-          </p>
-        </div>
+      {/* El Mensaje de Rai */}
+      <Reveal delay={350}>
+        {(() => {
+          const tieneSesiones = sesiones.length > 0;
+          const ultimoTema = tieneSesiones
+            ? (sesiones.at(-1)?.titulo || MATERIAS.find(x => x.id === sesiones.at(-1)?.materia)?.label || sesiones.at(-1)?.materia)
+            : "";
+          const mensajeRai = tieneSesiones
+            ? `¡Hola! Ayer hiciste un trabajo increíble en ${ultimoTema}. ¡Sigamos sumando pasos hoy! 🌟`
+            : "¡Hola! Estoy muy entusiasmado de conocerte hoy y empezar a aprender juntos. 🚀";
+
+          return (
+            <div className="relative rounded-zen border border-amber-200/50 dark:border-amber-900/30 p-6 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 shadow-sm overflow-hidden text-left">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-4 bg-white/40 dark:bg-black/20 -rotate-2 border-b border-hair/20" />
+              <div className="flex items-start gap-3 mt-1">
+                <span className="text-[20px]" aria-hidden>🤖</span>
+                <div className="flex flex-col gap-1">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider text-amber-800/80 dark:text-amber-300/80">
+                    Mensaje de Rai
+                  </span>
+                  <p className="font-serif italic text-[15px] leading-relaxed">
+                    "{mensajeRai}"
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </Reveal>
 
-      {/* aviso si va apretado */}
-      {plan.veredicto === "apretado" && plan.horasSemanaSugeridas && (
-        <Reveal delay={620}>
-          <div className="rounded-zen border border-[color-mix(in_srgb,var(--clay)_34%,transparent)] px-5 py-4 text-[13.5px] leading-[1.5] text-ink">
-            Para llegar cómodo, {nombre} debería estudiar alrededor de{" "}
-            <strong className="text-clay">
-              {plan.horasSemanaSugeridas} horas por semana
-            </strong>{" "}
-            (hoy son {perfil.disponibilidad.horasSemana}). Si no es posible,
-            prioricen las materias marcadas abajo como más urgentes.
-          </div>
-        </Reveal>
-      )}
-
-      {/* reparto por materia */}
-      <Reveal delay={720}>
-        <div className="flex flex-col gap-3">
+      {/* Reparto por materia (Etapas) */}
+      <Reveal delay={450}>
+        <div className="flex flex-col gap-3 text-left">
           <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-ink-soft">
-            Dónde poner el esfuerzo
+            Tus materias y etapas
           </div>
           {plan.materias
             .slice()
             .sort((a, b) => a.prioridad - b.prioridad)
             .map((m) => {
-              const label =
-                MATERIAS.find((x) => x.id === m.materia)?.label ?? m.materia;
-              const pct = Math.round((m.horas / maxHoras) * 100);
-              const urgente = m.prioridad === 1;
+              const label = MATERIAS.find((x) => x.id === m.materia)?.label ?? m.materia;
+              const etapas = etapasDeMateria(m.materia, perfil.curso, perfil.tutoria);
+              const progreso = progresoDeMateria(etapas);
+              const pct = progreso.total > 0 ? Math.round((progreso.superadas / progreso.total) * 100) : 0;
+              const colorMateria = COLOR_MATERIA[m.materia] || "var(--sage)";
+
               return (
                 <div
                   key={m.materia}
-                  className="rounded-zen border border-hair px-5 py-4"
+                  className="rounded-zen border border-hair px-5 py-4 bg-surface"
                 >
                   <div className="flex items-baseline justify-between">
-                    <span className="font-serif text-[16px]">{label}</span>
-                    <span className="font-mono text-[13px] tabular-nums text-ink-soft">
-                      {m.horas} h
+                    <span className="font-serif text-[16px] font-medium text-ink">{label}</span>
+                    <span className="font-mono text-[12.5px] tabular-nums text-ink-soft">
+                      {progreso.superadas} de {progreso.total} etapas superadas 🗺️
                     </span>
                   </div>
                   <div className="mt-2.5 h-[6px] overflow-hidden rounded-full bg-mist">
                     <div
-                      className="h-full rounded-full"
+                      className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${pct}%`,
-                        background: urgente ? "var(--clay)" : "var(--sage)",
+                        background: colorMateria,
                       }}
                     />
                   </div>
-                  {urgente && (
-                    <p className="mt-2 text-[12px] text-clay">
-                      Empezar por aquí — es donde más se necesita.
-                    </p>
-                  )}
                 </div>
               );
             })}
@@ -333,15 +301,4 @@ function materiasDeHoy(acuerdo: any): any[] {
   return acuerdo.horario[diaClave] || [];
 }
 
-function Metrica({ valor, unidad }: { valor: string; unidad: string }) {
-  return (
-    <div className="rounded-zen border border-hair px-3 py-4 text-center">
-      <div className="font-serif text-[26px] tabular-nums leading-none">
-        {valor}
-      </div>
-      <div className="mt-1.5 text-[11px] leading-tight text-ink-soft">
-        {unidad}
-      </div>
-    </div>
-  );
-}
+
