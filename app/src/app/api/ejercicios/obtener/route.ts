@@ -6,6 +6,7 @@ import { recuperar } from "@/lib/tutor/rag";
 import { generar, tieneClave } from "@/lib/tutor/gemini";
 import { validarEjercicio } from "@/lib/tutor/checker";
 import type { Materia, Curso } from "@/lib/profile";
+import { chequearLimite } from "@/lib/rateLimit";
 
 // Semilla de ejercicios de respaldo si falla Gemini o no hay clave
 const SEMILLA_EJERCICIOS = [
@@ -74,6 +75,10 @@ const SEMILLA_EJERCICIOS = [
 ];
 
 export async function GET(req: NextRequest) {
+  // se piden en ráfaga durante una prueba de etapa → límite más alto
+  const limite = chequearLimite(req, { clave: "ejercicios", max: 40, ventanaMs: 60_000 });
+  if (limite) return limite;
+
   const { searchParams } = new URL(req.url);
   const materia = searchParams.get("materia") || "matematica";
   const curso = searchParams.get("curso") || "5basico";

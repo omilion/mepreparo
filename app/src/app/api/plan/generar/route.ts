@@ -9,6 +9,7 @@ import { generar, tieneClave, MODELO_LITE } from "@/lib/tutor/gemini";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import { rutaDeTemas } from "@/lib/plan/etapas";
 import type { PlanMateria } from "@/lib/tutor/acuerdo";
+import { chequearLimite } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,9 @@ interface Body {
 }
 
 export async function POST(req: NextRequest) {
+  const limite = chequearLimite(req, { clave: "plan", max: 10, ventanaMs: 60_000 });
+  if (limite) return limite;
+
   let body: Body;
   try {
     body = await req.json();

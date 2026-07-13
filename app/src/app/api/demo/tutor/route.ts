@@ -7,6 +7,7 @@ import { TUTOR } from "@/lib/tutor/personaje";
 import { generar, tieneClave, MODELO_LITE } from "@/lib/tutor/gemini";
 import { recuperar } from "@/lib/tutor/rag";
 import { MATERIAS, type Materia } from "@/lib/profile";
+import { chequearLimite } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,10 @@ const nombreMateria = (m?: Materia) =>
   MATERIAS.find((x) => x.id === m)?.label ?? "la materia";
 
 export async function POST(req: NextRequest) {
+  // demo es público (sin auth) → límite más estricto
+  const limite = chequearLimite(req, { clave: "demo", max: 15, ventanaMs: 60_000 });
+  if (limite) return limite;
+
   let body: Body;
   try {
     body = await req.json();

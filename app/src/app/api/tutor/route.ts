@@ -6,6 +6,7 @@
 // La clave de Gemini vive solo aquí (servidor), nunca llega al navegador.
 
 import { NextRequest, NextResponse } from "next/server";
+import { chequearLimite } from "@/lib/rateLimit";
 import {
   TUTOR,
   sistemaPrimeraCharla,
@@ -52,6 +53,9 @@ function normalizarPregunta(texto: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const limite = chequearLimite(req, { clave: "tutor", max: 30, ventanaMs: 60_000 });
+  if (limite) return limite;
+
   let body: Body;
   try {
     body = await req.json();
