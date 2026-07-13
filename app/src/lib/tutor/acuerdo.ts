@@ -63,10 +63,23 @@ export interface RecuerdoNino {
   tema?: string; // si el recuerdo está ligado a un tema concreto
 }
 
+// Plan de una materia generado por la IA al terminar el onboarding ("preparar
+// los mundos"): el orden pedagógico de temas + un objetivo. Da a las etapas y a
+// las conversaciones sentido de temporalidad ("sin esto no entenderás lo otro").
+// Es la BASE; el niño puede desviarse, pero orienta a Rai.
+export interface PlanMateria {
+  materia: Materia;
+  objetivo: string; // meta de la materia para el examen (1 frase)
+  temas: string[]; // orden pedagógico de temas (claves, como en el banco)
+  generadoEn: string; // ISO
+}
+
 export interface AcuerdoTutoria {
   creadoEn: string; // ISO — cuándo se hizo la primera charla
   // Qué ramo(s) toca cada día. Un día puede no tener ramo (descanso).
   horario: Partial<Record<Dia, Materia[]>>;
+  // Plan por materia generado por la IA (la ruta base de cada "mundo").
+  planMaterias?: PlanMateria[];
   // LEGADO: notas planas (se conserva para acuerdos antiguos; ya no se
   // trunca ni se escribe — los recuerdos nuevos van a `recuerdos`).
   notasNino: string;

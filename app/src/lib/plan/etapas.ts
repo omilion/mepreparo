@@ -39,8 +39,15 @@ export function tituloDeTema(tema: string): string {
   return limpio.charAt(0).toUpperCase() + limpio.slice(1);
 }
 
-// La secuencia de temas de una materia+curso (vacía si no hay banco para esa combinación).
-export function rutaDeTemas(materia: Materia, curso: Curso): string[] {
+// La secuencia de temas de una materia+curso. Prioridad: el plan generado por
+// la IA en el onboarding (si existe) → si no, el orden del banco por dificultad.
+export function rutaDeTemas(
+  materia: Materia,
+  curso: Curso,
+  acuerdo?: AcuerdoTutoria | null
+): string[] {
+  const plan = acuerdo?.planMaterias?.find((p) => p.materia === materia);
+  if (plan && plan.temas.length > 0) return plan.temas;
   const rutas = RUTAS as Record<string, string[]>;
   return rutas[`${materia}|${curso}`] ?? [];
 }
@@ -53,7 +60,7 @@ export function etapasDeMateria(
   curso: Curso,
   acuerdo?: AcuerdoTutoria | null
 ): Etapa[] {
-  const ruta = rutaDeTemas(materia, curso);
+  const ruta = rutaDeTemas(materia, curso, acuerdo);
   const temas = acuerdo?.temas ?? [];
 
   let actualAsignada = false;

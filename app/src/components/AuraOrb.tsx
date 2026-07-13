@@ -82,35 +82,42 @@ export const AuraOrb = memo(function AuraOrb({
             opacity: 0.95;
           }
         }
-        /* mientras escribe: late, brilla y se mueve suavemente (como vivo) */
+        /* mientras escribe: PULSA en brillo/color (protagonista) y deriva muy
+           poco. El foco del efecto es el latido de luz, no el movimiento. */
         .aura-activa {
-          animation: latido 1.5s ease-in-out infinite,
-            vaiven 3.2s ease-in-out infinite;
-          filter: blur(5px) saturate(1.25);
+          animation: latido 1.4s ease-in-out infinite,
+            vaiven 6s ease-in-out infinite,
+            brillo 1.4s ease-in-out infinite;
         }
         @keyframes latido {
           0%,
           100% {
-            transform: scale(0.94);
-            opacity: 0.8;
+            transform: scale(0.97);
+            opacity: 0.85;
           }
           50% {
-            transform: scale(1.13);
+            transform: scale(1.1);
             opacity: 1;
           }
         }
-        /* deriva sutil en X/Y — la animación se compone con el latido vía
-           translate + scale, así que animamos translate aquí y scale arriba */
+        /* el brillo/saturación pulsa fuerte: es lo que se debe notar */
+        @keyframes brillo {
+          0%,
+          100% {
+            filter: blur(6px) saturate(1) brightness(1);
+          }
+          50% {
+            filter: blur(4px) saturate(1.6) brightness(1.25);
+          }
+        }
+        /* deriva MÍNIMA (antes 9px, se movía demasiado de lado) */
         @keyframes vaiven {
           0%,
           100% {
-            translate: -5px 2px;
+            translate: -1.5px 1px;
           }
-          33% {
-            translate: 4px -4px;
-          }
-          66% {
-            translate: 3px 4px;
+          50% {
+            translate: 1.5px -1px;
           }
         }
         @media (prefers-reduced-motion: reduce) {

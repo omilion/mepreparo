@@ -343,9 +343,15 @@ export function Tutor({
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-zen flex-col px-[22px]">
+    // 100dvh = altura REAL del viewport en móvil (se ajusta a la barra del
+    // navegador y al teclado, a diferencia de 100vh/h-screen que dejaba el
+    // input fuera de pantalla al hacer scroll). minHeight de respaldo.
+    <div
+      className="mx-auto flex max-w-zen flex-col px-[22px]"
+      style={{ height: "100dvh", minHeight: "100dvh" }}
+    >
       {/* Barra superior de herramientas idéntica a otras vistas */}
-      <div className="flex h-[58px] items-center justify-end gap-2.5">
+      <div className="flex h-[58px] flex-none items-center justify-end gap-2.5">
         <HomeButton onHome={manejarVolver} />
         <SoundToggle />
         <ThemeToggle />
@@ -431,13 +437,20 @@ function CajaTexto({
   }
 
   return (
-    <div className="flex items-center gap-2.5 py-3">
+    <div className="flex flex-none items-center gap-2.5 py-3">
       <input
         type="text"
         value={texto}
         disabled={cargando}
         onChange={(e) => setTexto(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && enviar()}
+        // al enfocar (teclado móvil abre), aseguramos que el input quede visible
+        onFocus={(e) =>
+          setTimeout(
+            () => e.target.scrollIntoView({ block: "center", behavior: "smooth" }),
+            300
+          )
+        }
         placeholder={
           esPrimera
             ? "Responde a Rai…"
@@ -481,8 +494,9 @@ const Linea = memo(function Linea({
   onResponderEjercicio?: (opcion: string) => void;
 }) {
   if (m.de === "nino") {
+    // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
     return (
-      <p className="mx-auto max-w-[30ch] text-[17px] font-[560] leading-[1.4] text-ink-soft">
+      <p className="mx-auto max-w-[30ch] text-[17px] font-[600] leading-[1.4] text-sage-deep">
         {m.texto}
       </p>
     );

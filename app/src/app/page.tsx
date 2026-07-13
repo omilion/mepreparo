@@ -16,6 +16,7 @@ import { MiCuenta } from "@/components/MiCuenta";
 import { Landing } from "@/components/Landing";
 import { Demo } from "@/components/Demo";
 import { MapaEtapas } from "@/components/MapaEtapas";
+import { PrepararMundos } from "@/components/PrepararMundos";
 import { PruebaEtapa } from "@/components/PruebaEtapa";
 import {
   registrarEjercicios,
@@ -57,6 +58,7 @@ type Etapa =
   | "resultado"
   | "diagnostico"
   | "plan"
+  | "mundos"
   | "mapa"
   | "prueba"
   | "tutor";
@@ -280,6 +282,7 @@ export default function Home() {
     etapa !== "auth" &&
     etapa !== "landing" &&
     etapa !== "demo" &&
+    etapa !== "mundos" &&
     etapa !== "cargando";
 
   // Si el alumno tiene PIN y la sesión está bloqueada, renderizar SÓLO la pantalla del PIN
@@ -477,6 +480,29 @@ export default function Home() {
           }}
           onGuardarPerfil={(p) => {
             setCuenta(guardarPupilo(cuenta!, p));
+            // primera vez que el niño cierra su acuerdo con Rai y aún NO tiene
+            // plan de materias generado → pasa por "preparar sus mundos".
+            if (p.tutoria && !p.tutoria.planMaterias) {
+              setEtapa("mundos");
+            } else {
+              setEtapa("mapa");
+            }
+          }}
+        />
+      )}
+
+      {/* transición "preparando tus mundos": la IA arma el plan de cada materia */}
+      {etapa === "mundos" && pupilo && (
+        <PrepararMundos
+          perfil={pupilo}
+          onListo={(planMaterias) => {
+            if (planMaterias && pupilo.tutoria) {
+              const actualizado: PerfilNino = {
+                ...pupilo,
+                tutoria: { ...pupilo.tutoria, planMaterias },
+              };
+              setCuenta(guardarPupilo(cuenta!, actualizado));
+            }
             setEtapa("mapa");
           }}
         />
