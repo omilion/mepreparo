@@ -204,6 +204,7 @@ export function Tutor({
 
   // Pide un ejercicio del tema a la biblioteca validada y lo adjunta al mensaje.
   async function cargarEjercicioEnChat(tema: string, msgIdx: number) {
+    let ejercicioOk = false;
     try {
       const params = new URLSearchParams({
         materia,
@@ -214,19 +215,38 @@ export function Tutor({
       const res = await fetch(`/api/ejercicios/obtener?${params}`);
       const data = await res.json();
       const e = data.ejercicio;
-      if (!e) return;
-      const ejercicio: EjercicioChat = {
-        tema,
-        enunciado: rellenar(e.enunciado, e.datos?.variables),
-        opciones: e.datos?.opciones ?? e.opciones ?? [],
-        respuestaFinal: String(e.respuestaFinal ?? ""),
-      };
-      if (ejercicio.opciones.length < 2) return; // ejercicio inválido: lo omitimos
-      setMensajes((m) =>
-        m.map((msg, i) => (i === msgIdx ? { ...msg, ejercicio } : msg))
-      );
+      const opciones: string[] = e?.datos?.opciones ?? e?.opciones ?? [];
+      const respuestaFinal = String(e?.respuestaFinal ?? "");
+      // válido = enunciado + al menos 2 opciones + la respuesta está entre ellas
+      if (e?.enunciado && opciones.length >= 2 && opciones.includes(respuestaFinal)) {
+        const ejercicio: EjercicioChat = {
+          tema,
+          enunciado: rellenar(e.enunciado, e.datos?.variables),
+          opciones,
+          respuestaFinal,
+        };
+        setMensajes((m) =>
+          m.map((msg, i) => (i === msgIdx ? { ...msg, ejercicio } : msg))
+        );
+        ejercicioOk = true;
+      }
     } catch {
-      /* si falla, la charla sigue sin ejercicio */
+      /* cae al mensaje de respaldo abajo */
+    }
+
+    // RED DE SEGURIDAD: si el ejercicio no llegó, el niño NO debe quedar
+    // esperando un juego que Rai prometió. Rai lo retoma con naturalidad.
+    if (!ejercicioOk) {
+      setMensajes((m) => [
+        ...m,
+        {
+          de: "rai",
+          texto:
+            "¡Uy! Se me traspapeló el ejercicio 😅. Mejor sigamos conversando y " +
+            "lo intentamos de nuevo en un ratito. ¿Qué parte te gustaría repasar?",
+        },
+      ]);
+      scrollAlFinal();
     }
   }
 

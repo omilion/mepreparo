@@ -74,6 +74,52 @@ const SEMILLA_EJERCICIOS = [
   },
 ];
 
+// Parseo tolerante: intenta JSON.parse normal; si el JSON viene TRUNCADO
+// (respuesta cortada por tokens), recupera lo esencial (enunciado, opciones,
+// respuestaFinal, datos, formula) con extracción por campos. Devuelve un objeto
+// parcial usable o lanza si no hay nada rescatable.
+function parseJsonTolerante(cruda: string): Record<string, unknown> {
+  const limpia = cruda.trim().replace(/^```json?\s*/i, "").replace(/```\s*$/i, "");
+  try {
+    return JSON.parse(limpia);
+  } catch {
+    // rescate: extraer campos con regex del texto (aunque esté cortado)
+    const obj: Record<string, unknown> = {};
+    const str = (k: string) => {
+      const m = limpia.match(new RegExp(`"${k}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+      return m ? m[1].replace(/\\"/g, '"') : undefined;
+    };
+    const enunciado = str("enunciado");
+    const respuestaFinal = str("respuestaFinal");
+    const formula = str("formula");
+    // opciones: array de strings hasta el primer ] (aunque falte el resto del JSON)
+    const opcMatch = limpia.match(/"opciones"\s*:\s*\[([\s\S]*?)\]/);
+    const opciones = opcMatch
+      ? opcMatch[1]
+          .split(",")
+          .map((s) => s.trim().replace(/^"|"$/g, "").replace(/\\"/g, '"'))
+          .filter(Boolean)
+      : [];
+    // datos: objeto de variables numéricas (mejor esfuerzo)
+    let datos: Record<string, number> = {};
+    const datMatch = limpia.match(/"datos"\s*:\s*\{([\s\S]*?)\}/);
+    if (datMatch) {
+      for (const p of datMatch[1].matchAll(/"(\w+)"\s*:\s*(-?\d+(?:\.\d+)?)/g)) {
+        datos[p[1]] = Number(p[2]);
+      }
+    }
+    if (enunciado) obj.enunciado = enunciado;
+    if (respuestaFinal) obj.respuestaFinal = respuestaFinal;
+    if (formula) obj.formula = formula;
+    if (opciones.length) obj.opciones = opciones;
+    if (Object.keys(datos).length) obj.datos = datos;
+    obj.solucionPasoAPaso = [];
+    // si no rescatamos lo mínimo, que falle (para reintentar/caer a semilla)
+    if (!obj.enunciado || !obj.opciones) throw new Error("JSON irrescatable");
+    return obj;
+  }
+}
+
 export async function GET(req: NextRequest) {
   // se piden en ráfaga durante una prueba de etapa → límite más alto
   const limite = chequearLimite(req, { clave: "ejercicios", max: 40, ventanaMs: 60_000 });
@@ -159,14 +205,30 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
         const respuesta = await generar({
           sistema: sistemaPrompt,
           usuario: usuarioPrompt,
-          maxTokens: 600,
+          // 600 era insuficiente: el JSON se truncaba a media cadena y JSON.parse
+          // fallaba SIEMPRE → nunca se generaba un ejercicio (caía a semilla).
+          maxTokens: 1100,
           json: true,
         });
 
-        const ejercicioObj = JSON.parse(respuesta);
+        const ejercicioObj = parseJsonTolerante(respuesta) as {
+          enunciado: string;
+          datos?: Record<string, number>;
+          formula?: string;
+          solucionPasoAPaso?: string[];
+          respuestaFinal: string;
+          opciones: string[];
+        };
 
         // Validar el ejercicio generado con nuestro Checker de dos niveles
-        const check = await validarEjercicio(materia, ejercicioObj);
+        const check = await validarEjercicio(materia, {
+          enunciado: ejercicioObj.enunciado,
+          datos: ejercicioObj.datos ?? {},
+          formula: ejercicioObj.formula,
+          solucionPasoAPaso: ejercicioObj.solucionPasoAPaso ?? [],
+          respuestaFinal: ejercicioObj.respuestaFinal,
+          opciones: ejercicioObj.opciones,
+        });
 
         if (check.esValido) {
           const nuevoId = `validated-${crypto.randomUUID()}`;
