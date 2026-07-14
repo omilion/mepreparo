@@ -2,11 +2,12 @@ import { tieneClave, generar, MODELO_LITE } from "./gemini";
 
 interface EjercicioGenerado {
   enunciado: string;
-  datos: Record<string, number>;
+  datos: Record<string, any>;
   formula?: string;
   solucionPasoAPaso: string[];
   respuestaFinal: string;
-  opciones: string[];
+  opciones?: string[];
+  tipoPlantilla?: string;
 }
 
 // Evalúa una expresión matemática simple de forma segura
@@ -51,7 +52,7 @@ export async function auditarConIA(
 Tu objetivo es analizar si el siguiente ejercicio es apto para niños de enseñanza básica.
 Requisitos:
 1. El enunciado debe ser claro, comprensible y sin errores ortográficos.
-2. La respuestaFinal debe ser 100% correcta y estar listada entre las opciones.
+2. La respuestaFinal debe ser 100% correcta. Si es de opción múltiple, debe estar listada entre las opciones.
 3. No debe haber ambigüedad en cuál es la opción correcta.
 
 Responde únicamente con un objeto JSON con el siguiente formato exacto:
@@ -90,12 +91,19 @@ export async function validarEjercicio(
   ejercicio: EjercicioGenerado
 ): Promise<{ esValido: boolean; razon: string }> {
   // 1. Validar integridad básica
-  if (!ejercicio.enunciado || !ejercicio.respuestaFinal || !Array.isArray(ejercicio.opciones)) {
+  if (!ejercicio.enunciado || !ejercicio.respuestaFinal) {
     return { esValido: false, razon: "Formato de ejercicio incompleto" };
   }
 
-  if (!ejercicio.opciones.includes(ejercicio.respuestaFinal)) {
-    return { esValido: false, razon: "La respuesta correcta no se encuentra entre las opciones" };
+  const esEscrito = ejercicio.tipoPlantilla === "escrito";
+
+  if (!esEscrito) {
+    if (!Array.isArray(ejercicio.opciones)) {
+      return { esValido: false, razon: "Opción de ejercicio no es un array en opción múltiple" };
+    }
+    if (!ejercicio.opciones.includes(ejercicio.respuestaFinal)) {
+      return { esValido: false, razon: "La respuesta correcta no se encuentra entre las opciones" };
+    }
   }
 
   // 2. Validación matemática determinista si aplica

@@ -92,6 +92,7 @@ function parseJsonTolerante(cruda: string): Record<string, unknown> {
     const enunciado = str("enunciado");
     const respuestaFinal = str("respuestaFinal");
     const formula = str("formula");
+    const tipoPlantilla = str("tipoPlantilla");
     // opciones: array de strings hasta el primer ] (aunque falte el resto del JSON)
     const opcMatch = limpia.match(/"opciones"\s*:\s*\[([\s\S]*?)\]/);
     const opciones = opcMatch
@@ -111,11 +112,14 @@ function parseJsonTolerante(cruda: string): Record<string, unknown> {
     if (enunciado) obj.enunciado = enunciado;
     if (respuestaFinal) obj.respuestaFinal = respuestaFinal;
     if (formula) obj.formula = formula;
+    if (tipoPlantilla) obj.tipoPlantilla = tipoPlantilla;
     if (opciones.length) obj.opciones = opciones;
     if (Object.keys(datos).length) obj.datos = datos;
     obj.solucionPasoAPaso = [];
+    
+    const esEscrito = tipoPlantilla === "escrito";
     // si no rescatamos lo mínimo, que falle (para reintentar/caer a semilla)
-    if (!obj.enunciado || !obj.opciones) throw new Error("JSON irrescatable");
+    if (!obj.enunciado || (!esEscrito && !obj.opciones)) throw new Error("JSON irrescatable");
     return obj;
   }
 }
@@ -132,6 +136,7 @@ export async function GET(req: NextRequest) {
   // tema del mapa/charla (ej. "fracciones"): acota el RAG y se guarda en oa
   const tema = searchParams.get("tema") || "";
   const oa = searchParams.get("oa") || tema || "General";
+  const tipoPlantilla = searchParams.get("tipoPlantilla") || "opcion_multiple";
 
   try {
     // 1. Intentar buscar un ejercicio ya validado y publicado en la BD Postgres
@@ -148,9 +153,16 @@ export async function GET(req: NextRequest) {
       );
 
     if (existentes.length > 0) {
-      // Retornar un ejercicio aleatorio de los coincidentes (ahorro 100% de tokens)
-      const elegido = existentes[Math.floor(Math.random() * existentes.length)];
-      return NextResponse.json({ ejercicio: elegido, fuente: "biblioteca_compartida" });
+      const coincidentes = existentes.filter((e) => {
+        const d = e.datos as any;
+        const t = d?.tipoPlantilla || "opcion_multiple";
+        return t === tipoPlantilla;
+      });
+      if (coincidentes.length > 0) {
+        // Retornar un ejercicio aleatorio de los coincidentes (ahorro 100% de tokens)
+        const elegido = coincidentes[Math.floor(Math.random() * coincidentes.length)];
+        return NextResponse.json({ ejercicio: elegido, fuente: "biblioteca_compartida" });
+      }
     }
 
     // 2. Si no hay, y no tenemos API key de Gemini, devolvemos uno de la semilla local
@@ -173,7 +185,26 @@ export async function GET(req: NextRequest) {
     while (intentos < 2) {
       intentos++;
       try {
-        const sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
+        let sistemaPrompt = "";
+        if (tipoPlantilla === "escrito") {
+          sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
+Genera un ejercicio de respuesta escrita (respuesta corta/numérica exacta de una o dos palabras, NO de opción múltiple) adaptado al curso, materia, dificultad y contexto pedagógico provisto.
+Debes responder con un objeto JSON en el siguiente formato exacto:
+{
+  "tipoPlantilla": "escrito",
+  "enunciado": "Enunciado del ejercicio. Puedes incluir variables entre llaves como {cajas} y {manzanas}.",
+  "datos": {
+    "nombre_variable": valor_numerico
+  },
+  "formula": "Fórmula matemática simple para calcular la respuesta final usando las variables en 'datos'. Dejar vacío si no es matemática.",
+  "solucionPasoAPaso": [
+    "Paso 1: Explicación...",
+    "Paso 2: Explicación..."
+  ],
+  "respuestaFinal": "La respuesta exacta y correcta (ej: 24)"
+}`;
+        } else {
+          sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
 Genera un ejercicio adaptado al curso, materia, dificultad y contexto pedagógico provisto.
 Debes responder con un objeto JSON en el siguiente formato exacto:
 {
@@ -194,6 +225,7 @@ Debes responder con un objeto JSON en el siguiente formato exacto:
     "Opción incorrecta 3"
   ]
 }`;
+        }
 
         const usuarioPrompt = `Genera un ejercicio para:
 Materia: ${materia}
@@ -217,7 +249,8 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
           formula?: string;
           solucionPasoAPaso?: string[];
           respuestaFinal: string;
-          opciones: string[];
+          opciones?: string[];
+          tipoPlantilla?: string;
         };
 
         // Validar el ejercicio generado con nuestro Checker de dos niveles
@@ -228,6 +261,7 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
           solucionPasoAPaso: ejercicioObj.solucionPasoAPaso ?? [],
           respuestaFinal: ejercicioObj.respuestaFinal,
           opciones: ejercicioObj.opciones,
+          tipoPlantilla: ejercicioObj.tipoPlantilla || tipoPlantilla,
         });
 
         if (check.esValido) {
@@ -244,6 +278,7 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
               variables: ejercicioObj.datos || {},
               opciones: ejercicioObj.opciones || [],
               formula: ejercicioObj.formula || "",
+              tipoPlantilla: ejercicioObj.tipoPlantilla || tipoPlantilla,
             },
             solucionPasoAPaso: ejercicioObj.solucionPasoAPaso || [],
             respuestaFinal: ejercicioObj.respuestaFinal,
@@ -268,6 +303,7 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
             datos: {
               variables: ejercicioObj.datos || {},
               opciones: ejercicioObj.opciones || [],
+              tipoPlantilla: ejercicioObj.tipoPlantilla || tipoPlantilla,
               errorLog: check.razon,
             },
             solucionPasoAPaso: ejercicioObj.solucionPasoAPaso || [],

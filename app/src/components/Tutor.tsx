@@ -26,6 +26,7 @@ interface EjercicioChat {
   opciones: string[];
   respuestaFinal: string;
   respondido?: "ok" | "no";
+  tipoPlantilla?: string;
 }
 
 interface Mensaje {
@@ -182,6 +183,7 @@ export function Tutor({
     fuentes?: string[];
     modo?: "gemini" | "simulado";
     ejercicioTema?: string;
+    ejercicioFormato?: string;
   }) {
     const idx = { current: -1 };
     setMensajes((m) => {
@@ -196,14 +198,19 @@ export function Tutor({
         },
       ];
     });
-    // si Rai lanzó un ejercicio, lo pedimos a la biblioteca y lo adjuntamos
+    // si Rai lanzó un ejercicio, lo pedimos a la biblioteca y lo adjuntamos.
+    // El FORMATO lo eligió Rai (no el azar): "escrito" o "opcion_multiple".
     if (data.ejercicioTema) {
-      void cargarEjercicioEnChat(data.ejercicioTema, idx.current);
+      void cargarEjercicioEnChat(
+        data.ejercicioTema,
+        idx.current,
+        data.ejercicioFormato || "opcion_multiple"
+      );
     }
   }
 
   // Pide un ejercicio del tema a la biblioteca validada y lo adjunta al mensaje.
-  async function cargarEjercicioEnChat(tema: string, msgIdx: number) {
+  async function cargarEjercicioEnChat(tema: string, msgIdx: number, formato: string) {
     let ejercicioOk = false;
     try {
       const params = new URLSearchParams({
@@ -211,19 +218,27 @@ export function Tutor({
         curso: perfil.curso,
         dificultad: "2",
         tema,
+        tipoPlantilla: formato,
       });
       const res = await fetch(`/api/ejercicios/obtener?${params}`);
       const data = await res.json();
       const e = data.ejercicio;
       const opciones: string[] = e?.datos?.opciones ?? e?.opciones ?? [];
       const respuestaFinal = String(e?.respuestaFinal ?? "");
-      // válido = enunciado + al menos 2 opciones + la respuesta está entre ellas
-      if (e?.enunciado && opciones.length >= 2 && opciones.includes(respuestaFinal)) {
+      const tipoPlantilla = e?.tipoPlantilla ?? e?.datos?.tipoPlantilla ?? "opcion_multiple";
+      
+      const esEscrito = tipoPlantilla === "escrito";
+      const esValido = esEscrito
+        ? !!(e?.enunciado && respuestaFinal)
+        : !!(e?.enunciado && opciones.length >= 2 && opciones.includes(respuestaFinal));
+
+      if (esValido) {
         const ejercicio: EjercicioChat = {
           tema,
           enunciado: rellenar(e.enunciado, e.datos?.variables),
           opciones,
           respuestaFinal,
+          tipoPlantilla,
         };
         setMensajes((m) =>
           m.map((msg, i) => (i === msgIdx ? { ...msg, ejercicio } : msg))
@@ -255,13 +270,13 @@ export function Tutor({
     setMensajes((m) =>
       m.map((msg, i) => {
         if (i !== msgIdx || !msg.ejercicio || msg.ejercicio.respondido) return msg;
-        const ok = opcion === msg.ejercicio.respuestaFinal;
+        const ok = opcion.trim().toLowerCase() === msg.ejercicio.respuestaFinal.trim().toLowerCase();
         return { ...msg, ejercicio: { ...msg.ejercicio, respondido: ok ? "ok" : "no" } };
       })
     );
     const ej = mensajes[msgIdx]?.ejercicio;
     if (ej && !ej.respondido && acuerdo) {
-      const ok = opcion === ej.respuestaFinal;
+      const ok = opcion.trim().toLowerCase() === ej.respuestaFinal.trim().toLowerCase();
       // evidencia dura de UN ejercicio en la charla (correctos/total)
       const tutoria = registrarEjercicios(acuerdo, ej.tema, materia, ok ? 1 : 0, 1);
       onGuardarPerfil?.({ ...perfil, tutoria });
@@ -387,8 +402,10 @@ export function Tutor({
     // 100dvh = altura REAL del viewport en móvil (se ajusta a la barra del
     // navegador y al teclado, a diferencia de 100vh/h-screen que dejaba el
     // input fuera de pantalla al hacer scroll). minHeight de respaldo.
+    // Ancho responsive: en móvil la columna zen (560px, buena legibilidad); en
+    // tablet+ ocupa ~80% del ancho con un tope, para no dejar márgenes enormes.
     <div
-      className="mx-auto flex max-w-zen flex-col px-[22px]"
+      className="mx-auto flex w-full max-w-zen flex-col px-[22px] md:w-[80%] md:max-w-[900px]"
       style={{ height: "100dvh", minHeight: "100dvh" }}
     >
       {/* Barra superior de herramientas idéntica a otras vistas */}
@@ -492,36 +509,38 @@ function CajaTexto({
   }
 
   return (
-    <div className="flex flex-none items-center gap-2.5 py-3">
-      <input
-        type="text"
-        value={texto}
-        disabled={cargando}
-        onChange={(e) => setTexto(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && enviar()}
-        // al enfocar (teclado móvil abre), aseguramos que el input quede visible
-        onFocus={(e) =>
-          setTimeout(
-            () => e.target.scrollIntoView({ block: "center", behavior: "smooth" }),
-            300
-          )
-        }
-        placeholder={
-          esPrimera
-            ? "Responde a Rai…"
-            : `Escríbele a ${tutorNombre}…`
-        }
-        className="flex-1 border-b border-hair bg-transparent px-1 py-2.5 text-center text-[16px] text-ink outline-none transition-colors focus:border-sage"
-      />
-      <button
-        type="button"
-        onClick={enviar}
-        disabled={!texto.trim() || cargando}
-        aria-label="Enviar"
-        className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-sage-deep transition-opacity hover:opacity-70 disabled:opacity-30"
-      >
-        ↑
-      </button>
+    // input DESTACADO: caja con borde completo, fondo sutil, ~90% del ancho y
+    // tipografía más grande — pensado para que el niño lo vea claro en tablet.
+    <div className="flex flex-none justify-center py-3">
+      <div className="flex w-[90%] items-center gap-2 rounded-2xl border border-hair bg-surface/60 px-3 py-1.5 transition-colors focus-within:border-sage">
+        <input
+          type="text"
+          value={texto}
+          disabled={cargando}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && enviar()}
+          // al enfocar (teclado móvil abre), aseguramos que el input quede visible
+          onFocus={(e) =>
+            setTimeout(
+              () => e.target.scrollIntoView({ block: "center", behavior: "smooth" }),
+              300
+            )
+          }
+          placeholder={
+            esPrimera ? "Responde a Rai…" : `Escríbele a ${tutorNombre}…`
+          }
+          className="flex-1 bg-transparent px-1 py-2 text-[19px] text-ink outline-none placeholder:text-ink-soft/60"
+        />
+        <button
+          type="button"
+          onClick={enviar}
+          disabled={!texto.trim() || cargando}
+          aria-label="Enviar"
+          className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-sage-deep text-[18px] text-white transition-opacity hover:opacity-90 disabled:opacity-30"
+        >
+          ↑
+        </button>
+      </div>
     </div>
   );
 }
@@ -594,36 +613,68 @@ function TarjetaEjercicioChat({
   onResponder?: (opcion: string) => void;
 }) {
   const resuelto = !!ejercicio.respondido;
+  const esEscrito = ejercicio.tipoPlantilla === "escrito";
+  const [inputValue, setInputValue] = useState("");
+
   return (
     <div className="mt-3 w-full rounded-2xl border border-hair bg-surface/50 p-4 text-center">
       <p className="mb-3 font-serif text-[17px] leading-[1.3] text-ink">
         {ejercicio.enunciado}
       </p>
-      <div className="flex flex-col gap-2">
-        {ejercicio.opciones.map((op, i) => {
-          const esCorrecta = op === ejercicio.respuestaFinal;
-          const marca = resuelto && esCorrecta;
-          const marcaMal =
-            ejercicio.respondido === "no" && !esCorrecta;
-          return (
-            <button
-              key={i}
-              onClick={() => !resuelto && onResponder?.(op)}
-              disabled={resuelto}
-              className={
-                "rounded-xl border px-3 py-2 text-[14px] transition-colors " +
-                (marca
-                  ? "border-sage bg-sage/10 text-ink"
-                  : marcaMal
-                    ? "border-hair text-ink-soft opacity-50"
-                    : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60")
+      
+      {esEscrito ? (
+        <div className="flex flex-col items-center gap-3">
+          <input
+            type="text"
+            value={inputValue}
+            disabled={resuelto}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Escribe tu respuesta aquí..."
+            className="border-b border-hair bg-transparent px-2 py-1 text-center text-[15px] text-ink outline-none focus:border-sage w-full max-w-[200px] transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && inputValue.trim() && !resuelto) {
+                onResponder?.(inputValue.trim());
               }
+            }}
+          />
+          {!resuelto && (
+            <button
+              onClick={() => inputValue.trim() && onResponder?.(inputValue.trim())}
+              disabled={!inputValue.trim()}
+              className="rounded-xl border border-hair px-4 py-1.5 text-[13px] bg-sage/10 text-sage-deep font-[600] transition-colors hover:border-sage enabled:opacity-100 disabled:opacity-40"
             >
-              {op}
+              Comprobar
             </button>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {ejercicio.opciones.map((op, i) => {
+            const esCorrecta = op === ejercicio.respuestaFinal;
+            const marca = resuelto && esCorrecta;
+            const marcaMal =
+              ejercicio.respondido === "no" && !esCorrecta;
+            return (
+              <button
+                key={i}
+                onClick={() => !resuelto && onResponder?.(op)}
+                disabled={resuelto}
+                className={
+                  "rounded-xl border px-3 py-2 text-[14px] transition-colors " +
+                  (marca
+                    ? "border-sage bg-sage/10 text-ink"
+                    : marcaMal
+                      ? "border-hair text-ink-soft opacity-50"
+                      : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60")
+                }
+              >
+                {op}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      
       {resuelto && (
         <p
           className={
@@ -633,7 +684,7 @@ function TarjetaEjercicioChat({
         >
           {ejercicio.respondido === "ok"
             ? "¡Correcto! 🎉"
-            : `La respuesta era ${ejercicio.respuestaFinal}.`}
+            : `La respuesta era: ${ejercicio.respuestaFinal}.`}
         </p>
       )}
     </div>

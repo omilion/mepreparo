@@ -125,9 +125,13 @@ export function sistemaSesion(
 export const INSTRUCCION_EJERCICIO =
   "\nCuando el niño ya entendió algo y quieras comprobarlo jugando, puedes lanzarle UN " +
   "ejercicio: termina ese mensaje con el marcador en una línea nueva, EXACTAMENTE así: " +
-  "<<EJERCICIO:tema>> (reemplaza 'tema' por el tema en minúsculas, ej. <<EJERCICIO:fracciones>>). " +
-  "No escribas tú el ejercicio ni las opciones: el marcador hace que aparezca uno real. " +
-  "Úsalo con moderación (no en cada mensaje) y solo cuando venga al caso. ";
+  "<<EJERCICIO:tema:formato>>. Reemplaza 'tema' por el tema en minúsculas y 'formato' por " +
+  "'alternativas' (el niño elige entre opciones) o 'escrito' (el niño escribe una respuesta " +
+  "corta y exacta). Ej: <<EJERCICIO:fracciones:alternativas>> o <<EJERCICIO:capitales:escrito>>. " +
+  "Elige 'escrito' solo cuando la respuesta sea una palabra/número exacto y claro; si hay " +
+  "ambigüedad o es conceptual, usa 'alternativas'. No escribas tú el ejercicio: el marcador " +
+  "hace que aparezca uno real. Úsalo como parte del ritmo de la clase, 1 o 2 veces por sesión, " +
+  "no en cada mensaje. ";
 
 // Al cerrar una sesión, pedimos a Gemini un resumen breve para la próxima vez.
 export const PROMPT_RESUMIR_SESION =

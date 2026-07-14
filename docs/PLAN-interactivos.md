@@ -1,135 +1,74 @@
-# PLAN — Ejercicios interactivos y mini-juegos (brainstorm aterrizado)
+# PLAN — Decisiones de Interactivos de Estudio (El Qué y El Porqué)
 
-> Documento de diseño, NO de implementación (aún). Fija el modelo acordado en el
-> brainstorm del 2026-07 para cuando se construya. La regla que manda TODO:
-> **mantener las animaciones suaves y la estética zen** (papel cálido, salvia,
-> clay, Fraunces). Un juego que no se sienta zen no entra, por muy ingenioso.
+Este documento registra las decisiones estratégicas y de arquitectura técnica para la implementación de ejercicios interactivos en el tutor de IA (Rai) de `mepreparo`.
 
-## ⭐ ROL DE LOS INTERACTIVOS (decisión que reordena todo, usuario 2026-07)
-Los interactivos son **EL DULCE, NO LA COMIDA**. Un condimento de dinamismo
-ocasional entre las preguntas clásicas — NO el mainstream. Consecuencias:
-- El CORE sigue siendo opción múltiple + respuesta escrita (robusto, barato,
-  siempre funciona). Los juegos aparecen DE VEZ EN CUANDO, como sorpresa/premio.
-- NO construir los ~9 tipos. Empezar con 2-3 que se sientan mágicos (candidatos:
-  sopa de letras, pinta-fracción, arrastra-la-palabra) y ver si enganchan. La
-  tabla-excel, laberintos, conectar-puntos se posponen indefinidamente o nunca.
-- La frecuencia BAJA desinfla la preocupación costo/fragilidad: como aparecen
-  poco (y se guardan en biblioteca → después gratis), da igual que un generado
-  cueste más tokens. NO es el flujo principal.
-- RAI ELIGE cuándo lanzarlos, pero con una DOSIS clara: **1 o 2 por sesión**,
-  integrados en el RITMO de la clase — NO son un premio colgado al final ni algo
-  al azar. Es como un profesor que alterna explicar/preguntar/hacer actividad.
-  Predecible (el niño sabe que habrá un momento lúdico) sin ser mecánico (Rai
-  decide el punto donde fluye, típicamente a media clase cuando ya entendió algo
-  y viene bien afianzarlo jugando). Rai necesita "consciencia de dosis": un
-  contador de interactivos propuestos en la sesión para no pasarse ni quedarse
-  corto. Esto zanja el contrato de datos → Rai decide el tipo (no tabla tema→juego).
+---
 
-## El modelo (decidido)
-Plantillas FIJAS (componentes React propios) + la IA rellena los PARÁMETROS +
-el checker valida + se guarda en la BIBLIOTECA compartida. La IA genera DATOS,
-nunca CÓDIGO. Es el mismo circuito de los ejercicios de opción múltiple que ya
-existe, extendido a más "tipos".
+## 0. ⭐ EL ROL: EL DULCE, NO LA COMIDA (decisión del usuario — manda sobre todo)
+Los interactivos son un **condimento ocasional**, NO el mainstream. El CORE del
+estudio sigue siendo la conversación + opción múltiple + respuesta escrita.
+- **Dosis: 1 o 2 por sesión**, integrados en el RITMO de la clase (como un profe
+  que alterna explicar / preguntar / hacer una actividad). NO son un premio
+  colgado al final ni algo en cada turno. La rareza ES la feature.
+- **RAI ELIGE** cuándo lanzarlos y de qué tipo, por criterio pedagógico (no un
+  tema→juego fijo, no al azar). En el código: el marcador
+  `<<EJERCICIO:tema:formato>>` lleva el formato que Rai decide.
+- **NO construir los 6 tipos.** Empezar con el piloto (escrito, HECHO) + 2 juegos
+  visuales que enganchen (candidatos: pinta-fracción, sopa, arrastra-palabra). El
+  resto (tabla-excel, laberinto, conectar-puntos) queda POSPUESTO indefinidamente
+  o nunca — el catálogo de abajo es el universo POSIBLE, no una lista de tareas.
 
-Por qué así (y no HTML generado por IA en un iframe):
-- La IA generando código es FRÁGIL — el 2026-07-13 se truncó el JSON de un
-  ejercicio SIMPLE con 600 tokens; un juego HTML son miles de tokens y tiene que
-  funcionar sin un solo error de sintaxis. Un ejercicio malo se ve raro; un juego
-  con bug de JS no hace nada frente al niño.
-- Con plantillas: el componente SIEMPRE funciona (lo escribimos y probamos una
-  vez), cero riesgo de seguridad, y la IA hace lo barato y robusto (datos).
-- Embudo de costos: la 1ª vez que se pide un interactivo de un tema, la IA
-  rellena la plantilla → checker valida → se GUARDA en la biblioteca → el
-  siguiente niño lo recibe a 0 tokens. Cuando no exista, se genera; cuando exista,
-  se reutiliza.
-- El iframe+sandbox+srcdoc+postMessage (idea de Gema, técnicamente correcta)
-  queda SOLO para casos verdaderamente únicos y SIEMPRE con validación previa en
-  la biblioteca — nunca código sin probar frente a un niño. Es el último recurso,
-  no el primero.
+## 1. El Objetivo y la Filosofía Zen
 
-## Investigación de librerías (2026-07, hecha)
-Regla: la librería hace la MECÁNICA invisible/difícil; el LOOK lo controlamos
-nosotros (zen). Resultados:
-- **Drag & drop** → `@dnd-kit/core` (~6KB, touch nativo crítico para tablet,
-  "no animation opinions" = no impone estética, accesible ARIA). Estándar 2026.
-  react-beautiful-dnd está DEPRECADA. Para: arrastra-palabra, línea de tiempo,
-  matching.
-- **Sopa de letras** → `@sbj42/word-search-generator` (solo GENERA la grilla —
-  coloca palabras sin cruces, incl. diagonales; sin UI). Nosotros dibujamos la
-  grilla zen y la selección. Los "componentes listos" de GitHub traen su UI → NO.
-- **Matemática (fórmulas) → KaTeX (`react-katex`)**: hallazgo importante. Para
-  mostrar fracciones/ecuaciones BIEN renderizadas (3/8 como fracción real con
-  barra, no texto plano). Rápido (<50ms), liviano, NO impone colores (solo
-  compone la fórmula, le damos el estilo). Aplica a CUALQUIER ejercicio de mate,
-  no solo juegos.
-- **Pinta fracción / recta numérica / coordenadas / laberinto** → SVG/canvas
-  PROPIO, sin librería (más liviano, 100% control del look).
+El tutor de IA (Rai) puede complementar la conversación escrita con **algún
+ejercicio dinámico ocasional** (ver dosis en §0). El catálogo posible incluye
+completar tablas, sopa de letras, conectar puntos, arrastrar palabras, laberintos
+— pero solo se construyen 2-3, no todos.
 
-## Postura sobre librerías (decidida)
-Librerías SOLO para la mecánica invisible (arrastre, canvas), NUNCA para la
-apariencia. El look siempre lo controlamos nosotros. Donde no haga falta
-librería, componente propio (más liviano, 100% zen). Ej: dnd-kit solo maneja la
-física del drag; nosotros ponemos los colores y las curvas suaves. Rechazar
-librerías de "juego educativo listo" que traen su propia UI.
+Para no traicionar la **estética Zen** (minimalista, limpia y enfocada en evitar la sobreestimulación de los niños), nos autoimponemos las siguientes reglas de diseño:
+*   **Mecánica, nunca apariencia:** Las librerías externas se eligen exclusivamente por su motor de cálculo o eventos (lógica). La apariencia visual (colores salvia, tipografías, bordes sutiles, espaciados) es 100% controlada por nosotros con CSS Vanilla o SVG nativos.
+*   **Cero distractores:** No usaremos animaciones ruidosas, colores estridentes ni barras de herramientas comerciales (como las que traen Handsontable o Jspreadsheet).
 
-## Catálogo de plantillas (familia)
-Todas entran por el mismo flujo y reportan su resultado a la memoria (evidencia
-para el apoderado), igual que los ejercicios actuales.
+---
 
-| Plantilla | La IA rellena | Materias | Complejidad |
-|---|---|---|---|
-| Opción múltiple | (ya existe) | todas | — |
-| **Respuesta escrita** ← PILOTO | enunciado + respuesta(s) válida(s) | todas | baja |
-| Une con líneas (matching) | pares concepto–definición | todas | media |
-| Verdadero/Falso | afirmaciones | ciencias, historia | baja |
-| Pinta la fracción | fracción objetivo | mate | media (SVG) |
-| Ordena la línea de tiempo | hitos + orden correcto | historia | media (drag) |
-| Sopa de letras | palabras del tema | lenguaje, ciencias | media (propio) |
-| Arrastra la palabra al hueco | frase + palabras | lenguaje | media (drag) |
-| Recta numérica / coordenadas | punto objetivo | mate | media (SVG) |
-| Tabla tipo Excel | filas/columnas a completar | mate, ciencias | media |
+## 2. Decisiones de Arquitectura Clave
 
-Los de MAYOR valor para exámenes libres de básica (donde más se traban / más se
-evalúa): fracciones visuales, línea de tiempo de Historia, recta numérica/
-coordenadas. Son plantillas fijas ideales — 80% del valor con 20% del riesgo.
+### Decisión A: Plantillas React Fijas (IA Parametrizada, no Generativa)
+La IA de Gemini **nunca generará código (React, JS o HTML) al vuelo**. Esto es costoso, lento de renderizar, inseguro y propenso a romper la UI.
+*   **El Modelo:** Diseñamos plantillas fijas en React (ej. plantilla de sopa de letras, plantilla de arrastrar palabras). 
+*   **Los Parámetros:** La IA solo genera los parámetros en formato JSON (ej. la lista de palabras, la oración con huecos). El cliente React recibe el JSON y lo monta sobre el molde correspondiente de forma instantánea y segura.
 
-## PILOTO acordado: Respuesta escrita
-El molde de menor riesgo que valida todo el circuito nuevo antes de invertir en
-juegos visuales. En vez de botones de alternativas, un input + botón "Validar".
-- Validación exacta (números/palabras): comparación tolerante a
-  mayúsculas/espacios/tildes en el cliente.
-- Validación reflexiva ("¿por qué crees…?"): el texto va a Rai, que ya tiene el
-  contexto de la conversación, y evalúa el concepto + da feedback.
-- Reporta acierto/fallo a la memoria (registrarEjercicios), igual que hoy.
+### Decisión B: Biblioteca de Ejercicios (Embudo de Costos / Caché de Costo Cero)
+Para no consumir la cuota de la API de Gemini innecesariamente:
+1.  La primera vez que un niño solicita ejercitar un tema, Rai genera el ejercicio (JSON parametrizado) mediante IA.
+2.  Este JSON se valida en el backend y se guarda en la base de datos de la **biblioteca de ejercicios**.
+3.  Las siguientes veces que cualquier niño pida ejercitar el mismo tema, el sistema sirve el ejercicio desde la base de datos de manera inmediata y gratuita, reduciendo los costos de la API a cero para el 80% de los casos.
 
-## Las 3 cosas a resolver ANTES de construir (diseño)
-1. **Contrato de datos común por tipo**: definir el JSON que la IA devuelve para
-   cada plantilla, para que checker y componente lo entiendan igual. Es lo más
-   importante de acertar desde el inicio (evita reescribir después).
-2. **Checker por tipo**: cada plantilla necesita su validación propia
-   (sopa: ¿las palabras caben en la grilla y existen? línea de tiempo: ¿el orden
-   es históricamente correcto? escrita: ¿la respuesta es coherente?). Esto
-   garantiza que un interactivo generado NUNCA llegue roto al niño.
-3. **dnd-kit vs. arrastre nativo en TABLET táctil**: probar cuál se siente más
-   suave al tacto (las usuarias reales usan tablet). Decide toda la familia de
-   juegos con arrastre.
+### Decisión C: Aislamiento del Final 20% (Iframes Sandbox)
+Para el 80% de los casos usaremos las plantillas React fijas. Para el 20% restante de minijuegos visuales complejos o código externo de seguimiento:
+*   Se aíslan en un `<iframe>` usando `srcdoc` con atributos de seguridad `sandbox`.
+*   El iframe se comunica con el contenedor React mediante mensajes seguros (`window.parent.postMessage`).
+*   **Regla de Oro:** Ningún HTML dinámico llega al cliente sin haber sido validado previamente en la biblioteca.
 
-## Circuito técnico (igual al de ejercicios actuales)
-1. Rai lanza el interactivo con un marcador (extender el actual `<<EJERCICIO:tema>>`
-   a algo como `<<JUEGO:tipo:tema>>`).
-2. El front pide a `/api/ejercicios/obtener` (o endpoint hermano) el interactivo
-   del tipo+tema; si no está en biblioteca, la IA rellena la plantilla.
-3. El checker (por tipo) valida; si pasa, se guarda en `contenido_validado`
-   (añadir columna `tipo` y un `contenido`/`datos` jsonb por plantilla).
-4. El componente correspondiente se renderiza en la tarjeta del chat (misma
-   estética que la tarjeta de ejercicio actual).
-5. Al completar, callback/postMessage → registrarEjercicios → memoria + mapa.
-6. Red de seguridad (ya existe para ejercicios): si no llega o es inválido, Rai
-   lo dice con naturalidad; el niño nunca queda colgado.
+---
 
-## Estética (no negociable)
-- Colores de marca (salvia/clay/papel), Fraunces para títulos, curvas suaves.
-- Animaciones lentas y suaves (respeta prefers-reduced-motion), nada brusco.
-- Feedback de acierto discreto (el patrón de Fireworks sutil que ya existe), no
-  confeti estridente.
-- Nada de sonidos/colores chillones tipo "juego arcade".
+## 3. Catálogo de Librerías Seleccionadas (Internet Research)
+
+Tras investigar el ecosistema de paquetes NPM, seleccionamos las siguientes herramientas para resolver las mecánicas sin reinventar la rueda:
+
+### 1. Arrastre de Palabras (Drag & Drop) → **`@dnd-kit/core`**
+*   **Por qué:** Es una librería *headless* (sin estilos) y extremadamente ligera.
+*   **Soporte Tablets:** Es la única que maneja sensores de tacto de forma nativa sin requerir plugins complejos. Nos permite configurar una restricción de activación (`delay` de 250ms y `tolerance` de 10px) para que el niño pueda hacer scroll en la tablet de forma natural sin que el arrastre de elementos bloquee la página.
+
+### 2. Sopa de Letras → **`@blex41/word-search`**
+*   **Por qué:** A diferencia de otras librerías básicas, esta nos devuelve un array de objetos detallado con las coordenadas de inicio, fin y el camino de celdas que recorre cada palabra oculta. Esto facilita el pintado del resaltador en React.
+*   **Seguridad:** Incluye un filtro nativo de palabras prohibidas (`forbiddenWords`) para evitar que la generación aleatoria de letras forme insultos por accidente.
+
+### 3. Laberintos → **`generate-maze`**
+*   **Por qué:** Implementa el algoritmo de Eller (mazes perfectos sin bucles). Nos devuelve una matriz limpia con booleanos indicando qué paredes están activas (`top`, `bottom`, `left`, `right`), la cual podemos renderizar fácilmente usando SVG o CSS Grid.
+
+### 4. Tablas Tipo Excel → **`@tanstack/react-table`**
+*   **Por qué:** Handsontable y jExcel son extremadamente pesadas y traen estilos visuales rígidos. TanStack Table maneja la lógica pura de la edición de celdas, navegación y estados, dejándonos el control del diseño de los inputs a nosotros.
+
+### 5. Conectar Puntos → **SVG Nativo + React**
+*   **Por qué:** Las librerías de NPM están pensadas para flujogramas dinámicos (como `react-xarrows`), no para juegos escolares estáticos. Un SVG en React con coordenadas de 0 a 100 y líneas dinámicas es la solución más ligera y responsive posible.
