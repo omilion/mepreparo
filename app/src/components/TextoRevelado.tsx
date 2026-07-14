@@ -29,7 +29,10 @@ export const TextoRevelado = memo(function TextoRevelado({
   let wordIndex = 0;
 
   return (
-    <div className="texto-contenedor-zen">
+    // <span> (no <div>): este componente se renderiza DENTRO del <p> de cada
+    // línea de Rai, y un <div> dentro de <p> es HTML inválido (hydration error).
+    // Como el contenedor ya es display:inline-block, el <span> se ve idéntico.
+    <span className="texto-contenedor-zen">
       {tokens.map((token, idx) => {
         if (/^\s+$/.test(token)) {
           return <span key={idx}>{token}</span>;
@@ -78,6 +81,6 @@ export const TextoRevelado = memo(function TextoRevelado({
           }
         }
       `}</style>
-    </div>
+    </span>
   );
 });

@@ -265,6 +265,28 @@ export function Tutor({
     }
   }
 
+  // DEV ONLY: lanza un ejercicio del formato pedido sin pasar por Rai, para poder
+  // probar la tarjeta on-demand (como Rai ahora ELIGE el formato, no hay forma
+  // determinista de forzar un "escrito" conversando). Crea un mensaje de Rai
+  // anfitrión y le engancha el ejercicio por índice.
+  function lanzarEjercicioDev(formato: "escrito" | "opcion_multiple") {
+    const idx = { current: -1 };
+    setMensajes((m) => {
+      idx.current = m.length;
+      return [
+        ...m,
+        {
+          de: "rai",
+          texto:
+            formato === "escrito"
+              ? "(dev) Ejercicio de respuesta escrita 👇"
+              : "(dev) Ejercicio de alternativas 👇",
+        },
+      ];
+    });
+    void cargarEjercicioEnChat("prueba", idx.current, formato);
+  }
+
   // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
   function responderEjercicio(msgIdx: number, opcion: string) {
     setMensajes((m) =>
@@ -475,6 +497,29 @@ export function Tutor({
               </button>
             </div>
           )}
+          {/* PANEL DEV: solo en desarrollo. Fuerza un ejercicio de cada formato
+              sin depender de que Rai decida lanzarlo (ahora él elige, así que no
+              hay manera determinista de llegar al "escrito" conversando). */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="flex justify-center gap-2 pb-1">
+              <button
+                type="button"
+                onClick={() => lanzarEjercicioDev("escrito")}
+                disabled={cargando}
+                className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
+              >
+                dev · escrito
+              </button>
+              <button
+                type="button"
+                onClick={() => lanzarEjercicioDev("opcion_multiple")}
+                disabled={cargando}
+                className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
+              >
+                dev · alternativas
+              </button>
+            </div>
+          )}
           <CajaTexto
             onEnviar={enviar}
             cargando={cargando}
@@ -529,7 +574,7 @@ function CajaTexto({
           placeholder={
             esPrimera ? "Responde a Rai…" : `Escríbele a ${tutorNombre}…`
           }
-          className="flex-1 bg-transparent px-1 py-2 text-[19px] text-ink outline-none placeholder:text-ink-soft/60"
+          className="flex-1 border-none bg-transparent px-1 py-2 text-[19px] text-ink outline-none focus:outline-none focus:ring-0 placeholder:text-ink-soft/60"
         />
         <button
           type="button"
