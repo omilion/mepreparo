@@ -129,8 +129,19 @@ export async function GET(req: NextRequest) {
       maxRetries: 15,
     });
 
-    // Solo conservamos las palabras que la librería logró colocar.
-    const colocadas = ws.words.map((w) => ({ clean: w.clean, path: w.path }));
+    // Solo conservamos las palabras que la librería logró colocar Y que además
+    // REALMENTE están en el grid en su path (verificación de integridad: releemos
+    // las letras del grid siguiendo cada path y las comparamos con la palabra).
+    // Así la lista mostrada nunca incluye una palabra que no está en la grilla.
+    const grid = ws.grid;
+    const enGrid = (path: { x: number; y: number }[], clean: string) =>
+      path.length === clean.length &&
+      path.every((c, i) => grid[c.y]?.[c.x] === clean[i]);
+
+    const colocadas = ws.words
+      .filter((w) => enGrid(w.path, w.clean))
+      .map((w) => ({ clean: w.clean, path: w.path }));
+
     if (colocadas.length < 3) {
       return NextResponse.json(
         { error: "No se pudo armar una sopa jugable" },
@@ -141,7 +152,7 @@ export async function GET(req: NextRequest) {
     const datos = {
       tipoPlantilla: "sopa",
       tema,
-      grid: ws.grid.map((fila: string[]) => fila.join("")),
+      grid: grid.map((fila: string[]) => fila.join("")),
       palabras: colocadas,
     };
 

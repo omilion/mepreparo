@@ -40,10 +40,19 @@ export function SopaLetras({
 
   // set de palabras ya encontradas (por su texto limpio)
   const [encontradas, setEncontradas] = useState<Set<string>>(new Set());
-  // celdas de la selección en curso (mientras el dedo arrastra)
+  // celdas de la selección en curso (mientras el dedo/mouse arrastra). La
+  // guardamos TAMBIÉN en un ref: al soltar (pointerup) el estado del closure
+  // puede ir desfasado, así que la comprobación lee siempre el ref (fuente de
+  // verdad), no el estado. Sin esto, con mouse rápido no se detectaba nada.
   const [seleccion, setSeleccion] = useState<Celda[]>([]);
+  const seleccionRef = useRef<Celda[]>([]);
   const inicioRef = useRef<Celda | null>(null);
   const contenedorRef = useRef<HTMLDivElement>(null);
+
+  function fijarSeleccion(celdas: Celda[]) {
+    seleccionRef.current = celdas;
+    setSeleccion(celdas);
+  }
 
   // celdas que pertenecen a alguna palabra ya encontrada → se pintan fijas
   const celdasResueltas = useMemo(() => {
@@ -94,21 +103,21 @@ export function SopaLetras({
     const c = celdaEnPunto(clientX, clientY);
     if (!c) return;
     inicioRef.current = c;
-    setSeleccion([c]);
+    fijarSeleccion([c]);
   }
 
   function mover(clientX: number, clientY: number) {
     if (!inicioRef.current) return;
     const c = celdaEnPunto(clientX, clientY);
     if (!c) return;
-    setSeleccion(lineaRecta(inicioRef.current, c));
+    fijarSeleccion(lineaRecta(inicioRef.current, c));
   }
 
   function terminar() {
     if (!inicioRef.current) return;
-    comprobarSeleccion(seleccion);
+    comprobarSeleccion(seleccionRef.current);
     inicioRef.current = null;
-    setSeleccion([]);
+    fijarSeleccion([]);
   }
 
   // ¿La selección corresponde a una palabra? Aceptamos el camino en cualquiera
@@ -149,13 +158,15 @@ export function SopaLetras({
           touchAction: "none",
         }}
         onPointerDown={(e) => {
-          (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+          // Capturamos el puntero en el CONTENEDOR: así el move/up siguen
+          // llegando aunque el dedo/mouse se salga del grid, y podemos usar
+          // elementFromPoint sin que el target original "secuestre" los eventos.
+          contenedorRef.current?.setPointerCapture(e.pointerId);
           iniciar(e.clientX, e.clientY);
         }}
         onPointerMove={(e) => mover(e.clientX, e.clientY)}
         onPointerUp={terminar}
         onPointerCancel={terminar}
-        onPointerLeave={terminar}
       >
         {datos.grid.map((fila, y) =>
           fila.split("").map((letra, x) => {
