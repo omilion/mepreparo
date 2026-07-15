@@ -7,6 +7,7 @@ interface EjercicioGenerado {
   solucionPasoAPaso: string[];
   respuestaFinal: string;
   opciones?: string[];
+  respuestasCorrectas?: string[]; // solo selección múltiple
   tipoPlantilla?: string;
 }
 
@@ -98,6 +99,24 @@ export async function validarEjercicio(
   if (!Array.isArray(ejercicio.opciones)) {
     return { esValido: false, razon: "Opción de ejercicio no es un array en opción múltiple" };
   }
+
+  // Selección múltiple: valida el conjunto de correctas (subconjunto de opciones,
+  // al menos una) en vez de una única respuesta.
+  if (ejercicio.tipoPlantilla === "seleccion_multiple") {
+    const correctas = ejercicio.respuestasCorrectas;
+    if (!Array.isArray(correctas) || correctas.length < 1) {
+      return { esValido: false, razon: "Selección múltiple sin respuestasCorrectas" };
+    }
+    if (ejercicio.opciones.length < 3) {
+      return { esValido: false, razon: "Selección múltiple con muy pocas opciones" };
+    }
+    if (!correctas.every((c) => ejercicio.opciones!.includes(c))) {
+      return { esValido: false, razon: "Alguna respuesta correcta no está entre las opciones" };
+    }
+    // omitimos la validación matemática determinista (no aplica) y pasamos a la IA
+    return auditarConIA(materia, ejercicio);
+  }
+
   if (!ejercicio.opciones.includes(ejercicio.respuestaFinal)) {
     return { esValido: false, razon: "La respuesta correcta no se encuentra entre las opciones" };
   }

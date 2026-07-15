@@ -126,7 +126,10 @@ export const INSTRUCCION_EJERCICIO =
   "\nCuando el niño ya entendió algo y quieras comprobarlo jugando, puedes lanzarle UNA " +
   "actividad terminando ese mensaje con un marcador en una línea nueva, EXACTAMENTE con una " +
   "de estas formas:\n" +
-  "- <<EJERCICIO:tema>> → una pregunta de opción múltiple con alternativas. Ej: <<EJERCICIO:fracciones>>.\n" +
+  "- <<EJERCICIO:tema>> → una pregunta de opción múltiple con UNA sola respuesta correcta. Ej: <<EJERCICIO:fracciones>>.\n" +
+  "- <<SELECCION:tema>> → una pregunta de selección múltiple con VARIAS respuestas correctas " +
+  "(el niño marca todas las que cumplen). Úsala para clasificar/agrupar/identificar varios " +
+  "elementos (ej: 'marca todos los números pares', 'marca los mamíferos'). Ej: <<SELECCION:numeros_pares>>.\n" +
   "- <<SOPA:tema>> → una sopa de letras para buscar palabras del tema, ideal para vocabulario " +
   "(ciencias, historia, lenguaje). Ej: <<SOPA:sistema_solar>>.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +

@@ -49,6 +49,7 @@ export type Foco = { materia: Materia; tema: string } | null;
 export type AccionesDevTutor = {
   lanzarSopa: () => void;
   lanzarEjercicio: () => void;
+  lanzarSeleccion: () => void;
 } | null;
 
 interface AppState {

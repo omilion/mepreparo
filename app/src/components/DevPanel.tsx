@@ -31,6 +31,7 @@ export function DevPanel({
   accionesTutor?: {
     lanzarSopa: () => void;
     lanzarEjercicio: () => void;
+    lanzarSeleccion: () => void;
   } | null;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -79,18 +80,24 @@ export function DevPanel({
           {accionesTutor && (
             <div className="mb-3">
               <div className="mb-1 text-[11px] text-ink-soft">En el tutor:</div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={accionesTutor.lanzarSopa}
                   className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
                 >
-                  Sopa de letras
+                  Sopa
                 </button>
                 <button
                   onClick={accionesTutor.lanzarEjercicio}
                   className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
                 >
-                  Ejercicio
+                  Opción única
+                </button>
+                <button
+                  onClick={accionesTutor.lanzarSeleccion}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  Selección múltiple
                 </button>
               </div>
             </div>

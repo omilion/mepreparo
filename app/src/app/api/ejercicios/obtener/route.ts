@@ -185,7 +185,23 @@ export async function GET(req: NextRequest) {
     while (intentos < 2) {
       intentos++;
       try {
-        const sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
+        const esSeleccionMultiple = tipoPlantilla === "seleccion_multiple";
+        const sistemaPrompt = esSeleccionMultiple
+          ? `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
+Genera un ejercicio de SELECCIÓN MÚLTIPLE (VARIAS respuestas correctas) adaptado al curso, materia, dificultad y contexto pedagógico provisto. Debe tener entre 2 y 3 opciones correctas y al menos 2 incorrectas (5 o 6 opciones en total). Sirve para clasificar, agrupar o identificar varios elementos que cumplen una condición.
+Debes responder con un objeto JSON en el siguiente formato exacto:
+{
+  "tipoPlantilla": "seleccion_multiple",
+  "enunciado": "Enunciado claro que pida marcar TODAS las que cumplan (ej: 'Marca todos los números pares').",
+  "solucionPasoAPaso": [
+    "Explicación de por qué esas son las correctas."
+  ],
+  "opciones": ["opcion A", "opcion B", "opcion C", "opcion D", "opcion E"],
+  "respuestasCorrectas": ["opcion A", "opcion C"],
+  "respuestaFinal": "opcion A, opcion C"
+}
+Las respuestasCorrectas DEBEN ser un subconjunto EXACTO de opciones (texto idéntico).`
+          : `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
 Genera un ejercicio de opción múltiple adaptado al curso, materia, dificultad y contexto pedagógico provisto.
 Debes responder con un objeto JSON en el siguiente formato exacto:
 {
@@ -230,6 +246,7 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
           solucionPasoAPaso?: string[];
           respuestaFinal: string;
           opciones?: string[];
+          respuestasCorrectas?: string[];
           tipoPlantilla?: string;
         };
 
@@ -241,6 +258,7 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
           solucionPasoAPaso: ejercicioObj.solucionPasoAPaso ?? [],
           respuestaFinal: ejercicioObj.respuestaFinal,
           opciones: ejercicioObj.opciones,
+          respuestasCorrectas: ejercicioObj.respuestasCorrectas,
           tipoPlantilla: ejercicioObj.tipoPlantilla || tipoPlantilla,
         });
 
@@ -257,6 +275,7 @@ ${contextoRAG || "No hay información curricular específica disponible."}`;
             datos: {
               variables: ejercicioObj.datos || {},
               opciones: ejercicioObj.opciones || [],
+              respuestasCorrectas: ejercicioObj.respuestasCorrectas || [],
               formula: ejercicioObj.formula || "",
               tipoPlantilla: ejercicioObj.tipoPlantilla || tipoPlantilla,
             },

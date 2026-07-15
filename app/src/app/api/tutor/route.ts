@@ -258,8 +258,9 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       });
 
       const { texto: sinHorario, horario } = separarHorario(cruda, body.materias || []);
-      // extrae los marcadores <<EJERCICIO:tema>> y <<SOPA:tema>> si Rai los lanzó
-      const { texto, ejercicioTema, sopaTema } = separarEjercicio(sinHorario);
+      // extrae los marcadores <<EJERCICIO/SELECCION/SOPA:tema>> si Rai los lanzó
+      const { texto, ejercicioTema, ejercicioFormato, sopaTema } =
+        separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
       // No cacheamos respuestas con actividad: la actividad es dinámica.
@@ -289,7 +290,8 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         respuesta: texto,
         fuentes,
         horario,
-        ejercicioTema, // presente si Rai lanzó un ejercicio (opción múltiple)
+        ejercicioTema, // presente si Rai lanzó un ejercicio
+        ejercicioFormato, // "opcion_multiple" | "seleccion_multiple"
         sopaTema, // presente si Rai lanzó una sopa de letras
         modo: "gemini",
       });
@@ -317,6 +319,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
 function separarEjercicio(cruda: string): {
   texto: string;
   ejercicioTema?: string;
+  ejercicioFormato?: string; // "opcion_multiple" | "seleccion_multiple"
   sopaTema?: string;
 } {
   let texto = cruda;
@@ -330,15 +333,27 @@ function separarEjercicio(cruda: string): {
     texto = texto.replace(ms[0], "");
   }
 
-  // <<EJERCICIO:tema>> → opción múltiple (tolera un :sufijo antiguo y lo ignora)
+  // <<SELECCION:tema>> → selección múltiple (varias correctas)
   let ejercicioTema: string | undefined;
-  const me = texto.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::[a-z_]+)?>>/i);
-  if (me) {
-    ejercicioTema = norm(me[1]);
-    texto = texto.replace(me[0], "");
+  let ejercicioFormato: string | undefined;
+  const msel = texto.match(/<<SELECCION:([a-zñáéíóú_ ]+?)>>/i);
+  if (msel) {
+    ejercicioTema = norm(msel[1]);
+    ejercicioFormato = "seleccion_multiple";
+    texto = texto.replace(msel[0], "");
   }
 
-  return { texto: texto.trim(), ejercicioTema, sopaTema };
+  // <<EJERCICIO:tema>> → opción múltiple (tolera un :sufijo antiguo y lo ignora)
+  if (!ejercicioTema) {
+    const me = texto.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::[a-z_]+)?>>/i);
+    if (me) {
+      ejercicioTema = norm(me[1]);
+      ejercicioFormato = "opcion_multiple";
+      texto = texto.replace(me[0], "");
+    }
+  }
+
+  return { texto: texto.trim(), ejercicioTema, ejercicioFormato, sopaTema };
 }
 
 function separarHorario(

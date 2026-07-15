@@ -20,6 +20,7 @@ import { HomeButton } from "./HomeButton";
 import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
+import { Fireworks } from "./Fireworks";
 import { devToolsActivas } from "@/lib/devTools";
 import { useApp } from "@/lib/app/AppProvider";
 
@@ -27,9 +28,12 @@ interface EjercicioChat {
   tema: string;
   enunciado: string;
   opciones: string[];
-  respuestaFinal: string;
+  respuestaFinal: string; // opción múltiple: la única correcta
+  // selección múltiple: todas las correctas (>1). Si viene, la tarjeta cambia a
+  // modo multi (el niño marca varias y confirma; se valida el conjunto exacto).
+  respuestasCorrectas?: string[];
   respondido?: "ok" | "no";
-  tipoPlantilla?: string;
+  tipoPlantilla?: string; // "opcion_multiple" | "seleccion_multiple"
 }
 
 interface Mensaje {
@@ -189,13 +193,14 @@ export function Tutor({
     fuentes?: string[];
     modo?: "gemini" | "simulado";
     ejercicioTema?: string;
+    ejercicioFormato?: string;
     sopaTema?: string;
   }) {
     // Si Rai lanzó una actividad (ejercicio o sopa), la resolvemos ANTES de pintar
     // su mensaje y la adjuntamos en el MISMO turno (texto + tarjeta juntos). Así
     // evitamos depender de un índice numérico, que llegaba desfasado.
     const ejercicio = data.ejercicioTema
-      ? await obtenerEjercicio(data.ejercicioTema)
+      ? await obtenerEjercicio(data.ejercicioTema, data.ejercicioFormato)
       : null;
     const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema) : null;
 
@@ -229,27 +234,43 @@ export function Tutor({
   }
 
   // Pide un ejercicio a la biblioteca validada y lo devuelve listo (o null si no
-  // hay uno válido). NO toca el estado: quien llama decide dónde lo adjunta.
-  async function obtenerEjercicio(tema: string): Promise<EjercicioChat | null> {
+  // hay uno válido). `formato` = "opcion_multiple" | "seleccion_multiple".
+  // NO toca el estado: quien llama decide dónde lo adjunta.
+  async function obtenerEjercicio(
+    tema: string,
+    formato: string = "opcion_multiple"
+  ): Promise<EjercicioChat | null> {
     try {
       const params = new URLSearchParams({
         materia,
         curso: perfil.curso,
         dificultad: "2",
         tema,
-        tipoPlantilla: "opcion_multiple",
+        tipoPlantilla: formato,
       });
       const res = await fetch(`/api/ejercicios/obtener?${params}`);
       const data = await res.json();
       const e = data.ejercicio;
       const opciones: string[] = e?.datos?.opciones ?? e?.opciones ?? [];
       const respuestaFinal = String(e?.respuestaFinal ?? "");
+      const tipoPlantilla =
+        e?.tipoPlantilla ?? e?.datos?.tipoPlantilla ?? "opcion_multiple";
+      const respuestasCorrectas: string[] =
+        e?.datos?.respuestasCorrectas ?? e?.respuestasCorrectas ?? [];
 
-      const esValido = !!(
-        e?.enunciado &&
-        opciones.length >= 2 &&
-        opciones.includes(respuestaFinal)
-      );
+      const esMulti = tipoPlantilla === "seleccion_multiple";
+      const esValido = esMulti
+        ? !!(
+            e?.enunciado &&
+            opciones.length >= 3 &&
+            respuestasCorrectas.length >= 1 &&
+            respuestasCorrectas.every((r) => opciones.includes(r))
+          )
+        : !!(
+            e?.enunciado &&
+            opciones.length >= 2 &&
+            opciones.includes(respuestaFinal)
+          );
       if (!esValido) return null;
 
       return {
@@ -257,7 +278,8 @@ export function Tutor({
         enunciado: rellenar(e.enunciado, e.datos?.variables),
         opciones,
         respuestaFinal,
-        tipoPlantilla: "opcion_multiple",
+        respuestasCorrectas: esMulti ? respuestasCorrectas : undefined,
+        tipoPlantilla,
       };
     } catch {
       return null;
@@ -287,20 +309,20 @@ export function Tutor({
     }
   }
 
-  // DEV ONLY: lanza un ejercicio de opción múltiple sin pasar por Rai, para
-  // probar la tarjeta on-demand sin tener que conversar hasta que él lo lance.
-  async function lanzarEjercicioDev() {
+  // DEV ONLY: lanza un ejercicio sin pasar por Rai, para probar la tarjeta
+  // on-demand. `formato` = "opcion_multiple" | "seleccion_multiple".
+  async function lanzarEjercicioDev(formato: string = "opcion_multiple") {
     // Resolvemos el ejercicio PRIMERO y lo adjuntamos en el MISMO mensaje que lo
     // presenta, en un solo setMensajes. Así no dependemos de un índice numérico
     // (que llegaba en -1 porque el updater async no lo asignaba a tiempo).
-    const ejercicio = await obtenerEjercicio("prueba");
+    const ejercicio = await obtenerEjercicio("prueba", formato);
+    const etiqueta =
+      formato === "seleccion_multiple"
+        ? "(dev) Selección múltiple 👇"
+        : "(dev) Ejercicio de alternativas 👇";
     setMensajes((m) => [
       ...m,
-      {
-        de: "rai",
-        texto: "(dev) Ejercicio de alternativas 👇",
-        ejercicio: ejercicio ?? undefined,
-      },
+      { de: "rai", texto: etiqueta, ejercicio: ejercicio ?? undefined },
     ]);
     if (!ejercicio) {
       setMensajes((m) => [
@@ -337,26 +359,86 @@ export function Tutor({
     if (!devToolsActivas()) return;
     setAccionesDevTutor({
       lanzarSopa: () => void lanzarSopaRef.current(),
-      lanzarEjercicio: () => void lanzarEjercicioRef.current(),
+      lanzarEjercicio: () => void lanzarEjercicioRef.current("opcion_multiple"),
+      lanzarSeleccion: () => void lanzarEjercicioRef.current("seleccion_multiple"),
     });
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
 
   // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
-  function responderEjercicio(msgIdx: number, opcion: string) {
-    setMensajes((m) =>
-      m.map((msg, i) => {
-        if (i !== msgIdx || !msg.ejercicio || msg.ejercicio.respondido) return msg;
-        const ok = opcion.trim().toLowerCase() === msg.ejercicio.respuestaFinal.trim().toLowerCase();
-        return { ...msg, ejercicio: { ...msg.ejercicio, respondido: ok ? "ok" : "no" } };
-      })
-    );
+  // `seleccion` = opciones elegidas. En opción múltiple es 1; en selección
+  // múltiple pueden ser varias (se valida el conjunto EXACTO: todo o nada).
+  function responderEjercicio(msgIdx: number, seleccion: string[]) {
     const ej = mensajes[msgIdx]?.ejercicio;
-    if (ej && !ej.respondido && acuerdo) {
-      const ok = opcion.trim().toLowerCase() === ej.respuestaFinal.trim().toLowerCase();
+    if (!ej || ej.respondido) return;
+    const ok = evaluarEjercicio(ej, seleccion);
+
+    setMensajes((m) =>
+      m.map((msg, i) =>
+        i === msgIdx && msg.ejercicio
+          ? { ...msg, ejercicio: { ...msg.ejercicio, respondido: ok ? "ok" : "no" } }
+          : msg
+      )
+    );
+
+    if (acuerdo) {
       // evidencia dura de UN ejercicio en la charla (correctos/total)
       const tutoria = registrarEjercicios(acuerdo, ej.tema, materia, ok ? 1 : 0, 1);
       onGuardarPerfil?.({ ...perfil, tutoria });
+    }
+
+    // Si falló, le pedimos a Rai que le explique cuáles eran y por qué, para que
+    // aprenda (no solo "incorrecto"). Es un mensaje de sistema al tutor.
+    if (!ok) void raiExplicaError(ej, seleccion);
+  }
+
+  // ¿La selección del niño es correcta? Todo o nada.
+  function evaluarEjercicio(ej: EjercicioChat, seleccion: string[]): boolean {
+    const norm = (s: string) => s.trim().toLowerCase();
+    const correctas = (ej.respuestasCorrectas?.length
+      ? ej.respuestasCorrectas
+      : [ej.respuestaFinal]
+    ).map(norm);
+    const elegidas = seleccion.map(norm);
+    const set = (a: string[]) => new Set(a);
+    const A = set(correctas);
+    const B = set(elegidas);
+    return A.size === B.size && [...A].every((x) => B.has(x));
+  }
+
+  // Pide a Rai una explicación breve de por qué la respuesta fue incorrecta,
+  // nombrando las correctas, y la agrega a la conversación como turno suyo.
+  async function raiExplicaError(ej: EjercicioChat, seleccion: string[]) {
+    const correctas = ej.respuestasCorrectas?.length
+      ? ej.respuestasCorrectas
+      : [ej.respuestaFinal];
+    try {
+      const res = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...cuerpoBase(),
+          accion: "chat",
+          materia,
+          pregunta:
+            `[Sistema] El niño respondió el ejercicio "${ej.enunciado}". ` +
+            `Marcó: ${seleccion.join(", ") || "nada"}. ` +
+            `La(s) respuesta(s) correcta(s) era(n): ${correctas.join(", ")}. ` +
+            `Explícale con cariño y en 1-2 frases cuál era la correcta y por qué, ` +
+            `para que lo entienda. No lances otro ejercicio.`,
+          historial: historialPlano(),
+        }),
+      });
+      const data = await res.json();
+      if (data?.respuesta) {
+        setMensajes((m) => [
+          ...m,
+          { de: "rai", texto: data.respuesta, fuentes: data.fuentes, modo: data.modo },
+        ]);
+        scrollAlFinal();
+      }
+    } catch {
+      /* si falla, el niño ya vio las correctas en la tarjeta; no bloqueamos */
     }
   }
 
@@ -519,7 +601,7 @@ export function Tutor({
             // solo el último mensaje de Rai se "escribe"; el resto ya está completo
             animar={m.de === "rai" && i === mensajes.length - 1}
             onTick={scrollAlFinal}
-            onResponderEjercicio={(op) => responderEjercicio(i, op)}
+            onResponderEjercicio={(seleccion) => responderEjercicio(i, seleccion)}
           />
         ))}
 
@@ -645,7 +727,7 @@ const Linea = memo(function Linea({
   m: Mensaje;
   animar?: boolean;
   onTick?: () => void;
-  onResponderEjercicio?: (opcion: string) => void;
+  onResponderEjercicio?: (seleccion: string[]) => void;
 }) {
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
@@ -675,10 +757,13 @@ const Linea = memo(function Linea({
         </span>
       )}
       {m.ejercicio && (
-        <TarjetaEjercicioChat
-          ejercicio={m.ejercicio}
-          onResponder={onResponderEjercicio}
-        />
+        // escapa el max-w-[40ch] del mensaje para ocupar ~80% de la pantalla
+        <div className="mt-3 w-[80vw] max-w-[480px]">
+          <TarjetaEjercicioChat
+            ejercicio={m.ejercicio}
+            onResponder={onResponderEjercicio}
+          />
+        </div>
       )}
       {m.sopa && (
         // escapa el max-w-[40ch] del mensaje para ocupar ~90% de la PANTALLA
@@ -691,40 +776,71 @@ const Linea = memo(function Linea({
   );
 });
 
-// Tarjeta de ejercicio embebida en la conversación con Rai.
+// Tarjeta de ejercicio embebida en la conversación con Rai. Soporta dos modos:
+// - opción múltiple: una sola correcta, se responde al tocar.
+// - selección múltiple (respuestasCorrectas): el niño marca varias y confirma.
+// Sin marco (encaja en el flujo zen). Al acertar, fuegos artificiales sutiles.
 function TarjetaEjercicioChat({
   ejercicio,
   onResponder,
 }: {
   ejercicio: EjercicioChat;
-  onResponder?: (opcion: string) => void;
+  onResponder?: (seleccion: string[]) => void;
 }) {
   const resuelto = !!ejercicio.respondido;
+  const esMulti = !!ejercicio.respuestasCorrectas?.length;
+  const correctas = esMulti
+    ? ejercicio.respuestasCorrectas!
+    : [ejercicio.respuestaFinal];
+
+  // en modo multi, las opciones marcadas antes de confirmar
+  const [marcadas, setMarcadas] = useState<string[]>([]);
+  const estaMarcada = (op: string) => marcadas.includes(op);
+  const alternar = (op: string) =>
+    setMarcadas((prev) =>
+      prev.includes(op) ? prev.filter((x) => x !== op) : [...prev, op]
+    );
+
+  function elegir(op: string) {
+    if (resuelto) return;
+    if (esMulti) alternar(op);
+    else onResponder?.([op]); // single: responde de inmediato
+  }
 
   return (
-    <div className="mt-3 w-full rounded-2xl border border-hair bg-surface/50 p-4 text-center">
-      <p className="mb-3 font-serif text-[17px] leading-[1.3] text-ink">
+    <div className="relative text-center">
+      {resuelto && ejercicio.respondido === "ok" && <Fireworks />}
+
+      <p className="mb-1 font-serif text-[18px] leading-[1.3] text-ink">
         {ejercicio.enunciado}
       </p>
+      {esMulti && !resuelto && (
+        <p className="mb-3 text-[12px] text-ink-soft">
+          Puede haber más de una respuesta. Márcalas y confirma.
+        </p>
+      )}
 
-      <div className="flex flex-col gap-2">
+      <div className="mt-3 flex flex-col gap-2">
         {ejercicio.opciones.map((op, i) => {
-          const esCorrecta = op === ejercicio.respuestaFinal;
-          const marca = resuelto && esCorrecta;
-          const marcaMal = ejercicio.respondido === "no" && !esCorrecta;
+          const esCorrecta = correctas.includes(op);
+          const marcada = estaMarcada(op);
+          // colores tras resolver: verde en las correctas, tenue en el resto;
+          // si marcó una incorrecta, se resalta en clay.
+          const clase = resuelto
+            ? esCorrecta
+              ? "border-sage bg-sage/10 text-ink"
+              : marcada
+                ? "border-clay/50 text-clay opacity-70"
+                : "border-hair text-ink-soft opacity-50"
+            : marcada
+              ? "border-sage bg-sage/10 text-ink"
+              : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60";
           return (
             <button
               key={i}
-              onClick={() => !resuelto && onResponder?.(op)}
+              onClick={() => elegir(op)}
               disabled={resuelto}
-              className={
-                "rounded-xl border px-3 py-2 text-[14px] transition-colors " +
-                (marca
-                  ? "border-sage bg-sage/10 text-ink"
-                  : marcaMal
-                    ? "border-hair text-ink-soft opacity-50"
-                    : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60")
-              }
+              className={"rounded-xl border px-3 py-2 text-[15px] transition-colors " + clase}
             >
               {op}
             </button>
@@ -732,14 +848,27 @@ function TarjetaEjercicioChat({
         })}
       </div>
 
+      {/* botón Confirmar (solo en modo multi, antes de resolver) */}
+      {esMulti && !resuelto && (
+        <button
+          onClick={() => onResponder?.(marcadas)}
+          disabled={marcadas.length === 0}
+          className="mt-3 rounded-xl bg-sage-deep px-5 py-2 text-[14px] font-[600] text-white transition-opacity hover:opacity-90 disabled:opacity-30"
+        >
+          Confirmar
+        </button>
+      )}
+
       {resuelto &&
         (ejercicio.respondido === "ok" ? (
-          <p className="mt-4 font-serif text-[20px] font-[600] text-sage-deep">
-            ¡Correcto! 🎆
+          <p className="relative mt-4 font-serif text-[20px] font-[600] text-sage-deep">
+            ¡Correcto!
           </p>
         ) : (
           <p className="mt-4 text-[15px] text-clay">
-            La respuesta era: {ejercicio.respuestaFinal}.
+            {correctas.length > 1
+              ? `Las correctas eran: ${correctas.join(", ")}.`
+              : `La respuesta era: ${correctas[0]}.`}
           </p>
         ))}
     </div>
