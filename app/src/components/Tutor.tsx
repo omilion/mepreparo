@@ -21,6 +21,7 @@ import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
 import { devToolsActivas } from "@/lib/devTools";
+import { useApp } from "@/lib/app/AppProvider";
 
 interface EjercicioChat {
   tema: string;
@@ -55,6 +56,7 @@ export function Tutor({
   // si viene del mapa de etapas: la lección se centra en este tema
   temaFoco?: string;
 }) {
+  const { setAccionesDevTutor } = useApp();
   const nombre = perfil.nombre.trim() || "tú";
   const acuerdo = perfil.tutoria ?? null;
   const esPrimera = !acuerdo;
@@ -323,6 +325,23 @@ export function Tutor({
     }
   }
 
+  // Publica las acciones dev en el panel dev GLOBAL mientras el tutor está en
+  // pantalla, y las quita al salir. Así los botones "Sopa/Ejercicio" viven en un
+  // solo lugar (el panel flotante) en vez de ensuciar el chat. Usamos refs para
+  // que el efecto no re-registre en cada render (las funciones se recrean).
+  const lanzarSopaRef = useRef(lanzarSopaDev);
+  const lanzarEjercicioRef = useRef(lanzarEjercicioDev);
+  lanzarSopaRef.current = lanzarSopaDev;
+  lanzarEjercicioRef.current = lanzarEjercicioDev;
+  useEffect(() => {
+    if (!devToolsActivas()) return;
+    setAccionesDevTutor({
+      lanzarSopa: () => void lanzarSopaRef.current(),
+      lanzarEjercicio: () => void lanzarEjercicioRef.current(),
+    });
+    return () => setAccionesDevTutor(null);
+  }, [setAccionesDevTutor]);
+
   // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
   function responderEjercicio(msgIdx: number, opcion: string) {
     setMensajes((m) =>
@@ -533,29 +552,9 @@ export function Tutor({
               </button>
             </div>
           )}
-          {/* CONTROLES DEV: fuerzan una actividad sin depender de que Rai la
-              lance, para probarla on-demand. Visibles en local siempre y en el
-              VPS solo si NEXT_PUBLIC_DEV_TOOLS=1 (ver lib/devTools). */}
-          {devToolsActivas() && (
-            <div className="flex justify-center gap-2 pb-1">
-              <button
-                type="button"
-                onClick={() => void lanzarSopaDev()}
-                disabled={cargando}
-                className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
-              >
-                dev · sopa
-              </button>
-              <button
-                type="button"
-                onClick={() => void lanzarEjercicioDev()}
-                disabled={cargando}
-                className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
-              >
-                dev · ejercicio
-              </button>
-            </div>
-          )}
+          {/* Los controles dev (sopa/ejercicio) ya NO viven aquí: se publican al
+              panel dev flotante global (ver useEffect + setAccionesDevTutor), así
+              todo lo dev está en un solo lugar y se quita de un tiro. */}
           <CajaTexto
             onEnviar={enviar}
             cargando={cargando}

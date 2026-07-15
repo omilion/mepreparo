@@ -20,12 +20,18 @@ export function DevPanel({
   onCargarPrueba,
   onLimpiar,
   onSaltar,
+  accionesTutor,
 }: {
   cuenta: Cuenta | null;
   onCargarPrueba: () => void;
   onLimpiar: () => void;
   // salta a `etapa` con el pupilo en el índice dado (o el panel si no aplica)
   onSaltar: (indice: number, etapa: EtapaDev) => void;
+  // acciones que solo existen mientras se está en el tutor (lanzar actividades)
+  accionesTutor?: {
+    lanzarSopa: () => void;
+    lanzarEjercicio: () => void;
+  } | null;
 }) {
   const [abierto, setAbierto] = useState(false);
 
@@ -66,6 +72,29 @@ export function DevPanel({
               Limpiar
             </button>
           </div>
+
+          {/* Acciones del tutor: solo aparecen cuando se está en esa pantalla
+              (el Tutor las registra al montarse). Fuerzan una actividad para
+              probarla sin depender de que Rai la lance. */}
+          {accionesTutor && (
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] text-ink-soft">En el tutor:</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={accionesTutor.lanzarSopa}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  Sopa de letras
+                </button>
+                <button
+                  onClick={accionesTutor.lanzarEjercicio}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  Ejercicio
+                </button>
+              </div>
+            </div>
+          )}
 
           {cuenta && cuenta.pupilos.length > 0 ? (
             <div className="flex flex-col gap-3">

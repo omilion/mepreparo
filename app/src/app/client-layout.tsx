@@ -17,6 +17,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     setEnfocado,
     cargarPrueba,
     limpiarTodo,
+    accionesDevTutor,
   } = useApp();
 
   if (sesionAlumno && pinBloqueado) {
@@ -42,6 +43,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             setEnfocado(idx);
             router.push("/" + etapa);
           }}
+          accionesTutor={accionesDevTutor}
         />
       )}
     </>

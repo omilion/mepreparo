@@ -44,6 +44,13 @@ import { cuentaDePrueba } from "@/lib/dev/seed";
 
 export type Foco = { materia: Materia; tema: string } | null;
 
+// Acciones dev que el Tutor "publica" al panel dev global mientras está montado.
+// El DevPanel las muestra como botones solo si existen (o sea, solo en el tutor).
+export type AccionesDevTutor = {
+  lanzarSopa: () => void;
+  lanzarEjercicio: () => void;
+} | null;
+
 interface AppState {
   // datos
   cuenta: Cuenta | null;
@@ -79,6 +86,8 @@ interface AppState {
   // dev
   cargarPrueba: () => void;
   limpiarTodo: () => void;
+  accionesDevTutor: AccionesDevTutor;
+  setAccionesDevTutor: (a: AccionesDevTutor) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -102,6 +111,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [sesionAlumno, setSesionAlumno] = useState<SesionAlumno | null>(null);
   const [pinBloqueado, setPinBloqueado] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [accionesDevTutor, setAccionesDevTutor] = useState<AccionesDevTutor>(null);
   // evita re-ejecutar el ruteo inicial en cada render
   const arranqueHecho = useRef(false);
 
@@ -325,6 +335,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     guardarPupiloEnfocado,
     cargarPrueba,
     limpiarTodo,
+    accionesDevTutor,
+    setAccionesDevTutor,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
