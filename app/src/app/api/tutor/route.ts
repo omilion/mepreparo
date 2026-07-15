@@ -258,14 +258,15 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       });
 
       const { texto: sinHorario, horario } = separarHorario(cruda, body.materias || []);
-      // extrae el marcador <<EJERCICIO:tema>> si Rai lanzó un ejercicio
-      const { texto, ejercicioTema } = separarEjercicio(sinHorario);
+      // extrae los marcadores <<EJERCICIO:tema>> y <<SOPA:tema>> si Rai los lanzó
+      const { texto, ejercicioTema, sopaTema } = separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
-      // No cacheamos respuestas con ejercicio: el ejercicio es dinámico.
+      // No cacheamos respuestas con actividad: la actividad es dinámica.
       if (
         accion === "chat" &&
         !ejercicioTema &&
+        !sopaTema &&
         preguntaNormalizada.length > 5 &&
         body.materia &&
         body.curso &&
@@ -289,6 +290,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         fuentes,
         horario,
         ejercicioTema, // presente si Rai lanzó un ejercicio (opción múltiple)
+        sopaTema, // presente si Rai lanzó una sopa de letras
         modo: "gemini",
       });
     } catch (e) {
@@ -315,13 +317,28 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
 function separarEjercicio(cruda: string): {
   texto: string;
   ejercicioTema?: string;
+  sopaTema?: string;
 } {
-  // acepta <<EJERCICIO:tema>> (también tolera un :sufijo antiguo y lo ignora)
-  const m = cruda.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::[a-z_]+)?>>/i);
-  if (!m) return { texto: cruda.trim() };
-  const texto = cruda.replace(m[0], "").trim();
-  const tema = m[1].trim().toLowerCase().replace(/\s+/g, "_");
-  return { texto, ejercicioTema: tema || undefined };
+  let texto = cruda;
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "_") || undefined;
+
+  // <<SOPA:tema>> → sopa de letras
+  let sopaTema: string | undefined;
+  const ms = texto.match(/<<SOPA:([a-zñáéíóú_ ]+?)>>/i);
+  if (ms) {
+    sopaTema = norm(ms[1]);
+    texto = texto.replace(ms[0], "");
+  }
+
+  // <<EJERCICIO:tema>> → opción múltiple (tolera un :sufijo antiguo y lo ignora)
+  let ejercicioTema: string | undefined;
+  const me = texto.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::[a-z_]+)?>>/i);
+  if (me) {
+    ejercicioTema = norm(me[1]);
+    texto = texto.replace(me[0], "");
+  }
+
+  return { texto: texto.trim(), ejercicioTema, sopaTema };
 }
 
 function separarHorario(

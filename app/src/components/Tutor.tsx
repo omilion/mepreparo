@@ -19,6 +19,7 @@ import { TextoRevelado } from "./TextoRevelado";
 import { HomeButton } from "./HomeButton";
 import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
+import { SopaLetras, type DatosSopa } from "./SopaLetras";
 
 interface EjercicioChat {
   tema: string;
@@ -36,6 +37,8 @@ interface Mensaje {
   modo?: "gemini" | "simulado";
   // si Rai lanzó un ejercicio en este turno, va embebido bajo su texto
   ejercicio?: EjercicioChat;
+  // si Rai lanzó una sopa de letras, va embebida bajo su texto
+  sopa?: DatosSopa;
 }
 
 export function Tutor({
@@ -183,14 +186,15 @@ export function Tutor({
     fuentes?: string[];
     modo?: "gemini" | "simulado";
     ejercicioTema?: string;
+    sopaTema?: string;
   }) {
-    // Si Rai lanzó un ejercicio, lo resolvemos ANTES de pintar su mensaje y lo
-    // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos
-    // depender de un índice numérico, que llegaba desfasado y dejaba la tarjeta
-    // sin engancharse.
+    // Si Rai lanzó una actividad (ejercicio o sopa), la resolvemos ANTES de pintar
+    // su mensaje y la adjuntamos en el MISMO turno (texto + tarjeta juntos). Así
+    // evitamos depender de un índice numérico, que llegaba desfasado.
     const ejercicio = data.ejercicioTema
       ? await obtenerEjercicio(data.ejercicioTema)
       : null;
+    const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema) : null;
 
     setMensajes((m) => [
       ...m,
@@ -200,18 +204,21 @@ export function Tutor({
         fuentes: data.fuentes,
         modo: data.modo,
         ejercicio: ejercicio ?? undefined,
+        sopa: sopa ?? undefined,
       },
     ]);
 
-    // RED DE SEGURIDAD: Rai prometió un ejercicio pero no llegó uno válido; que
+    // RED DE SEGURIDAD: Rai prometió una actividad pero no llegó una válida; que
     // no quede el niño esperando un juego que nunca aparece.
-    if (data.ejercicioTema && !ejercicio) {
+    const prometioActividad = !!(data.ejercicioTema || data.sopaTema);
+    const llegoActividad = !!(ejercicio || sopa);
+    if (prometioActividad && !llegoActividad) {
       setMensajes((m) => [
         ...m,
         {
           de: "rai",
           texto:
-            "¡Uy! Se me traspapeló el ejercicio 😅. Mejor sigamos conversando y " +
+            "¡Uy! Se me traspapeló la actividad 😅. Mejor sigamos conversando y " +
             "lo intentamos de nuevo en un ratito. ¿Qué parte te gustaría repasar?",
         },
       ]);
@@ -254,6 +261,29 @@ export function Tutor({
     }
   }
 
+  // Pide una sopa de letras del tema a la biblioteca/generador. Devuelve los
+  // datos listos (grid + palabras con su path) o null si no se pudo armar.
+  async function obtenerSopa(tema: string): Promise<DatosSopa | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/sopa/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const s = data.sopa;
+      const gridOk = Array.isArray(s?.grid) && s.grid.length > 0;
+      const palabrasOk = Array.isArray(s?.palabras) && s.palabras.length >= 3;
+      if (!gridOk || !palabrasOk) return null;
+      return { grid: s.grid, palabras: s.palabras };
+    } catch {
+      return null;
+    }
+  }
+
   // DEV ONLY: lanza un ejercicio de opción múltiple sin pasar por Rai, para
   // probar la tarjeta on-demand sin tener que conversar hasta que él lo lance.
   async function lanzarEjercicioDev() {
@@ -273,6 +303,21 @@ export function Tutor({
       setMensajes((m) => [
         ...m,
         { de: "rai", texto: "(dev) No se pudo obtener el ejercicio." },
+      ]);
+    }
+  }
+
+  // DEV ONLY: lanza una sopa de letras sin pasar por Rai.
+  async function lanzarSopaDev() {
+    const sopa = await obtenerSopa("prueba");
+    setMensajes((m) => [
+      ...m,
+      { de: "rai", texto: "(dev) Sopa de letras 👇", sopa: sopa ?? undefined },
+    ]);
+    if (!sopa) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar la sopa." },
       ]);
     }
   }
@@ -493,6 +538,14 @@ export function Tutor({
             <div className="flex justify-center gap-2 pb-1">
               <button
                 type="button"
+                onClick={() => void lanzarSopaDev()}
+                disabled={cargando}
+                className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
+              >
+                dev · sopa
+              </button>
+              <button
+                type="button"
                 onClick={() => void lanzarEjercicioDev()}
                 disabled={cargando}
                 className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
@@ -625,6 +678,11 @@ const Linea = memo(function Linea({
           ejercicio={m.ejercicio}
           onResponder={onResponderEjercicio}
         />
+      )}
+      {m.sopa && (
+        <div className="mt-3 w-full rounded-2xl border border-hair bg-surface/50 p-4">
+          <SopaLetras datos={m.sopa} />
+        </div>
       )}
     </div>
   );

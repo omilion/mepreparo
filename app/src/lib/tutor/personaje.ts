@@ -123,13 +123,16 @@ export function sistemaSesion(
 // mensaje escribe el marcador y la app muestra el ejercicio (de la biblioteca).
 // El resultado alimenta la memoria por tema (evidencia dura), igual que la prueba.
 export const INSTRUCCION_EJERCICIO =
-  "\nCuando el niño ya entendió algo y quieras comprobarlo jugando, puedes lanzarle UN " +
-  "ejercicio de opción múltiple: termina ese mensaje con el marcador en una línea nueva, " +
-  "EXACTAMENTE así: <<EJERCICIO:tema>>. Reemplaza 'tema' por el tema en minúsculas. Ej: " +
-  "<<EJERCICIO:fracciones>>. No escribas tú el ejercicio: el marcador hace que aparezca uno " +
-  "real con alternativas. Para preguntas de respuesta corta o abierta NO uses el marcador: " +
-  "pregúntale directo en la conversación. Úsalo como parte del ritmo de la clase, 1 o 2 veces " +
-  "por sesión, no en cada mensaje. ";
+  "\nCuando el niño ya entendió algo y quieras comprobarlo jugando, puedes lanzarle UNA " +
+  "actividad terminando ese mensaje con un marcador en una línea nueva, EXACTAMENTE con una " +
+  "de estas formas:\n" +
+  "- <<EJERCICIO:tema>> → una pregunta de opción múltiple con alternativas. Ej: <<EJERCICIO:fracciones>>.\n" +
+  "- <<SOPA:tema>> → una sopa de letras para buscar palabras del tema, ideal para vocabulario " +
+  "(ciencias, historia, lenguaje). Ej: <<SOPA:sistema_solar>>.\n" +
+  "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +
+  "tú la actividad: el marcador hace que aparezca una real. Para preguntas de respuesta corta o " +
+  "abierta NO uses marcador: pregúntale directo en la conversación. Las actividades son un DULCE " +
+  "ocasional: úsalas como parte del ritmo de la clase, 1 o 2 veces por sesión, no en cada mensaje. ";
 
 // Al cerrar una sesión, pedimos a Gemini un resumen breve para la próxima vez.
 export const PROMPT_RESUMIR_SESION =
