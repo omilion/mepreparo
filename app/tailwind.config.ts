@@ -15,6 +15,9 @@ const config: Config = {
         clay: "var(--clay)",
         mist: "var(--mist)",
         hair: "var(--hair)",
+        // exclusivo de la sopa de letras (ver globals.css)
+        gold: "var(--gold)",
+        "gold-soft": "var(--gold-soft)",
       },
       fontFamily: {
         serif: ["var(--font-serif)"],

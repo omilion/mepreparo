@@ -144,7 +144,8 @@ export function SopaLetras({
 
   return (
     <div className="flex w-full flex-col items-center gap-3">
-      {/* PALABRAS A BUSCAR — arriba y más grandes */}
+      {/* PALABRAS A BUSCAR — arriba y más grandes. Al encontrarlas cambian a
+          gold (el color propio de la sopa) además de tacharse. */}
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
         {datos.palabras.map((p) => {
           const hallada = encontradas.has(p.clean);
@@ -153,9 +154,7 @@ export function SopaLetras({
               key={p.clean}
               className={
                 "text-[17px] font-[600] transition-colors " +
-                (hallada
-                  ? "text-sage-deep line-through opacity-70"
-                  : "text-ink-soft")
+                (hallada ? "text-gold line-through" : "text-ink-soft")
               }
             >
               {p.clean}
@@ -200,23 +199,19 @@ export function SopaLetras({
                 data-cy={y}
                 className={
                   "flex aspect-square items-center justify-center rounded-md transition-colors " +
-                  (resuelta
-                    ? "bg-sage/25"
-                    : activa
-                      ? "bg-sage/40"
-                      : "bg-surface/60")
+                  (resuelta || activa ? "bg-gold-soft" : "bg-surface/60")
                 }
               >
-                {/* la LETRA en un span propio: al seleccionarse crece 50% y
-                    cambia a salvia; al quedar resuelta vuelve al tamaño normal
-                    con el color nuevo. El transform anima suave. */}
+                {/* la LETRA en un span propio: al seleccionarse crece 50% y se
+                    pone gold; al quedar resuelta vuelve al tamaño normal con el
+                    color nuevo. El transform anima suave. */}
                 <span
                   className={
                     "pointer-events-none text-[16px] font-[600] transition-all duration-150 " +
                     (resuelta
-                      ? "scale-100 text-sage-deep"
+                      ? "scale-100 text-gold"
                       : activa
-                        ? "scale-150 text-sage-deep"
+                        ? "scale-150 text-gold"
                         : "scale-100 text-ink")
                   }
                 >
@@ -229,8 +224,8 @@ export function SopaLetras({
       </div>
 
       {listo && (
-        <p className="text-[14px] font-[600] text-sage-deep">
-          ¡Las encontraste todas! 🎉
+        <p className="text-[14px] font-[600] text-gold">
+          ¡Las encontraste todas! 🎆
         </p>
       )}
     </div>

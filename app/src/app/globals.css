@@ -24,6 +24,10 @@
   --sage-deep: #436b57;
   --clay: #c97b5a;
   --mist: #e4e8e2;
+  /* amarillo mostaza poco saturado, exclusivo de la sopa de letras (más
+     contraste que el salvia sin chocar con el dorado cálido de Historia) */
+  --gold: #9a8a2e;
+  --gold-soft: #efe7c4;
   --hair: color-mix(in srgb, var(--ink) 9%, transparent);
 
   /* Asignaturas - Tonos poco saturados */
@@ -50,6 +54,8 @@
     --sage-deep: #9bc7ac;
     --clay: #db9576;
     --mist: #28302f;
+    --gold: #cbb85f;
+    --gold-soft: #3a3720;
 
     --color-ciencias: #8cb1c7;
     --color-ciencias-deep: #afd2e6;
@@ -70,6 +76,8 @@
   --sage-deep: #436b57;
   --clay: #c97b5a;
   --mist: #e4e8e2;
+  --gold: #9a8a2e;
+  --gold-soft: #efe7c4;
 
   --color-ciencias: #5e7a8c;
   --color-ciencias-deep: #415b6d;
@@ -89,6 +97,8 @@
   --sage-deep: #9bc7ac;
   --clay: #db9576;
   --mist: #28302f;
+  --gold: #cbb85f;
+  --gold-soft: #3a3720;
 
   --color-ciencias: #8cb1c7;
   --color-ciencias-deep: #afd2e6;
