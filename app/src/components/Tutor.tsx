@@ -20,6 +20,7 @@ import { HomeButton } from "./HomeButton";
 import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
+import { devToolsActivas } from "@/lib/devTools";
 
 interface EjercicioChat {
   tema: string;
@@ -532,9 +533,10 @@ export function Tutor({
               </button>
             </div>
           )}
-          {/* PANEL DEV: solo en desarrollo. Fuerza un ejercicio sin depender de
-              que Rai decida lanzarlo, para poder probar la tarjeta on-demand. */}
-          {process.env.NODE_ENV !== "production" && (
+          {/* CONTROLES DEV: fuerzan una actividad sin depender de que Rai la
+              lance, para probarla on-demand. Visibles en local siempre y en el
+              VPS solo si NEXT_PUBLIC_DEV_TOOLS=1 (ver lib/devTools). */}
+          {devToolsActivas() && (
             <div className="flex justify-center gap-2 pb-1">
               <button
                 type="button"

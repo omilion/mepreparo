@@ -3,6 +3,7 @@
 import { AppProvider, useApp } from "@/lib/app/AppProvider";
 import { PinScreen } from "@/components/PinScreen";
 import { DevPanel } from "@/components/DevPanel";
+import { devToolsActivas } from "@/lib/devTools";
 import { useRouter } from "next/navigation";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -32,7 +33,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      {process.env.NODE_ENV === "development" && (
+      {devToolsActivas() && (
         <DevPanel
           cuenta={cuenta}
           onCargarPrueba={cargarPrueba}
