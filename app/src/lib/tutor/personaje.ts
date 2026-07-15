@@ -132,6 +132,8 @@ export const INSTRUCCION_EJERCICIO =
   "elementos (ej: 'marca todos los números pares', 'marca los mamíferos'). Ej: <<SELECCION:numeros_pares>>.\n" +
   "- <<SOPA:tema>> → una sopa de letras para buscar palabras del tema, ideal para vocabulario " +
   "(ciencias, historia, lenguaje). Ej: <<SOPA:sistema_solar>>.\n" +
+  "- <<RUEDA:tema>> → una pregunta cuya respuesta (una sola palabra) el niño forma arrastrando " +
+  "letras revueltas, tipo juego. Ideal para adivinar un concepto clave. Ej: <<RUEDA:sistema_solar>>.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +
   "tú la actividad: el marcador hace que aparezca una real. Para preguntas de respuesta corta o " +
   "abierta NO uses marcador: pregúntale directo en la conversación. Las actividades son un DULCE " +

@@ -20,6 +20,7 @@ import { HomeButton } from "./HomeButton";
 import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
+import { RuedaLetras, type DatosRueda } from "./RuedaLetras";
 import { Fireworks } from "./Fireworks";
 import { devToolsActivas } from "@/lib/devTools";
 import { useApp } from "@/lib/app/AppProvider";
@@ -45,6 +46,8 @@ interface Mensaje {
   ejercicio?: EjercicioChat;
   // si Rai lanzó una sopa de letras, va embebida bajo su texto
   sopa?: DatosSopa;
+  // si Rai lanzó una rueda de letras (formar la respuesta), va embebida
+  rueda?: DatosRueda;
 }
 
 export function Tutor({
@@ -195,14 +198,16 @@ export function Tutor({
     ejercicioTema?: string;
     ejercicioFormato?: string;
     sopaTema?: string;
+    ruedaTema?: string;
   }) {
-    // Si Rai lanzó una actividad (ejercicio o sopa), la resolvemos ANTES de pintar
-    // su mensaje y la adjuntamos en el MISMO turno (texto + tarjeta juntos). Así
-    // evitamos depender de un índice numérico, que llegaba desfasado.
+    // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
+    // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
+    // de un índice numérico, que llegaba desfasado.
     const ejercicio = data.ejercicioTema
       ? await obtenerEjercicio(data.ejercicioTema, data.ejercicioFormato)
       : null;
     const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema) : null;
+    const rueda = data.ruedaTema ? await obtenerRueda(data.ruedaTema) : null;
 
     setMensajes((m) => [
       ...m,
@@ -213,13 +218,14 @@ export function Tutor({
         modo: data.modo,
         ejercicio: ejercicio ?? undefined,
         sopa: sopa ?? undefined,
+        rueda: rueda ?? undefined,
       },
     ]);
 
     // RED DE SEGURIDAD: Rai prometió una actividad pero no llegó una válida; que
     // no quede el niño esperando un juego que nunca aparece.
-    const prometioActividad = !!(data.ejercicioTema || data.sopaTema);
-    const llegoActividad = !!(ejercicio || sopa);
+    const prometioActividad = !!(data.ejercicioTema || data.sopaTema || data.ruedaTema);
+    const llegoActividad = !!(ejercicio || sopa || rueda);
     if (prometioActividad && !llegoActividad) {
       setMensajes((m) => [
         ...m,
@@ -309,6 +315,32 @@ export function Tutor({
     }
   }
 
+  // Pide una rueda de letras del tema (pregunta + respuesta a formar). Devuelve
+  // los datos listos o null si no se pudo generar.
+  async function obtenerRueda(tema: string): Promise<DatosRueda | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/rueda/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const r = data.rueda;
+      const ok =
+        typeof r?.enunciado === "string" &&
+        typeof r?.respuesta === "string" &&
+        Array.isArray(r?.letras) &&
+        r.letras.length >= 3;
+      if (!ok) return null;
+      return { enunciado: r.enunciado, respuesta: r.respuesta, letras: r.letras };
+    } catch {
+      return null;
+    }
+  }
+
   // DEV ONLY: lanza un ejercicio sin pasar por Rai, para probar la tarjeta
   // on-demand. `formato` = "opcion_multiple" | "seleccion_multiple".
   async function lanzarEjercicioDev(formato: string = "opcion_multiple") {
@@ -347,20 +379,38 @@ export function Tutor({
     }
   }
 
+  // DEV ONLY: lanza una rueda de letras sin pasar por Rai.
+  async function lanzarRuedaDev() {
+    const rueda = await obtenerRueda("prueba");
+    setMensajes((m) => [
+      ...m,
+      { de: "rai", texto: "(dev) Rueda de letras 👇", rueda: rueda ?? undefined },
+    ]);
+    if (!rueda) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar la rueda." },
+      ]);
+    }
+  }
+
   // Publica las acciones dev en el panel dev GLOBAL mientras el tutor está en
-  // pantalla, y las quita al salir. Así los botones "Sopa/Ejercicio" viven en un
-  // solo lugar (el panel flotante) en vez de ensuciar el chat. Usamos refs para
-  // que el efecto no re-registre en cada render (las funciones se recrean).
+  // pantalla, y las quita al salir. Así los botones viven en un solo lugar (el
+  // panel flotante) en vez de ensuciar el chat. Usamos refs para que el efecto no
+  // re-registre en cada render (las funciones se recrean).
   const lanzarSopaRef = useRef(lanzarSopaDev);
   const lanzarEjercicioRef = useRef(lanzarEjercicioDev);
+  const lanzarRuedaRef = useRef(lanzarRuedaDev);
   lanzarSopaRef.current = lanzarSopaDev;
   lanzarEjercicioRef.current = lanzarEjercicioDev;
+  lanzarRuedaRef.current = lanzarRuedaDev;
   useEffect(() => {
     if (!devToolsActivas()) return;
     setAccionesDevTutor({
       lanzarSopa: () => void lanzarSopaRef.current(),
       lanzarEjercicio: () => void lanzarEjercicioRef.current("opcion_multiple"),
       lanzarSeleccion: () => void lanzarEjercicioRef.current("seleccion_multiple"),
+      lanzarRueda: () => void lanzarRuedaRef.current(),
     });
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
@@ -770,6 +820,11 @@ const Linea = memo(function Linea({
         // (con un tope en tablet), centrado bajo el texto de Rai.
         <div className="mt-3 w-[90vw] max-w-[520px]">
           <SopaLetras datos={m.sopa} />
+        </div>
+      )}
+      {m.rueda && (
+        <div className="mt-3 w-[85vw] max-w-[420px]">
+          <RuedaLetras datos={m.rueda} />
         </div>
       )}
     </div>

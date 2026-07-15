@@ -50,6 +50,7 @@ export type AccionesDevTutor = {
   lanzarSopa: () => void;
   lanzarEjercicio: () => void;
   lanzarSeleccion: () => void;
+  lanzarRueda: () => void;
 } | null;
 
 interface AppState {

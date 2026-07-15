@@ -32,6 +32,7 @@ export function DevPanel({
     lanzarSopa: () => void;
     lanzarEjercicio: () => void;
     lanzarSeleccion: () => void;
+    lanzarRueda: () => void;
   } | null;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -98,6 +99,12 @@ export function DevPanel({
                   className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
                 >
                   Selección múltiple
+                </button>
+                <button
+                  onClick={accionesTutor.lanzarRueda}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  Rueda de letras
                 </button>
               </div>
             </div>
