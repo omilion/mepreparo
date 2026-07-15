@@ -143,17 +143,37 @@ export function SopaLetras({
   const listo = encontradas.size === datos.palabras.length;
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      {/* GRID */}
+    <div className="flex w-full flex-col items-center gap-3">
+      {/* PALABRAS A BUSCAR — arriba y más grandes */}
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        {datos.palabras.map((p) => {
+          const hallada = encontradas.has(p.clean);
+          return (
+            <span
+              key={p.clean}
+              className={
+                "text-[17px] font-[600] transition-colors " +
+                (hallada
+                  ? "text-sage-deep line-through opacity-70"
+                  : "text-ink-soft")
+              }
+            >
+              {p.clean}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* GRID — ocupa el 90% del ancho en móvil, sin marco */}
       <div
         ref={contenedorRef}
         className="select-none touch-none"
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gap: "2px",
+          gap: "3px",
           width: "100%",
-          maxWidth: `${cols * 40}px`,
+          maxWidth: `${cols * 46}px`,
           // touch-action:none evita que el arrastre haga scroll de la página
           touchAction: "none",
         }}
@@ -179,43 +199,39 @@ export function SopaLetras({
                 data-cx={x}
                 data-cy={y}
                 className={
-                  "flex aspect-square items-center justify-center rounded-md text-[15px] font-[600] transition-colors " +
+                  "flex aspect-square items-center justify-center rounded-md transition-colors " +
                   (resuelta
-                    ? "bg-sage/25 text-sage-deep"
+                    ? "bg-sage/25"
                     : activa
-                      ? "bg-sage/40 text-ink"
-                      : "bg-surface/60 text-ink")
+                      ? "bg-sage/40"
+                      : "bg-surface/60")
                 }
               >
-                {letra}
+                {/* la LETRA en un span propio: al seleccionarse crece 50% y
+                    cambia a salvia; al quedar resuelta vuelve al tamaño normal
+                    con el color nuevo. El transform anima suave. */}
+                <span
+                  className={
+                    "pointer-events-none text-[16px] font-[600] transition-all duration-150 " +
+                    (resuelta
+                      ? "scale-100 text-sage-deep"
+                      : activa
+                        ? "scale-150 text-sage-deep"
+                        : "scale-100 text-ink")
+                  }
+                >
+                  {letra}
+                </span>
               </div>
             );
           })
         )}
       </div>
 
-      {/* PALABRAS A BUSCAR */}
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
-        {datos.palabras.map((p) => {
-          const hallada = encontradas.has(p.clean);
-          return (
-            <span
-              key={p.clean}
-              className={
-                "text-[13px] transition-colors " +
-                (hallada
-                  ? "text-sage-deep line-through opacity-70"
-                  : "text-ink-soft")
-              }
-            >
-              {p.clean}
-            </span>
-          );
-        })}
-      </div>
-
       {listo && (
-        <p className="text-[13px] text-sage-deep">¡Las encontraste todas! 🎉</p>
+        <p className="text-[14px] font-[600] text-sage-deep">
+          ¡Las encontraste todas! 🎉
+        </p>
       )}
     </div>
   );

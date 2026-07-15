@@ -681,7 +681,9 @@ const Linea = memo(function Linea({
         />
       )}
       {m.sopa && (
-        <div className="mt-3 w-full rounded-2xl border border-hair bg-surface/50 p-4">
+        // escapa el max-w-[40ch] del mensaje para ocupar ~90% de la PANTALLA
+        // (con un tope en tablet), centrado bajo el texto de Rai.
+        <div className="mt-3 w-[90vw] max-w-[520px]">
           <SopaLetras datos={m.sopa} />
         </div>
       )}
@@ -730,18 +732,16 @@ function TarjetaEjercicioChat({
         })}
       </div>
 
-      {resuelto && (
-        <p
-          className={
-            "mt-3 text-[13px] " +
-            (ejercicio.respondido === "ok" ? "text-sage-deep" : "text-clay")
-          }
-        >
-          {ejercicio.respondido === "ok"
-            ? "¡Correcto! 🎉"
-            : `La respuesta era: ${ejercicio.respuestaFinal}.`}
-        </p>
-      )}
+      {resuelto &&
+        (ejercicio.respondido === "ok" ? (
+          <p className="mt-4 font-serif text-[20px] font-[600] text-sage-deep">
+            ¡Correcto! 🎆
+          </p>
+        ) : (
+          <p className="mt-4 text-[15px] text-clay">
+            La respuesta era: {ejercicio.respuestaFinal}.
+          </p>
+        ))}
     </div>
   );
 }
