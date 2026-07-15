@@ -116,10 +116,10 @@ function parseJsonTolerante(cruda: string): Record<string, unknown> {
     if (opciones.length) obj.opciones = opciones;
     if (Object.keys(datos).length) obj.datos = datos;
     obj.solucionPasoAPaso = [];
-    
-    const esEscrito = tipoPlantilla === "escrito";
-    // si no rescatamos lo mínimo, que falle (para reintentar/caer a semilla)
-    if (!obj.enunciado || (!esEscrito && !obj.opciones)) throw new Error("JSON irrescatable");
+
+    // si no rescatamos lo mínimo (enunciado + opciones), que falle
+    // (para reintentar o caer a semilla)
+    if (!obj.enunciado || !obj.opciones) throw new Error("JSON irrescatable");
     return obj;
   }
 }
@@ -185,27 +185,8 @@ export async function GET(req: NextRequest) {
     while (intentos < 2) {
       intentos++;
       try {
-        let sistemaPrompt = "";
-        if (tipoPlantilla === "escrito") {
-          sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
-Genera un ejercicio de respuesta escrita (respuesta corta/numérica exacta de una o dos palabras, NO de opción múltiple) adaptado al curso, materia, dificultad y contexto pedagógico provisto.
-Debes responder con un objeto JSON en el siguiente formato exacto:
-{
-  "tipoPlantilla": "escrito",
-  "enunciado": "Enunciado del ejercicio. Puedes incluir variables entre llaves como {cajas} y {manzanas}.",
-  "datos": {
-    "nombre_variable": valor_numerico
-  },
-  "formula": "Fórmula matemática simple para calcular la respuesta final usando las variables en 'datos'. Dejar vacío si no es matemática.",
-  "solucionPasoAPaso": [
-    "Paso 1: Explicación...",
-    "Paso 2: Explicación..."
-  ],
-  "respuestaFinal": "La respuesta exacta y correcta (ej: 24)"
-}`;
-        } else {
-          sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
-Genera un ejercicio adaptado al curso, materia, dificultad y contexto pedagógico provisto.
+        const sistemaPrompt = `Eres un generador premium de ejercicios y evaluaciones escolares para educación básica en Chile.
+Genera un ejercicio de opción múltiple adaptado al curso, materia, dificultad y contexto pedagógico provisto.
 Debes responder con un objeto JSON en el siguiente formato exacto:
 {
   "enunciado": "Enunciado del ejercicio. Puedes incluir variables entre llaves como {cajas} y {manzanas}.",
@@ -225,7 +206,6 @@ Debes responder con un objeto JSON en el siguiente formato exacto:
     "Opción incorrecta 3"
   ]
 }`;
-        }
 
         const usuarioPrompt = `Genera un ejercicio para:
 Materia: ${materia}

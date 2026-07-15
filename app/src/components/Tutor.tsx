@@ -113,7 +113,7 @@ export function Tutor({
         body: JSON.stringify({ ...cuerpoBase(), accion: "saludo" }),
       });
       const data = await res.json();
-      agregarRai(data);
+      void agregarRai(data);
       quizasGuardarHorario(data.horario);
     } catch {
       setMensajes([
@@ -165,7 +165,7 @@ export function Tutor({
           },
         ]);
       } else {
-        agregarRai(data);
+        void agregarRai(data);
         quizasGuardarHorario(data.horario);
       }
     } catch {
@@ -178,80 +178,34 @@ export function Tutor({
     }
   }
 
-  function agregarRai(data: {
+  async function agregarRai(data: {
     respuesta?: string;
     fuentes?: string[];
     modo?: "gemini" | "simulado";
     ejercicioTema?: string;
-    ejercicioFormato?: string;
   }) {
-    const idx = { current: -1 };
-    setMensajes((m) => {
-      idx.current = m.length;
-      return [
-        ...m,
-        {
-          de: "rai",
-          texto: data.respuesta ?? "Ups, no pude responder ahora.",
-          fuentes: data.fuentes,
-          modo: data.modo,
-        },
-      ];
-    });
-    // si Rai lanzó un ejercicio, lo pedimos a la biblioteca y lo adjuntamos.
-    // El FORMATO lo eligió Rai (no el azar): "escrito" o "opcion_multiple".
-    if (data.ejercicioTema) {
-      void cargarEjercicioEnChat(
-        data.ejercicioTema,
-        idx.current,
-        data.ejercicioFormato || "opcion_multiple"
-      );
-    }
-  }
+    // Si Rai lanzó un ejercicio, lo resolvemos ANTES de pintar su mensaje y lo
+    // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos
+    // depender de un índice numérico, que llegaba desfasado y dejaba la tarjeta
+    // sin engancharse.
+    const ejercicio = data.ejercicioTema
+      ? await obtenerEjercicio(data.ejercicioTema)
+      : null;
 
-  // Pide un ejercicio del tema a la biblioteca validada y lo adjunta al mensaje.
-  async function cargarEjercicioEnChat(tema: string, msgIdx: number, formato: string) {
-    let ejercicioOk = false;
-    try {
-      const params = new URLSearchParams({
-        materia,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-        tipoPlantilla: formato,
-      });
-      const res = await fetch(`/api/ejercicios/obtener?${params}`);
-      const data = await res.json();
-      const e = data.ejercicio;
-      const opciones: string[] = e?.datos?.opciones ?? e?.opciones ?? [];
-      const respuestaFinal = String(e?.respuestaFinal ?? "");
-      const tipoPlantilla = e?.tipoPlantilla ?? e?.datos?.tipoPlantilla ?? "opcion_multiple";
-      
-      const esEscrito = tipoPlantilla === "escrito";
-      const esValido = esEscrito
-        ? !!(e?.enunciado && respuestaFinal)
-        : !!(e?.enunciado && opciones.length >= 2 && opciones.includes(respuestaFinal));
+    setMensajes((m) => [
+      ...m,
+      {
+        de: "rai",
+        texto: data.respuesta ?? "Ups, no pude responder ahora.",
+        fuentes: data.fuentes,
+        modo: data.modo,
+        ejercicio: ejercicio ?? undefined,
+      },
+    ]);
 
-      if (esValido) {
-        const ejercicio: EjercicioChat = {
-          tema,
-          enunciado: rellenar(e.enunciado, e.datos?.variables),
-          opciones,
-          respuestaFinal,
-          tipoPlantilla,
-        };
-        setMensajes((m) =>
-          m.map((msg, i) => (i === msgIdx ? { ...msg, ejercicio } : msg))
-        );
-        ejercicioOk = true;
-      }
-    } catch {
-      /* cae al mensaje de respaldo abajo */
-    }
-
-    // RED DE SEGURIDAD: si el ejercicio no llegó, el niño NO debe quedar
-    // esperando un juego que Rai prometió. Rai lo retoma con naturalidad.
-    if (!ejercicioOk) {
+    // RED DE SEGURIDAD: Rai prometió un ejercicio pero no llegó uno válido; que
+    // no quede el niño esperando un juego que nunca aparece.
+    if (data.ejercicioTema && !ejercicio) {
       setMensajes((m) => [
         ...m,
         {
@@ -261,30 +215,66 @@ export function Tutor({
             "lo intentamos de nuevo en un ratito. ¿Qué parte te gustaría repasar?",
         },
       ]);
-      scrollAlFinal();
     }
   }
 
-  // DEV ONLY: lanza un ejercicio del formato pedido sin pasar por Rai, para poder
-  // probar la tarjeta on-demand (como Rai ahora ELIGE el formato, no hay forma
-  // determinista de forzar un "escrito" conversando). Crea un mensaje de Rai
-  // anfitrión y le engancha el ejercicio por índice.
-  function lanzarEjercicioDev(formato: "escrito" | "opcion_multiple") {
-    const idx = { current: -1 };
-    setMensajes((m) => {
-      idx.current = m.length;
-      return [
+  // Pide un ejercicio a la biblioteca validada y lo devuelve listo (o null si no
+  // hay uno válido). NO toca el estado: quien llama decide dónde lo adjunta.
+  async function obtenerEjercicio(tema: string): Promise<EjercicioChat | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+        tipoPlantilla: "opcion_multiple",
+      });
+      const res = await fetch(`/api/ejercicios/obtener?${params}`);
+      const data = await res.json();
+      const e = data.ejercicio;
+      const opciones: string[] = e?.datos?.opciones ?? e?.opciones ?? [];
+      const respuestaFinal = String(e?.respuestaFinal ?? "");
+
+      const esValido = !!(
+        e?.enunciado &&
+        opciones.length >= 2 &&
+        opciones.includes(respuestaFinal)
+      );
+      if (!esValido) return null;
+
+      return {
+        tema,
+        enunciado: rellenar(e.enunciado, e.datos?.variables),
+        opciones,
+        respuestaFinal,
+        tipoPlantilla: "opcion_multiple",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // DEV ONLY: lanza un ejercicio de opción múltiple sin pasar por Rai, para
+  // probar la tarjeta on-demand sin tener que conversar hasta que él lo lance.
+  async function lanzarEjercicioDev() {
+    // Resolvemos el ejercicio PRIMERO y lo adjuntamos en el MISMO mensaje que lo
+    // presenta, en un solo setMensajes. Así no dependemos de un índice numérico
+    // (que llegaba en -1 porque el updater async no lo asignaba a tiempo).
+    const ejercicio = await obtenerEjercicio("prueba");
+    setMensajes((m) => [
+      ...m,
+      {
+        de: "rai",
+        texto: "(dev) Ejercicio de alternativas 👇",
+        ejercicio: ejercicio ?? undefined,
+      },
+    ]);
+    if (!ejercicio) {
+      setMensajes((m) => [
         ...m,
-        {
-          de: "rai",
-          texto:
-            formato === "escrito"
-              ? "(dev) Ejercicio de respuesta escrita 👇"
-              : "(dev) Ejercicio de alternativas 👇",
-        },
-      ];
-    });
-    void cargarEjercicioEnChat("prueba", idx.current, formato);
+        { de: "rai", texto: "(dev) No se pudo obtener el ejercicio." },
+      ]);
+    }
   }
 
   // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
@@ -497,26 +487,17 @@ export function Tutor({
               </button>
             </div>
           )}
-          {/* PANEL DEV: solo en desarrollo. Fuerza un ejercicio de cada formato
-              sin depender de que Rai decida lanzarlo (ahora él elige, así que no
-              hay manera determinista de llegar al "escrito" conversando). */}
+          {/* PANEL DEV: solo en desarrollo. Fuerza un ejercicio sin depender de
+              que Rai decida lanzarlo, para poder probar la tarjeta on-demand. */}
           {process.env.NODE_ENV !== "production" && (
             <div className="flex justify-center gap-2 pb-1">
               <button
                 type="button"
-                onClick={() => lanzarEjercicioDev("escrito")}
+                onClick={() => void lanzarEjercicioDev()}
                 disabled={cargando}
                 className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
               >
-                dev · escrito
-              </button>
-              <button
-                type="button"
-                onClick={() => lanzarEjercicioDev("opcion_multiple")}
-                disabled={cargando}
-                className="rounded-full border border-clay/40 px-3 py-1 text-[11px] text-clay hover:bg-clay/10 disabled:opacity-40"
-              >
-                dev · alternativas
+                dev · ejercicio
               </button>
             </div>
           )}
@@ -658,68 +639,38 @@ function TarjetaEjercicioChat({
   onResponder?: (opcion: string) => void;
 }) {
   const resuelto = !!ejercicio.respondido;
-  const esEscrito = ejercicio.tipoPlantilla === "escrito";
-  const [inputValue, setInputValue] = useState("");
 
   return (
     <div className="mt-3 w-full rounded-2xl border border-hair bg-surface/50 p-4 text-center">
       <p className="mb-3 font-serif text-[17px] leading-[1.3] text-ink">
         {ejercicio.enunciado}
       </p>
-      
-      {esEscrito ? (
-        <div className="flex flex-col items-center gap-3">
-          <input
-            type="text"
-            value={inputValue}
-            disabled={resuelto}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Escribe tu respuesta aquí..."
-            className="border-b border-hair bg-transparent px-2 py-1 text-center text-[15px] text-ink outline-none focus:border-sage w-full max-w-[200px] transition-colors"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && inputValue.trim() && !resuelto) {
-                onResponder?.(inputValue.trim());
-              }
-            }}
-          />
-          {!resuelto && (
+
+      <div className="flex flex-col gap-2">
+        {ejercicio.opciones.map((op, i) => {
+          const esCorrecta = op === ejercicio.respuestaFinal;
+          const marca = resuelto && esCorrecta;
+          const marcaMal = ejercicio.respondido === "no" && !esCorrecta;
+          return (
             <button
-              onClick={() => inputValue.trim() && onResponder?.(inputValue.trim())}
-              disabled={!inputValue.trim()}
-              className="rounded-xl border border-hair px-4 py-1.5 text-[13px] bg-sage/10 text-sage-deep font-[600] transition-colors hover:border-sage enabled:opacity-100 disabled:opacity-40"
+              key={i}
+              onClick={() => !resuelto && onResponder?.(op)}
+              disabled={resuelto}
+              className={
+                "rounded-xl border px-3 py-2 text-[14px] transition-colors " +
+                (marca
+                  ? "border-sage bg-sage/10 text-ink"
+                  : marcaMal
+                    ? "border-hair text-ink-soft opacity-50"
+                    : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60")
+              }
             >
-              Comprobar
+              {op}
             </button>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {ejercicio.opciones.map((op, i) => {
-            const esCorrecta = op === ejercicio.respuestaFinal;
-            const marca = resuelto && esCorrecta;
-            const marcaMal =
-              ejercicio.respondido === "no" && !esCorrecta;
-            return (
-              <button
-                key={i}
-                onClick={() => !resuelto && onResponder?.(op)}
-                disabled={resuelto}
-                className={
-                  "rounded-xl border px-3 py-2 text-[14px] transition-colors " +
-                  (marca
-                    ? "border-sage bg-sage/10 text-ink"
-                    : marcaMal
-                      ? "border-hair text-ink-soft opacity-50"
-                      : "border-hair text-ink enabled:hover:border-sage disabled:opacity-60")
-                }
-              >
-                {op}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      
+          );
+        })}
+      </div>
+
       {resuelto && (
         <p
           className={

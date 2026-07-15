@@ -95,15 +95,11 @@ export async function validarEjercicio(
     return { esValido: false, razon: "Formato de ejercicio incompleto" };
   }
 
-  const esEscrito = ejercicio.tipoPlantilla === "escrito";
-
-  if (!esEscrito) {
-    if (!Array.isArray(ejercicio.opciones)) {
-      return { esValido: false, razon: "Opción de ejercicio no es un array en opción múltiple" };
-    }
-    if (!ejercicio.opciones.includes(ejercicio.respuestaFinal)) {
-      return { esValido: false, razon: "La respuesta correcta no se encuentra entre las opciones" };
-    }
+  if (!Array.isArray(ejercicio.opciones)) {
+    return { esValido: false, razon: "Opción de ejercicio no es un array en opción múltiple" };
+  }
+  if (!ejercicio.opciones.includes(ejercicio.respuestaFinal)) {
+    return { esValido: false, razon: "La respuesta correcta no se encuentra entre las opciones" };
   }
 
   // 2. Validación matemática determinista si aplica

@@ -258,8 +258,8 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       });
 
       const { texto: sinHorario, horario } = separarHorario(cruda, body.materias || []);
-      // extrae el marcador <<EJERCICIO:tema:formato>> si Rai lanzó un ejercicio
-      const { texto, ejercicioTema, ejercicioFormato } = separarEjercicio(sinHorario);
+      // extrae el marcador <<EJERCICIO:tema>> si Rai lanzó un ejercicio
+      const { texto, ejercicioTema } = separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
       // No cacheamos respuestas con ejercicio: el ejercicio es dinámico.
@@ -288,8 +288,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         respuesta: texto,
         fuentes,
         horario,
-        ejercicioTema, // presente si Rai lanzó un ejercicio
-        ejercicioFormato, // "escrito" | "opcion_multiple" (Rai lo elige)
+        ejercicioTema, // presente si Rai lanzó un ejercicio (opción múltiple)
         modo: "gemini",
       });
     } catch (e) {
@@ -316,17 +315,13 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
 function separarEjercicio(cruda: string): {
   texto: string;
   ejercicioTema?: string;
-  ejercicioFormato?: string;
 } {
-  // acepta <<EJERCICIO:tema>> o <<EJERCICIO:tema:formato>>
-  const m = cruda.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::([a-z_]+))?>>/i);
+  // acepta <<EJERCICIO:tema>> (también tolera un :sufijo antiguo y lo ignora)
+  const m = cruda.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::[a-z_]+)?>>/i);
   if (!m) return { texto: cruda.trim() };
   const texto = cruda.replace(m[0], "").trim();
   const tema = m[1].trim().toLowerCase().replace(/\s+/g, "_");
-  // formato: "escrito" o "alternativas" (default). Rai lo elige.
-  const fmt = (m[2] || "").trim().toLowerCase();
-  const ejercicioFormato = fmt === "escrito" ? "escrito" : "opcion_multiple";
-  return { texto, ejercicioTema: tema || undefined, ejercicioFormato };
+  return { texto, ejercicioTema: tema || undefined };
 }
 
 function separarHorario(

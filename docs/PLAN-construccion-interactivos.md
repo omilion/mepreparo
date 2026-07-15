@@ -4,38 +4,24 @@ Este documento detalla la guía de implementación técnica para construir las p
 
 > ⚠️ ALCANCE (decisión del usuario, ver PLAN-interactivos.md §0): los interactivos
 > son EL DULCE, NO LA COMIDA (1-2 por sesión, Rai elige). **NO se construyen los 6
-> tipos.** Prioridad real: Paso 1 (escrito, HECHO) → luego SOLO 2 juegos visuales
-> que enganchen (candidatos: pinta-fracción, sopa, arrastra-palabra). Los Pasos de
-> tabla-excel, laberinto y conectar-puntos de abajo son REFERENCIA TÉCNICA para el
-> futuro, NO tareas pendientes. Construir de a uno, verificar en tablet, commitear.
+> tipos.**
 >
-> ESTADO: Paso 1 (escrito) implementado y verificado E2E (2026-07-14). El formato
-> lo elige RAI vía marcador `<<EJERCICIO:tema:formato>>` (escrito|alternativas),
-> no un Math.random.
+> ESTADO (2026-07-15): el "escrito" se DESCARTÓ y se quitó del código — era
+> redundante con el chat (pregunta-respuesta ya lo hace la conversación). Los
+> interactivos quedan SOLO para lo visual/táctil. El marcador volvió a
+> `<<EJERCICIO:tema>>` (siempre opción múltiple). PRÓXIMO Y ÚNICO por ahora:
+> **Paso 2 — Sopa de Letras**. Los Pasos de conectar-puntos, arrastre, tabla-excel
+> y laberinto de abajo son REFERENCIA TÉCNICA, NO tareas pendientes. Construir la
+> sopa, verificar en tablet, commitear, y recién ahí decidir si hay un segundo.
 
 ---
 
-## Paso 1 — Piloto: Ejercicio de Respuesta Escrita (Menor Riesgo)
-Comenzamos con la dinámica de respuesta libre corta, ideal para validar el almacenamiento de evidencias antes de implementar juegos visuales.
-
-### A. Contrato de Datos (JSON Schema)
-La IA de Gemini debe generar el siguiente formato:
-```json
-{
-  "tipo": "escrito",
-  "datos": {
-    "enunciado": "¿Cuál es la capital de la Región de la Araucanía?",
-    "respuestaCorrecta": "Temuco"
-  }
-}
-```
-
-### B. Checker (Validación en Cliente)
-```typescript
-const checkEscrito = (userInput: string, correct: string): boolean => {
-  return userInput.trim().toLowerCase() === correct.trim().toLowerCase();
-};
-```
+## Paso 1 — ~~Ejercicio de Respuesta Escrita~~ (DESCARTADO 2026-07-15)
+Se implementó y luego se **quitó**: era redundante con el chat. Pregunta-respuesta
+ya lo resuelve la conversación normal, no aporta poner una tarjeta con input +
+"Comprobar" para eso. Un interactivo solo justifica su andamiaje cuando la
+mecánica no se puede hacer conversando (arrastrar, pintar, buscar en un grid).
+Lección: no envolver en tarjeta lo que el chat ya hace.
 
 ---
 

@@ -13,10 +13,15 @@ estudio sigue siendo la conversación + opción múltiple + respuesta escrita.
 - **RAI ELIGE** cuándo lanzarlos y de qué tipo, por criterio pedagógico (no un
   tema→juego fijo, no al azar). En el código: el marcador
   `<<EJERCICIO:tema:formato>>` lleva el formato que Rai decide.
-- **NO construir los 6 tipos.** Empezar con el piloto (escrito, HECHO) + 2 juegos
-  visuales que enganchen (candidatos: pinta-fracción, sopa, arrastra-palabra). El
-  resto (tabla-excel, laberinto, conectar-puntos) queda POSPUESTO indefinidamente
-  o nunca — el catálogo de abajo es el universo POSIBLE, no una lista de tareas.
+- **NO construir los 6 tipos.** El "escrito" se DESCARTÓ (2026-07-15): era
+  redundante con el chat normal — pregunta-respuesta ya lo hace la conversación,
+  no hace falta una tarjeta para eso. Los interactivos son SOLO lo visual/táctil,
+  donde la mecánica misma es el punto (arrastrar, pintar, buscar en un grid). El
+  CORE de pregunta-respuesta queda cubierto por conversación + opción múltiple.
+- **Primer (y único, por ahora) interactivo visual: SOPA DE LETRAS.** El resto
+  (pinta-fracción, arrastra-palabra, tabla-excel, laberinto, conectar-puntos)
+  queda POSPUESTO — el catálogo de abajo es el universo POSIBLE, no una lista de
+  tareas. Construir la sopa, verificar en tablet, y recién ahí decidir el segundo.
 
 ## 1. El Objetivo y la Filosofía Zen
 
