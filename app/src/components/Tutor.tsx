@@ -22,6 +22,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
 import { RuedaLetras, type DatosRueda } from "./RuedaLetras";
 import { Fireworks } from "./Fireworks";
+import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
 import { useApp } from "@/lib/app/AppProvider";
 
@@ -856,10 +857,15 @@ function TarjetaEjercicioChat({
       prev.includes(op) ? prev.filter((x) => x !== op) : [...prev, op]
     );
 
-  function elegir(op: string) {
+  function elegir(op: string, i: number) {
     if (resuelto) return;
-    if (esMulti) alternar(op);
-    else onResponder?.([op]); // single: responde de inmediato
+    if (esMulti) {
+      alternar(op);
+      tocarLira(i); // selección múltiple: cada opción suena distinto
+    } else {
+      tocarLira(); // respuesta única: una sola nota al responder
+      onResponder?.([op]);
+    }
   }
 
   return (
@@ -893,7 +899,7 @@ function TarjetaEjercicioChat({
           return (
             <button
               key={i}
-              onClick={() => elegir(op)}
+              onClick={() => elegir(op, i)}
               disabled={resuelto}
               className={"rounded-xl border px-3 py-2 text-[15px] transition-colors " + clase}
             >

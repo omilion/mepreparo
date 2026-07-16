@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Fireworks } from "./Fireworks";
+import { tocarLira } from "@/lib/audio/liraUI";
 
 // Coordenada de celda en el grid.
 export interface Celda {
@@ -105,13 +106,17 @@ export function SopaLetras({
     if (!c) return;
     inicioRef.current = c;
     fijarSeleccion([c]);
+    tocarLira(); // primera celda
   }
 
   function mover(clientX: number, clientY: number) {
     if (!inicioRef.current) return;
     const c = celdaEnPunto(clientX, clientY);
     if (!c) return;
-    fijarSeleccion(lineaRecta(inicioRef.current, c));
+    const nueva = lineaRecta(inicioRef.current, c);
+    // suena una nota cada vez que la selección GANA una celda (no en cada frame)
+    if (nueva.length > seleccionRef.current.length) tocarLira();
+    fijarSeleccion(nueva);
   }
 
   function terminar() {

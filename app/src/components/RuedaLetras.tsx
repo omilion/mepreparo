@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Fireworks } from "./Fireworks";
+import { tocarLira } from "@/lib/audio/liraUI";
 
 // Rueda de letras para FORMAR LA RESPUESTA a una pregunta de Rai. Arriba la
 // pregunta y las casillas vacías de la respuesta; abajo, en un círculo, las
@@ -87,6 +88,7 @@ export function RuedaLetras({
     arrastrando.current = true;
     setFeedback("");
     fijar([i]);
+    tocarLira(i); // cada ficha suena una nota distinta según su posición
   }
 
   function mover(clientX: number, clientY: number) {
@@ -101,6 +103,7 @@ export function RuedaLetras({
     }
     if (sel.includes(i)) return; // ya usada, no se reutiliza
     fijar([...sel, i]);
+    tocarLira(i); // cada ficha su propia nota
   }
 
   function terminar() {
