@@ -266,6 +266,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         sopaTema,
         ruedaTema,
         intrusoTema,
+        conectorTema,
       } = separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
@@ -276,6 +277,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         !sopaTema &&
         !ruedaTema &&
         !intrusoTema &&
+        !conectorTema &&
         preguntaNormalizada.length > 5 &&
         body.materia &&
         body.curso &&
@@ -303,6 +305,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         sopaTema, // presente si Rai lanzó una sopa de letras
         ruedaTema, // presente si Rai lanzó una rueda de letras
         intrusoTema, // presente si Rai lanzó "el intruso"
+        conectorTema, // presente si Rai lanzó "el conector"
         modo: "gemini",
       });
     } catch (e) {
@@ -333,6 +336,7 @@ function separarEjercicio(cruda: string): {
   sopaTema?: string;
   ruedaTema?: string;
   intrusoTema?: string;
+  conectorTema?: string;
 } {
   let texto = cruda;
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "_") || undefined;
@@ -359,6 +363,14 @@ function separarEjercicio(cruda: string): {
   if (mi) {
     intrusoTema = norm(mi[1]);
     texto = texto.replace(mi[0], "");
+  }
+
+  // <<CONECTOR:tema>> → "el conector" (unir dos columnas con líneas)
+  let conectorTema: string | undefined;
+  const mc = texto.match(/<<CONECTOR:([a-zñáéíóú_ ]+?)>>/i);
+  if (mc) {
+    conectorTema = norm(mc[1]);
+    texto = texto.replace(mc[0], "");
   }
 
   // <<SELECCION:tema>> → selección múltiple (varias correctas)
@@ -388,6 +400,7 @@ function separarEjercicio(cruda: string): {
     sopaTema,
     ruedaTema,
     intrusoTema,
+    conectorTema,
   };
 }
 

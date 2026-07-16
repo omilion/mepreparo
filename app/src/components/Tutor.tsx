@@ -22,6 +22,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
 import { RuedaLetras, type DatosRueda } from "./RuedaLetras";
 import { Intruso, type DatosIntruso } from "./Intruso";
+import { Conector, type DatosConector } from "./Conector";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
@@ -52,6 +53,8 @@ interface Mensaje {
   rueda?: DatosRueda;
   // si Rai lanzó "el intruso" (tocar el que no encaja), va embebido
   intruso?: DatosIntruso;
+  // si Rai lanzó "el conector" (unir columnas con líneas), va embebido
+  conector?: DatosConector;
 }
 
 export function Tutor({
@@ -204,6 +207,7 @@ export function Tutor({
     sopaTema?: string;
     ruedaTema?: string;
     intrusoTema?: string;
+    conectorTema?: string;
   }) {
     // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
@@ -214,6 +218,9 @@ export function Tutor({
     const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema) : null;
     const rueda = data.ruedaTema ? await obtenerRueda(data.ruedaTema) : null;
     const intruso = data.intrusoTema ? await obtenerIntruso(data.intrusoTema) : null;
+    const conector = data.conectorTema
+      ? await obtenerConector(data.conectorTema)
+      : null;
 
     setMensajes((m) => [
       ...m,
@@ -226,6 +233,7 @@ export function Tutor({
         sopa: sopa ?? undefined,
         rueda: rueda ?? undefined,
         intruso: intruso ?? undefined,
+        conector: conector ?? undefined,
       },
     ]);
 
@@ -235,9 +243,10 @@ export function Tutor({
       data.ejercicioTema ||
       data.sopaTema ||
       data.ruedaTema ||
-      data.intrusoTema
+      data.intrusoTema ||
+      data.conectorTema
     );
-    const llegoActividad = !!(ejercicio || sopa || rueda || intruso);
+    const llegoActividad = !!(ejercicio || sopa || rueda || intruso || conector);
     if (prometioActividad && !llegoActividad) {
       setMensajes((m) => [
         ...m,
@@ -385,6 +394,37 @@ export function Tutor({
     }
   }
 
+  // Pide "el conector" del tema (consigna + pares izq↔der). Devuelve los datos
+  // listos o null si no se pudo generar.
+  async function obtenerConector(tema: string): Promise<DatosConector | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/conector/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const c = data.conector;
+      const ok =
+        typeof c?.enunciado === "string" &&
+        Array.isArray(c?.pares) &&
+        c.pares.length >= 3 &&
+        c.pares.every(
+          (p: unknown) =>
+            !!p &&
+            typeof (p as { izq?: unknown }).izq === "string" &&
+            typeof (p as { der?: unknown }).der === "string"
+        );
+      if (!ok) return null;
+      return { enunciado: c.enunciado, pares: c.pares };
+    } catch {
+      return null;
+    }
+  }
+
   // DEV ONLY: lanza un ejercicio sin pasar por Rai, para probar la tarjeta
   // on-demand. `formato` = "opcion_multiple" | "seleccion_multiple".
   async function lanzarEjercicioDev(formato: string = "opcion_multiple") {
@@ -453,6 +493,21 @@ export function Tutor({
     }
   }
 
+  // DEV ONLY: lanza "el conector" sin pasar por Rai.
+  async function lanzarConectorDev() {
+    const conector = await obtenerConector("prueba");
+    setMensajes((m) => [
+      ...m,
+      { de: "rai", texto: "(dev) El conector 👇", conector: conector ?? undefined },
+    ]);
+    if (!conector) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar el conector." },
+      ]);
+    }
+  }
+
   // Publica las acciones dev en el panel dev GLOBAL mientras el tutor está en
   // pantalla, y las quita al salir. Así los botones viven en un solo lugar (el
   // panel flotante) en vez de ensuciar el chat. Usamos refs para que el efecto no
@@ -461,10 +516,12 @@ export function Tutor({
   const lanzarEjercicioRef = useRef(lanzarEjercicioDev);
   const lanzarRuedaRef = useRef(lanzarRuedaDev);
   const lanzarIntrusoRef = useRef(lanzarIntrusoDev);
+  const lanzarConectorRef = useRef(lanzarConectorDev);
   lanzarSopaRef.current = lanzarSopaDev;
   lanzarEjercicioRef.current = lanzarEjercicioDev;
   lanzarRuedaRef.current = lanzarRuedaDev;
   lanzarIntrusoRef.current = lanzarIntrusoDev;
+  lanzarConectorRef.current = lanzarConectorDev;
   useEffect(() => {
     if (!devToolsActivas()) return;
     setAccionesDevTutor({
@@ -473,6 +530,7 @@ export function Tutor({
       lanzarSeleccion: () => void lanzarEjercicioRef.current("seleccion_multiple"),
       lanzarRueda: () => void lanzarRuedaRef.current(),
       lanzarIntruso: () => void lanzarIntrusoRef.current(),
+      lanzarConector: () => void lanzarConectorRef.current(),
     });
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
@@ -545,6 +603,16 @@ export function Tutor({
     } catch {
       /* si falla, el niño ya vio el intruso correcto en la tarjeta */
     }
+  }
+
+  // El niño terminó "el conector": registra evidencia. No hace falta que Rai
+  // explique — la tarjeta ya muestra en rojo las uniones equivocadas.
+  function responderConector(msgIdx: number, acerto: boolean) {
+    const c = mensajes[msgIdx]?.conector;
+    if (!c || !acuerdo) return;
+    const tema = c.enunciado.slice(0, 40);
+    const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
+    onGuardarPerfil?.({ ...perfil, tutoria });
   }
 
   // ¿La selección del niño es correcta? Todo o nada.
@@ -760,6 +828,7 @@ export function Tutor({
             onResponderIntruso={(acerto, elegido) =>
               responderIntruso(i, acerto, elegido)
             }
+            onResponderConector={(acerto) => responderConector(i, acerto)}
           />
         ))}
 
@@ -882,12 +951,14 @@ const Linea = memo(function Linea({
   onTick,
   onResponderEjercicio,
   onResponderIntruso,
+  onResponderConector,
 }: {
   m: Mensaje;
   animar?: boolean;
   onTick?: () => void;
   onResponderEjercicio?: (seleccion: string[]) => void;
   onResponderIntruso?: (acerto: boolean, elegido: string) => void;
+  onResponderConector?: (acerto: boolean) => void;
 }) {
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
@@ -940,6 +1011,11 @@ const Linea = memo(function Linea({
       {m.intruso && (
         <div className="mt-3 w-[85vw] max-w-[480px]">
           <Intruso datos={m.intruso} onResponder={onResponderIntruso} />
+        </div>
+      )}
+      {m.conector && (
+        <div className="mt-3 w-[85vw] max-w-[480px]">
+          <Conector datos={m.conector} onResponder={onResponderConector} />
         </div>
       )}
     </div>
