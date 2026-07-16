@@ -36,6 +36,8 @@ export function DevPanel({
     lanzarIntruso: () => void;
     lanzarConector: () => void;
     lanzarClasificador: () => void;
+    lanzarSecuencia: () => void;
+    lanzarFlashcards: () => void;
   } | null;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -126,6 +128,18 @@ export function DevPanel({
                   className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
                 >
                   El clasificador
+                </button>
+                <button
+                  onClick={accionesTutor.lanzarSecuencia}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  Secuencia
+                </button>
+                <button
+                  onClick={accionesTutor.lanzarFlashcards}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  Flashcards
                 </button>
               </div>
             </div>

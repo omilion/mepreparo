@@ -268,6 +268,8 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         intrusoTema,
         conectorTema,
         clasificadorTema,
+        secuenciaTema,
+        flashcardsTema,
       } = separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
@@ -280,6 +282,8 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         !intrusoTema &&
         !conectorTema &&
         !clasificadorTema &&
+        !secuenciaTema &&
+        !flashcardsTema &&
         preguntaNormalizada.length > 5 &&
         body.materia &&
         body.curso &&
@@ -309,6 +313,8 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         intrusoTema, // presente si Rai lanzó "el intruso"
         conectorTema, // presente si Rai lanzó "el conector"
         clasificadorTema, // presente si Rai lanzó "el clasificador"
+        secuenciaTema, // presente si Rai lanzó una secuencia
+        flashcardsTema, // presente si Rai lanzó flashcards
         modo: "gemini",
       });
     } catch (e) {
@@ -341,6 +347,8 @@ function separarEjercicio(cruda: string): {
   intrusoTema?: string;
   conectorTema?: string;
   clasificadorTema?: string;
+  secuenciaTema?: string;
+  flashcardsTema?: string;
 } {
   let texto = cruda;
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "_") || undefined;
@@ -385,6 +393,22 @@ function separarEjercicio(cruda: string): {
     texto = texto.replace(mcl[0], "");
   }
 
+  // <<SECUENCIA:tema>> → secuencias a ordenar
+  let secuenciaTema: string | undefined;
+  const msec = texto.match(/<<SECUENCIA:([a-zñáéíóú_ ]+?)>>/i);
+  if (msec) {
+    secuenciaTema = norm(msec[1]);
+    texto = texto.replace(msec[0], "");
+  }
+
+  // <<FLASHCARDS:tema>> → mazo de flashcards
+  let flashcardsTema: string | undefined;
+  const mflash = texto.match(/<<FLASHCARDS:([a-zñáéíóú_ ]+?)>>/i);
+  if (mflash) {
+    flashcardsTema = norm(mflash[1]);
+    texto = texto.replace(mflash[0], "");
+  }
+
   // <<SELECCION:tema>> → selección múltiple (varias correctas)
   let ejercicioTema: string | undefined;
   let ejercicioFormato: string | undefined;
@@ -414,6 +438,8 @@ function separarEjercicio(cruda: string): {
     intrusoTema,
     conectorTema,
     clasificadorTema,
+    secuenciaTema,
+    flashcardsTema,
   };
 }
 

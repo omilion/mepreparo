@@ -54,6 +54,8 @@ export type AccionesDevTutor = {
   lanzarIntruso: () => void;
   lanzarConector: () => void;
   lanzarClasificador: () => void;
+  lanzarSecuencia: () => void;
+  lanzarFlashcards: () => void;
 } | null;
 
 interface AppState {

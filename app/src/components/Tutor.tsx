@@ -24,6 +24,8 @@ import { RuedaLetras, type DatosRueda } from "./RuedaLetras";
 import { Intruso, type DatosIntruso } from "./Intruso";
 import { Conector, type DatosConector } from "./Conector";
 import { Clasificador, type DatosClasificador } from "./Clasificador";
+import { Secuencia, type DatosSecuencia } from "./Secuencia";
+import { Flashcards, type DatosFlashcards } from "./Flashcards";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
@@ -58,6 +60,10 @@ interface Mensaje {
   conector?: DatosConector;
   // si Rai lanzó "el clasificador" (arrastrar a grupos), va embebido
   clasificador?: DatosClasificador;
+  // si Rai lanzó "secuencia" (ordenar pasos)
+  secuencia?: DatosSecuencia;
+  // si Rai lanzó "flashcards" (fichas de estudio)
+  flashcards?: DatosFlashcards;
 }
 
 export function Tutor({
@@ -216,6 +222,8 @@ export function Tutor({
     intrusoTema?: string;
     conectorTema?: string;
     clasificadorTema?: string;
+    secuenciaTema?: string;
+    flashcardsTema?: string;
   }) {
     // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
@@ -232,6 +240,12 @@ export function Tutor({
     const clasificador = data.clasificadorTema
       ? await obtenerClasificador(data.clasificadorTema)
       : null;
+    const secuencia = data.secuenciaTema
+      ? await obtenerSecuencia(data.secuenciaTema)
+      : null;
+    const flashcards = data.flashcardsTema
+      ? await obtenerFlashcards(data.flashcardsTema)
+      : null;
 
     setMensajes((m) => [
       ...m,
@@ -246,6 +260,8 @@ export function Tutor({
         intruso: intruso ?? undefined,
         conector: conector ?? undefined,
         clasificador: clasificador ?? undefined,
+        secuencia: secuencia ?? undefined,
+        flashcards: flashcards ?? undefined,
       },
     ]);
 
@@ -257,10 +273,12 @@ export function Tutor({
       data.ruedaTema ||
       data.intrusoTema ||
       data.conectorTema ||
-      data.clasificadorTema
+      data.clasificadorTema ||
+      data.secuenciaTema ||
+      data.flashcardsTema
     );
     const llegoActividad = !!(
-      ejercicio || sopa || rueda || intruso || conector || clasificador
+      ejercicio || sopa || rueda || intruso || conector || clasificador || secuencia || flashcards
     );
     if (prometioActividad && !llegoActividad) {
       setMensajes((m) => [
@@ -475,6 +493,61 @@ export function Tutor({
     }
   }
 
+  async function obtenerSecuencia(tema: string): Promise<DatosSecuencia | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/secuencia/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const s = data.secuencia;
+      const ok =
+        typeof s?.enunciado === "string" &&
+        Array.isArray(s?.pasosCorrectos) &&
+        s.pasosCorrectos.length >= 3 &&
+        Array.isArray(s?.pasosBarajados) &&
+        s.pasosBarajados.length === s.pasosCorrectos.length;
+      if (!ok) return null;
+      return {
+        enunciado: s.enunciado,
+        pasosCorrectos: s.pasosCorrectos,
+        pasosBarajados: s.pasosBarajados,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function obtenerFlashcards(tema: string): Promise<DatosFlashcards | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/flashcards/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const f = data.flashcards;
+      const ok =
+        typeof f?.enunciado === "string" &&
+        Array.isArray(f?.tarjetas) &&
+        f.tarjetas.length >= 2 &&
+        f.tarjetas.every(
+          (t: any) => typeof t?.frente === "string" && typeof t?.reverso === "string"
+        );
+      if (!ok) return null;
+      return { enunciado: f.enunciado, tarjetas: f.tarjetas };
+    } catch {
+      return null;
+    }
+  }
+
   // DEV ONLY: lanza un ejercicio sin pasar por Rai, para probar la tarjeta
   // on-demand. `formato` = "opcion_multiple" | "seleccion_multiple".
   async function lanzarEjercicioDev(formato: string = "opcion_multiple") {
@@ -577,6 +650,36 @@ export function Tutor({
     }
   }
 
+  // DEV ONLY: lanza "secuencia" sin pasar por Rai.
+  async function lanzarSecuenciaDev() {
+    const secuencia = await obtenerSecuencia("prueba");
+    setMensajes((m) => [
+      ...m,
+      { de: "rai", texto: "(dev) Secuencia 👇", secuencia: secuencia ?? undefined },
+    ]);
+    if (!secuencia) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar la secuencia." },
+      ]);
+    }
+  }
+
+  // DEV ONLY: lanza "flashcards" sin pasar por Rai.
+  async function lanzarFlashcardsDev() {
+    const flashcards = await obtenerFlashcards("prueba");
+    setMensajes((m) => [
+      ...m,
+      { de: "rai", texto: "(dev) Flashcards 👇", flashcards: flashcards ?? undefined },
+    ]);
+    if (!flashcards) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar el mazo de flashcards." },
+      ]);
+    }
+  }
+
   // Publica las acciones dev en el panel dev GLOBAL mientras el tutor está en
   // pantalla, y las quita al salir. Así los botones viven en un solo lugar (el
   // panel flotante) en vez de ensuciar el chat. Usamos refs para que el efecto no
@@ -587,12 +690,16 @@ export function Tutor({
   const lanzarIntrusoRef = useRef(lanzarIntrusoDev);
   const lanzarConectorRef = useRef(lanzarConectorDev);
   const lanzarClasificadorRef = useRef(lanzarClasificadorDev);
+  const lanzarSecuenciaRef = useRef(lanzarSecuenciaDev);
+  const lanzarFlashcardsRef = useRef(lanzarFlashcardsDev);
   lanzarSopaRef.current = lanzarSopaDev;
   lanzarEjercicioRef.current = lanzarEjercicioDev;
   lanzarRuedaRef.current = lanzarRuedaDev;
   lanzarIntrusoRef.current = lanzarIntrusoDev;
   lanzarConectorRef.current = lanzarConectorDev;
   lanzarClasificadorRef.current = lanzarClasificadorDev;
+  lanzarSecuenciaRef.current = lanzarSecuenciaDev;
+  lanzarFlashcardsRef.current = lanzarFlashcardsDev;
   useEffect(() => {
     if (!devToolsActivas()) return;
     setAccionesDevTutor({
@@ -603,6 +710,8 @@ export function Tutor({
       lanzarIntruso: () => void lanzarIntrusoRef.current(),
       lanzarConector: () => void lanzarConectorRef.current(),
       lanzarClasificador: () => void lanzarClasificadorRef.current(),
+      lanzarSecuencia: () => void lanzarSecuenciaRef.current(),
+      lanzarFlashcards: () => void lanzarFlashcardsRef.current(),
     });
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
@@ -729,6 +838,28 @@ export function Tutor({
     const r = mensajes[msgIdx]?.rueda;
     if (r && acuerdo) {
       const tema = r.respuesta;
+      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
+      onGuardarPerfil?.({ ...perfil, tutoria });
+    }
+  }
+
+  function responderSecuencia(msgIdx: number) {
+    setEstadoRai("celebracion");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+    const s = mensajes[msgIdx]?.secuencia;
+    if (s && acuerdo) {
+      const tema = s.pasosCorrectos[0] || "secuencia";
+      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
+      onGuardarPerfil?.({ ...perfil, tutoria });
+    }
+  }
+
+  function responderFlashcards(msgIdx: number) {
+    setEstadoRai("celebracion");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+    const f = mensajes[msgIdx]?.flashcards;
+    if (f && acuerdo) {
+      const tema = f.enunciado.slice(0, 40);
       const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
       onGuardarPerfil?.({ ...perfil, tutoria });
     }
@@ -956,6 +1087,8 @@ export function Tutor({
             onResponderSopa={() => responderSopa(i)}
             onResponderRueda={() => responderRueda(i)}
             onResponderClasificador={(acerto) => responderClasificador(i, acerto)}
+            onResponderSecuencia={() => responderSecuencia(i)}
+            onResponderFlashcards={() => responderFlashcards(i)}
           />
         ))}
 
@@ -1082,6 +1215,8 @@ const Linea = memo(function Linea({
   onResponderSopa,
   onResponderRueda,
   onResponderClasificador,
+  onResponderSecuencia,
+  onResponderFlashcards,
 }: {
   m: Mensaje;
   animar?: boolean;
@@ -1092,6 +1227,8 @@ const Linea = memo(function Linea({
   onResponderSopa?: () => void;
   onResponderRueda?: () => void;
   onResponderClasificador?: (acerto: boolean) => void;
+  onResponderSecuencia?: () => void;
+  onResponderFlashcards?: () => void;
 }) {
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
@@ -1157,6 +1294,16 @@ const Linea = memo(function Linea({
             datos={m.clasificador}
             onResponder={onResponderClasificador}
           />
+        </div>
+      )}
+      {m.secuencia && (
+        <div className="mt-3 w-[90vw] max-w-[480px]">
+          <Secuencia datos={m.secuencia} onCompleta={onResponderSecuencia} />
+        </div>
+      )}
+      {m.flashcards && (
+        <div className="mt-3 w-[90vw] max-w-[480px]">
+          <Flashcards datos={m.flashcards} onCompleta={onResponderFlashcards} />
         </div>
       )}
     </div>

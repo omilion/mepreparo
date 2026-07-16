@@ -135,17 +135,14 @@ export const INSTRUCCION_EJERCICIO =
   "- <<EJERCICIO:tema>> → una pregunta de opción múltiple con UNA sola respuesta correcta. Ej: <<EJERCICIO:fracciones>>.\n" +
   "- <<SELECCION:tema>> → una pregunta de selección múltiple con VARIAS respuestas correctas " +
   "(el niño marca todas las que cumplen). Úsala para clasificar/agrupar/identificar varios " +
-  "elementos (ej: 'marca todos los números pares', 'marca los mamíferos'). Ej: <<SELECCION:numeros_pares>>.\n" +
-  "- <<SOPA:tema>> → una sopa de letras para buscar palabras del tema, ideal para vocabulario " +
-  "(ciencias, historia, lenguaje). Ej: <<SOPA:sistema_solar>>.\n" +
-  "- <<RUEDA:tema>> → una pregunta cuya respuesta (una sola palabra) el niño forma arrastrando " +
-  "letras revueltas, tipo juego. Ideal para adivinar un concepto clave. Ej: <<RUEDA:sistema_solar>>.\n" +
-  "- <<INTRUSO:tema>> → 'encuentra el intruso': 4-5 elementos donde todos comparten una regla " +
-  "menos uno, y el niño toca el que sobra. Rápido y divertido para clasificar. Ej: <<INTRUSO:mamiferos>>.\n" +
-  "- <<CONECTOR:tema>> → 'unir con líneas': dos columnas donde el niño une cada elemento con su " +
-  "par (operación↔resultado, palabra↔tipo, órgano↔función). Ej: <<CONECTOR:tablas_de_multiplicar>>.\n" +
-  "- <<CLASIFICADOR:tema>> → 'arrastrar a grupos': el niño arrastra tarjetas a 2 o 3 grupos " +
-  "(pares/impares, animales/plantas, sustantivo/verbo). Ideal para clasificar. Ej: <<CLASIFICADOR:pares_impares>>.\n" +
+  "elementos. Ej: <<SELECCION:numeros_pares>>.\n" +
+  "- <<SOPA:tema>> → una sopa de letras para buscar palabras del tema, ideal para vocabulario. Ej: <<SOPA:sistema_solar>>.\n" +
+  "- <<RUEDA:tema>> → una pregunta cuya respuesta (una sola palabra) el niño forma arrastrando letras revueltas, tipo juego. Ej: <<RUEDA:sistema_solar>>.\n" +
+  "- <<INTRUSO:tema>> → 'encuentra el intruso': 4-5 elementos donde todos comparten una regla menos uno, y el niño toca el que sobra. Ej: <<INTRUSO:mamiferos>>.\n" +
+  "- <<CONECTOR:tema>> → 'unir con líneas': dos columnas donde el niño une cada elemento con su par (órgano↔función, etc.). Ej: <<CONECTOR:tablas_de_multiplicar>>.\n" +
+  "- <<CLASIFICADOR:tema>> → 'arrastrar a grupos': el niño arrastra tarjetas a 2 o 3 grupos. Ej: <<CLASIFICADOR:pares_impares>>.\n" +
+  "- <<SECUENCIA:tema>> → 'ordenar secuencia': bloques de pasos o etapas que el niño debe arrastrar y ordenar de primero a último (ciclos de vida, cronologías o procesos). Ej: <<SECUENCIA:ciclo_del_agua>>.\n" +
+  "- <<FLASHCARDS:tema>> → 'fichas de estudio': mazo de tarjetas con conceptos al frente (que muestran iconos si existen) y definiciones breves al reverso para memorizar. Ej: <<FLASHCARDS:cuerpo_humano>>.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +
   "tú la actividad: el marcador hace que aparezca una real. Para preguntas de respuesta corta o " +
   "abierta NO uses marcador: pregúntale directo en la conversación. Las actividades son un DULCE " +
