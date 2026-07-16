@@ -134,6 +134,8 @@ export const INSTRUCCION_EJERCICIO =
   "(ciencias, historia, lenguaje). Ej: <<SOPA:sistema_solar>>.\n" +
   "- <<RUEDA:tema>> → una pregunta cuya respuesta (una sola palabra) el niño forma arrastrando " +
   "letras revueltas, tipo juego. Ideal para adivinar un concepto clave. Ej: <<RUEDA:sistema_solar>>.\n" +
+  "- <<INTRUSO:tema>> → 'encuentra el intruso': 4-5 elementos donde todos comparten una regla " +
+  "menos uno, y el niño toca el que sobra. Rápido y divertido para clasificar. Ej: <<INTRUSO:mamiferos>>.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +
   "tú la actividad: el marcador hace que aparezca una real. Para preguntas de respuesta corta o " +
   "abierta NO uses marcador: pregúntale directo en la conversación. Las actividades son un DULCE " +

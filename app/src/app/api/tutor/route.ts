@@ -258,9 +258,15 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       });
 
       const { texto: sinHorario, horario } = separarHorario(cruda, body.materias || []);
-      // extrae los marcadores <<EJERCICIO/SELECCION/SOPA/RUEDA:tema>> de Rai
-      const { texto, ejercicioTema, ejercicioFormato, sopaTema, ruedaTema } =
-        separarEjercicio(sinHorario);
+      // extrae los marcadores <<EJERCICIO/SELECCION/SOPA/RUEDA/INTRUSO:tema>> de Rai
+      const {
+        texto,
+        ejercicioTema,
+        ejercicioFormato,
+        sopaTema,
+        ruedaTema,
+        intrusoTema,
+      } = separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
       // No cacheamos respuestas con actividad: la actividad es dinámica.
@@ -269,6 +275,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         !ejercicioTema &&
         !sopaTema &&
         !ruedaTema &&
+        !intrusoTema &&
         preguntaNormalizada.length > 5 &&
         body.materia &&
         body.curso &&
@@ -295,6 +302,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         ejercicioFormato, // "opcion_multiple" | "seleccion_multiple"
         sopaTema, // presente si Rai lanzó una sopa de letras
         ruedaTema, // presente si Rai lanzó una rueda de letras
+        intrusoTema, // presente si Rai lanzó "el intruso"
         modo: "gemini",
       });
     } catch (e) {
@@ -324,6 +332,7 @@ function separarEjercicio(cruda: string): {
   ejercicioFormato?: string; // "opcion_multiple" | "seleccion_multiple"
   sopaTema?: string;
   ruedaTema?: string;
+  intrusoTema?: string;
 } {
   let texto = cruda;
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "_") || undefined;
@@ -342,6 +351,14 @@ function separarEjercicio(cruda: string): {
   if (mr) {
     ruedaTema = norm(mr[1]);
     texto = texto.replace(mr[0], "");
+  }
+
+  // <<INTRUSO:tema>> → "el intruso" (tocar el que no encaja)
+  let intrusoTema: string | undefined;
+  const mi = texto.match(/<<INTRUSO:([a-zñáéíóú_ ]+?)>>/i);
+  if (mi) {
+    intrusoTema = norm(mi[1]);
+    texto = texto.replace(mi[0], "");
   }
 
   // <<SELECCION:tema>> → selección múltiple (varias correctas)
@@ -364,7 +381,14 @@ function separarEjercicio(cruda: string): {
     }
   }
 
-  return { texto: texto.trim(), ejercicioTema, ejercicioFormato, sopaTema, ruedaTema };
+  return {
+    texto: texto.trim(),
+    ejercicioTema,
+    ejercicioFormato,
+    sopaTema,
+    ruedaTema,
+    intrusoTema,
+  };
 }
 
 function separarHorario(

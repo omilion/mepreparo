@@ -51,6 +51,7 @@ export type AccionesDevTutor = {
   lanzarEjercicio: () => void;
   lanzarSeleccion: () => void;
   lanzarRueda: () => void;
+  lanzarIntruso: () => void;
 } | null;
 
 interface AppState {

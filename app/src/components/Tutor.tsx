@@ -21,6 +21,7 @@ import { SoundToggle } from "./SoundToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { SopaLetras, type DatosSopa } from "./SopaLetras";
 import { RuedaLetras, type DatosRueda } from "./RuedaLetras";
+import { Intruso, type DatosIntruso } from "./Intruso";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
@@ -49,6 +50,8 @@ interface Mensaje {
   sopa?: DatosSopa;
   // si Rai lanzó una rueda de letras (formar la respuesta), va embebida
   rueda?: DatosRueda;
+  // si Rai lanzó "el intruso" (tocar el que no encaja), va embebido
+  intruso?: DatosIntruso;
 }
 
 export function Tutor({
@@ -200,6 +203,7 @@ export function Tutor({
     ejercicioFormato?: string;
     sopaTema?: string;
     ruedaTema?: string;
+    intrusoTema?: string;
   }) {
     // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
@@ -209,6 +213,7 @@ export function Tutor({
       : null;
     const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema) : null;
     const rueda = data.ruedaTema ? await obtenerRueda(data.ruedaTema) : null;
+    const intruso = data.intrusoTema ? await obtenerIntruso(data.intrusoTema) : null;
 
     setMensajes((m) => [
       ...m,
@@ -220,13 +225,19 @@ export function Tutor({
         ejercicio: ejercicio ?? undefined,
         sopa: sopa ?? undefined,
         rueda: rueda ?? undefined,
+        intruso: intruso ?? undefined,
       },
     ]);
 
     // RED DE SEGURIDAD: Rai prometió una actividad pero no llegó una válida; que
     // no quede el niño esperando un juego que nunca aparece.
-    const prometioActividad = !!(data.ejercicioTema || data.sopaTema || data.ruedaTema);
-    const llegoActividad = !!(ejercicio || sopa || rueda);
+    const prometioActividad = !!(
+      data.ejercicioTema ||
+      data.sopaTema ||
+      data.ruedaTema ||
+      data.intrusoTema
+    );
+    const llegoActividad = !!(ejercicio || sopa || rueda || intruso);
     if (prometioActividad && !llegoActividad) {
       setMensajes((m) => [
         ...m,
@@ -342,6 +353,38 @@ export function Tutor({
     }
   }
 
+  // Pide "el intruso" del tema (consigna + opciones + cuál sobra). Devuelve los
+  // datos listos o null si no se pudo generar.
+  async function obtenerIntruso(tema: string): Promise<DatosIntruso | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/intruso/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const it = data.intruso;
+      const ok =
+        typeof it?.enunciado === "string" &&
+        Array.isArray(it?.opciones) &&
+        it.opciones.length >= 4 &&
+        typeof it?.intruso === "string" &&
+        it.opciones.includes(it.intruso);
+      if (!ok) return null;
+      return {
+        enunciado: it.enunciado,
+        opciones: it.opciones,
+        intruso: it.intruso,
+        pista: it.pista,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   // DEV ONLY: lanza un ejercicio sin pasar por Rai, para probar la tarjeta
   // on-demand. `formato` = "opcion_multiple" | "seleccion_multiple".
   async function lanzarEjercicioDev(formato: string = "opcion_multiple") {
@@ -395,6 +438,21 @@ export function Tutor({
     }
   }
 
+  // DEV ONLY: lanza "el intruso" sin pasar por Rai.
+  async function lanzarIntrusoDev() {
+    const intruso = await obtenerIntruso("prueba");
+    setMensajes((m) => [
+      ...m,
+      { de: "rai", texto: "(dev) El intruso 👇", intruso: intruso ?? undefined },
+    ]);
+    if (!intruso) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar el intruso." },
+      ]);
+    }
+  }
+
   // Publica las acciones dev en el panel dev GLOBAL mientras el tutor está en
   // pantalla, y las quita al salir. Así los botones viven en un solo lugar (el
   // panel flotante) en vez de ensuciar el chat. Usamos refs para que el efecto no
@@ -402,9 +460,11 @@ export function Tutor({
   const lanzarSopaRef = useRef(lanzarSopaDev);
   const lanzarEjercicioRef = useRef(lanzarEjercicioDev);
   const lanzarRuedaRef = useRef(lanzarRuedaDev);
+  const lanzarIntrusoRef = useRef(lanzarIntrusoDev);
   lanzarSopaRef.current = lanzarSopaDev;
   lanzarEjercicioRef.current = lanzarEjercicioDev;
   lanzarRuedaRef.current = lanzarRuedaDev;
+  lanzarIntrusoRef.current = lanzarIntrusoDev;
   useEffect(() => {
     if (!devToolsActivas()) return;
     setAccionesDevTutor({
@@ -412,6 +472,7 @@ export function Tutor({
       lanzarEjercicio: () => void lanzarEjercicioRef.current("opcion_multiple"),
       lanzarSeleccion: () => void lanzarEjercicioRef.current("seleccion_multiple"),
       lanzarRueda: () => void lanzarRuedaRef.current(),
+      lanzarIntruso: () => void lanzarIntrusoRef.current(),
     });
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
@@ -441,6 +502,49 @@ export function Tutor({
     // Si falló, le pedimos a Rai que le explique cuáles eran y por qué, para que
     // aprenda (no solo "incorrecto"). Es un mensaje de sistema al tutor.
     if (!ok) void raiExplicaError(ej, seleccion);
+  }
+
+  // El niño respondió "el intruso": registra evidencia y, si falló, Rai explica.
+  function responderIntruso(msgIdx: number, acerto: boolean, elegido: string) {
+    const it = mensajes[msgIdx]?.intruso;
+    if (!it) return;
+    if (acuerdo) {
+      const tema = it.enunciado.slice(0, 40);
+      const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
+      onGuardarPerfil?.({ ...perfil, tutoria });
+    }
+    if (!acerto) void raiExplicaIntruso(it, elegido);
+  }
+
+  // Rai explica por qué el intruso era ese (usa la pista si Gemini la dio).
+  async function raiExplicaIntruso(it: DatosIntruso, elegido: string) {
+    try {
+      const res = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...cuerpoBase(),
+          accion: "chat",
+          materia,
+          pregunta:
+            `[Sistema] En "${it.enunciado}" el niño tocó "${elegido}", pero el ` +
+            `intruso era "${it.intruso}"${it.pista ? ` (${it.pista})` : ""}. ` +
+            `Explícale con cariño y en 1-2 frases por qué ese era el intruso. ` +
+            `No lances otra actividad.`,
+          historial: historialPlano(),
+        }),
+      });
+      const data = await res.json();
+      if (data?.respuesta) {
+        setMensajes((m) => [
+          ...m,
+          { de: "rai", texto: data.respuesta, fuentes: data.fuentes, modo: data.modo },
+        ]);
+        scrollAlFinal();
+      }
+    } catch {
+      /* si falla, el niño ya vio el intruso correcto en la tarjeta */
+    }
   }
 
   // ¿La selección del niño es correcta? Todo o nada.
@@ -653,6 +757,9 @@ export function Tutor({
             animar={m.de === "rai" && i === mensajes.length - 1}
             onTick={scrollAlFinal}
             onResponderEjercicio={(seleccion) => responderEjercicio(i, seleccion)}
+            onResponderIntruso={(acerto, elegido) =>
+              responderIntruso(i, acerto, elegido)
+            }
           />
         ))}
 
@@ -774,11 +881,13 @@ const Linea = memo(function Linea({
   animar = false,
   onTick,
   onResponderEjercicio,
+  onResponderIntruso,
 }: {
   m: Mensaje;
   animar?: boolean;
   onTick?: () => void;
   onResponderEjercicio?: (seleccion: string[]) => void;
+  onResponderIntruso?: (acerto: boolean, elegido: string) => void;
 }) {
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
@@ -826,6 +935,11 @@ const Linea = memo(function Linea({
       {m.rueda && (
         <div className="mt-3 w-[85vw] max-w-[420px]">
           <RuedaLetras datos={m.rueda} />
+        </div>
+      )}
+      {m.intruso && (
+        <div className="mt-3 w-[85vw] max-w-[480px]">
+          <Intruso datos={m.intruso} onResponder={onResponderIntruso} />
         </div>
       )}
     </div>
