@@ -116,6 +116,35 @@ export class MotorAmbiente {
     return a;
   }
 
+  // Control GRANULAR: el colchón de fondo (calma|concentracion|null) y la lira se
+  // manejan por separado. `fondo` arma ruido+binaural (mutuamente excluyentes);
+  // `lira` prende/apaga la melodía de forma independiente. Todo apagado = silencio.
+  async aplicar(
+    fondo: "concentracion" | "calma" | null,
+    lira: boolean
+  ): Promise<void> {
+    if (!fondo && !lira) {
+      this.detener();
+      return;
+    }
+    await this.asegurarContexto();
+    this.detenerCapas(); // limpia lo previo antes de rearmar
+    if (fondo) {
+      const cfg = PRESETS[fondo];
+      if (cfg.ruido) this.iniciarRuido(cfg.ruidoGain);
+      if (cfg.binaural) this.iniciarBinaural(cfg.beatHz, cfg.binauralGain);
+    }
+    if (lira) {
+      // tomamos el ritmo/volumen de lira del fondo activo; si no hay fondo,
+      // usamos el de calma (más espaciado y suave) como base.
+      const cfg = PRESETS[fondo ?? "calma"];
+      this.iniciarLira(cfg.liraGain, cfg.liraMinMs, cfg.liraMaxMs);
+    }
+    // ambienteActual refleja el colchón; la lira sola queda como "silencio" de
+    // fondo pero con melodía (no afecta la lógica de presets antiguos).
+    this.ambienteActual = fondo ?? "silencio";
+  }
+
   detener(): void {
     this.detenerCapas();
     this.ambienteActual = "silencio";

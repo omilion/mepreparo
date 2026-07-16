@@ -1,36 +1,44 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MotorAmbiente, type Ambiente } from "@/lib/audio/motorAmbiente";
+import { MotorAmbiente } from "@/lib/audio/motorAmbiente";
 
-// Botón + menú de sonido ambiente para concentración. Tres modos (calibrados
-// con investigación: ruido marrón + binaural sutil afinado a la escala de la
-// lira + lira comprimida). Mantiene la API <SoundToggle /> sin props.
+// Botón + menú de sonido. Tres interruptores INDEPENDIENTES:
+//  - Calma y Concentración = colchón de fondo (ruido+binaural), EXCLUYENTES entre
+//    sí (solo uno a la vez).
+//  - Lira = melodía, aparte (se combina con cualquiera o suena sola).
+// Todo apagado = silencio.
 
-const OPCIONES: { id: Ambiente; label: string; hint: string }[] = [
-  { id: "concentracion", label: "Concentración", hint: "Foco · pulso 40 Hz + lira" },
-  { id: "calma", label: "Calma", hint: "Repaso tranquilo · pulso 16 Hz" },
-  { id: "silencio", label: "Silencio", hint: "Sin sonido" },
-];
+type Fondo = "concentracion" | "calma" | null;
 
 export function SoundToggle() {
   const motorRef = useRef<MotorAmbiente | null>(null);
-  const [ambiente, setAmbienteState] = useState<Ambiente>("silencio");
+  const [fondo, setFondo] = useState<Fondo>(null);
+  const [lira, setLira] = useState(false);
   const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
     return () => motorRef.current?.detener();
   }, []);
 
-  function aplicar(a: Ambiente) {
+  // aplica el estado (colchón + lira) al motor. El gesto de clic desbloquea el
+  // audio; aplicar() espera el resume() internamente.
+  function aplicar(nuevoFondo: Fondo, nuevaLira: boolean) {
     if (!motorRef.current) motorRef.current = new MotorAmbiente();
-    // el gesto de clic desbloquea el audio; setAmbiente espera el resume()
-    void motorRef.current.setAmbiente(a);
-    setAmbienteState(a);
-    setAbierto(false);
+    void motorRef.current.aplicar(nuevoFondo, nuevaLira);
+    setFondo(nuevoFondo);
+    setLira(nuevaLira);
   }
 
-  const activo = ambiente !== "silencio";
+  // Calma/Concentración: excluyentes. Tocar el activo lo apaga (toggle).
+  function elegirFondo(f: "concentracion" | "calma") {
+    aplicar(fondo === f ? null : f, lira);
+  }
+  function toggleLira() {
+    aplicar(fondo, !lira);
+  }
+
+  const activo = fondo !== null || lira;
 
   return (
     <div className="relative">
@@ -52,30 +60,26 @@ export function SoundToggle() {
             onClick={() => setAbierto(false)}
             aria-hidden
           />
-          <div className="absolute right-0 top-10 z-50 w-56 rounded-xl border border-hair bg-surface p-1.5 shadow-lg">
-            {OPCIONES.map((o) => {
-              const sel = o.id === ambiente;
-              return (
-                <button
-                  key={o.id}
-                  onClick={() => aplicar(o.id)}
-                  className={
-                    "flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left transition-colors " +
-                    (sel ? "bg-sage/10" : "hover:bg-hair/40")
-                  }
-                >
-                  <span
-                    className={
-                      "text-[13.5px] " + (sel ? "font-[560] text-sage-deep" : "text-ink")
-                    }
-                  >
-                    {o.label}
-                    {sel && " ·"}
-                  </span>
-                  <span className="text-[11px] text-ink-soft">{o.hint}</span>
-                </button>
-              );
-            })}
+          <div className="absolute right-0 top-10 z-50 w-60 rounded-xl border border-hair bg-surface p-1.5 shadow-lg">
+            <FilaToggle
+              label="Concentración"
+              hint="Foco · pulso 40 Hz"
+              activo={fondo === "concentracion"}
+              onToggle={() => elegirFondo("concentracion")}
+            />
+            <FilaToggle
+              label="Calma"
+              hint="Repaso tranquilo · pulso 16 Hz"
+              activo={fondo === "calma"}
+              onToggle={() => elegirFondo("calma")}
+            />
+            <div className="my-1 h-px bg-hair" />
+            <FilaToggle
+              label="Lira"
+              hint="Melodía suave · aparte"
+              activo={lira}
+              onToggle={toggleLira}
+            />
             <p className="px-3 pb-1 pt-2 text-[10.5px] leading-snug text-ink-soft">
               Con audífonos el efecto es mayor. El colchón de fondo también
               funciona con parlantes.
@@ -84,6 +88,52 @@ export function SoundToggle() {
         </>
       )}
     </div>
+  );
+}
+
+// Una fila con etiqueta + interruptor tipo switch (estética zen).
+function FilaToggle({
+  label,
+  hint,
+  activo,
+  onToggle,
+}: {
+  label: string;
+  hint: string;
+  activo: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      role="switch"
+      aria-checked={activo}
+      className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-hair/40"
+    >
+      <span className="flex flex-col gap-0.5">
+        <span
+          className={
+            "text-[13.5px] " + (activo ? "font-[560] text-sage-deep" : "text-ink")
+          }
+        >
+          {label}
+        </span>
+        <span className="text-[11px] text-ink-soft">{hint}</span>
+      </span>
+      <span
+        className={
+          "relative h-[18px] w-8 flex-none rounded-full transition-colors " +
+          (activo ? "bg-sage" : "bg-hair")
+        }
+      >
+        <span
+          className={
+            "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-surface shadow-sm transition-all " +
+            (activo ? "left-[16px]" : "left-[2px]")
+          }
+        />
+      </span>
+    </button>
   );
 }
 
