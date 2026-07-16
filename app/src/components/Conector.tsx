@@ -3,6 +3,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
+import { IconoZen } from "./IconoZen";
+import { ICONOS_VALIDOS } from "@/lib/tutor/iconos";
 
 // "El Conector": unir con líneas. Dos columnas de elementos; el niño MANTIENE
 // pulsado un elemento, arrastra el dedo (la línea lo sigue) y suelta sobre su par
@@ -236,6 +238,7 @@ export function Conector({
           <div className="flex flex-1 flex-col gap-2">
             {izquierda.map((txt, i) => {
               const usada = izqUsada(i);
+              const tieneIcono = ICONOS_VALIDOS.includes(txt.trim().toLowerCase());
               return (
                 <button
                   key={i}
@@ -252,7 +255,14 @@ export function Conector({
                       : "border-hair text-ink enabled:hover:border-gold")
                   }
                 >
-                  {txt}
+                  {tieneIcono ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <IconoZen nombre={txt} size={20} />
+                      <span className="capitalize">{txt}</span>
+                    </div>
+                  ) : (
+                    txt
+                  )}
                 </button>
               );
             })}
@@ -262,6 +272,7 @@ export function Conector({
           <div className="flex flex-1 flex-col gap-2">
             {derecha.map((txt, j) => {
               const usada = derUsada(j);
+              const tieneIcono = ICONOS_VALIDOS.includes(txt.trim().toLowerCase());
               return (
                 <button
                   key={j}
@@ -278,7 +289,14 @@ export function Conector({
                       : "border-hair text-ink enabled:hover:border-gold")
                   }
                 >
-                  {txt}
+                  {tieneIcono ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <IconoZen nombre={txt} size={20} />
+                      <span className="capitalize">{txt}</span>
+                    </div>
+                  ) : (
+                    txt
+                  )}
                 </button>
               );
             })}

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
+import { IconoZen } from "./IconoZen";
+import { ICONOS_VALIDOS } from "@/lib/tutor/iconos";
 
 // "El Intruso": una fila de tarjetas donde todas comparten una regla oculta
 // menos una. El niño toca la que no encaja. Baja fricción (solo tap), muy
@@ -55,17 +57,25 @@ export function Intruso({
                 ? "border-clay/50 text-clay opacity-70"
                 : "border-hair text-ink-soft opacity-50"
             : "border-hair text-ink enabled:hover:border-gold";
+          const tieneIcono = ICONOS_VALIDOS.includes(op.trim().toLowerCase());
           return (
             <button
               key={i}
               onClick={() => tocar(op, i)}
               disabled={resuelto}
               className={
-                "min-w-[72px] rounded-xl border-2 px-4 py-3 text-[16px] font-[600] transition-colors " +
+                "min-w-[84px] rounded-xl border-2 px-4 py-3 text-[16px] font-[600] transition-colors " +
                 clase
               }
             >
-              {op}
+              {tieneIcono ? (
+                <div className="flex flex-col items-center gap-1.5">
+                  <IconoZen nombre={op} size={32} />
+                  <span className="text-[12px] font-normal capitalize">{op}</span>
+                </div>
+              ) : (
+                op
+              )}
             </button>
           );
         })}
