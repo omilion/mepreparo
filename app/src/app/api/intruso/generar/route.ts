@@ -6,6 +6,7 @@ import { recuperar } from "@/lib/tutor/rag";
 import { generar, tieneClave } from "@/lib/tutor/gemini";
 import type { Materia, Curso } from "@/lib/profile";
 import { chequearLimite } from "@/lib/rateLimit";
+import { catalogoParaPrompt } from "@/lib/tutor/iconos";
 
 // Respaldo por materia si Gemini no está o falla. El intruso nunca queda vacío.
 const SEMILLA: Record<string, DatosIntruso[]> = {
@@ -63,9 +64,17 @@ async function intrusoDeGemini(
     const sistema = `Eres un generador de acertijos "encuentra el intruso" para educación básica en Chile.
 Crea un grupo de 4 o 5 elementos donde TODOS comparten una regla o categoría, MENOS UNO (el intruso).
 Los elementos deben ser palabras o números cortos, del tema, apropiados para niños.
+
+ICONOS: si TODOS los elementos (incluido el intruso) pueden expresarse con un
+dibujo de esta lista, ÚSALOS (el juego se ve mucho mejor con iconos). Solo vale
+si TODOS caben; si alguno no está en la lista, usa palabras normales para TODOS
+(no mezcles).
+${catalogoParaPrompt()}
+
 Responde SOLO un JSON:
 { "enunciado": "¿Cuál no corresponde?", "opciones": ["A","B","C","D"], "intruso": "C", "pista": "por qué C es el intruso, breve" }
-El "intruso" DEBE ser idéntico a uno de "opciones".`;
+El "intruso" DEBE ser idéntico a uno de "opciones". Si usas iconos, cada opción
+debe ser EXACTAMENTE un nombre de la lista (en minúsculas, sin tildes).`;
     const usuario = `Tema: ${tema}
 Materia: ${materia}
 Curso: ${curso}

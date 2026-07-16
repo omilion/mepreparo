@@ -6,6 +6,7 @@ import { recuperar } from "@/lib/tutor/rag";
 import { generar, tieneClave } from "@/lib/tutor/gemini";
 import type { Materia, Curso } from "@/lib/profile";
 import { chequearLimite } from "@/lib/rateLimit";
+import { catalogoParaPrompt } from "@/lib/tutor/iconos";
 
 interface Par {
   izq: string;
@@ -75,6 +76,13 @@ async function conectorDeGemini(
   try {
     const sistema = `Eres un generador de actividades "unir con líneas" para educación básica en Chile.
 Crea 3 o 4 pares donde cada elemento de la izquierda se une con UNO de la derecha (relación clara: operación↔resultado, palabra↔tipo, órgano↔función, etc.). Textos cortos, del tema, aptos para niños.
+
+ICONOS: si los elementos de la columna IZQUIERDA pueden expresarse con un dibujo
+de esta lista, usa el nombre EXACTO del icono en "izq" (en minúsculas, sin
+tildes). La derecha queda como texto (su pareja: nombre, categoría o función).
+Solo si TODAS las izquierdas caben en la lista; si no, usa palabras en todas.
+${catalogoParaPrompt()}
+
 Responde SOLO un JSON:
 { "enunciado": "Une cada X con su Y", "pares": [ {"izq":"...","der":"..."}, ... ] }
 Cada "izq" y cada "der" debe ser único (no repetir).`;
