@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useMemo } from "react";
+import { IconoZen } from "./IconoZen";
 
 // Revela el texto del tutor en un efecto "staggered fade-in" (palabra por palabra en cascada).
 // Para lograr el estilo Zen y evitar saltos de texto o parpadeos:
@@ -22,8 +23,8 @@ export const TextoRevelado = memo(function TextoRevelado({
     onTick?.();
   }, [texto, onTick]);
 
-  // Dividimos el texto en palabras y espacios
-  const tokens = useMemo(() => texto.split(/(\s+)/), [texto]);
+  // Dividimos el texto por espacios y marcadores de icono
+  const tokens = useMemo(() => texto.split(/(\s+|\[icono:\w+\])/), [texto]);
 
   // Contador para asignar retrasos solo a las palabras visibles, no a los espacios
   let wordIndex = 0;
@@ -38,6 +39,7 @@ export const TextoRevelado = memo(function TextoRevelado({
           return <span key={idx}>{token}</span>;
         }
 
+        const matchIcono = token.match(/^\[icono:(\w+)\]$/);
         const currentDelayIndex = wordIndex;
         wordIndex++;
 
@@ -49,7 +51,11 @@ export const TextoRevelado = memo(function TextoRevelado({
               animationDelay: `${currentDelayIndex * 0.09}s`,
             }}
           >
-            {token}
+            {matchIcono ? (
+              <IconoZen nombre={matchIcono[1]} className="mx-1 align-middle" size={20} />
+            ) : (
+              token
+            )}
           </span>
         );
       })}

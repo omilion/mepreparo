@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import type { Materia } from "@/lib/profile";
+import { IconoZen } from "./IconoZen";
 
 // Esfera de aura: gradiente radial difuminado, suave, tipo "presencia".
 // Cambia de color según la materia y "late" (escala + brillo) cuando Rai
@@ -21,10 +22,12 @@ export const AuraOrb = memo(function AuraOrb({
   materia,
   activa,
   size = 120,
+  estado,
 }: {
   materia: Materia;
   activa: boolean; // true mientras Rai "piensa"
   size?: number;
+  estado?: string;
 }) {
   const [c1, c2] = COLORES[materia] ?? COLORES.matematica;
 
@@ -47,11 +50,33 @@ export const AuraOrb = memo(function AuraOrb({
           } as React.CSSProperties
         }
       />
+      {estado && (
+        <div className="aura-icon-overlay">
+          <IconoZen nombre={estado} size={Math.round(size * 0.38)} className="text-ink" />
+        </div>
+      )}
       <style jsx>{`
         .aura-wrap {
           position: relative;
           display: grid;
           place-items: center;
+        }
+        .aura-icon-overlay {
+          position: absolute;
+          z-index: 2;
+          display: grid;
+          place-items: center;
+          animation: iconFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes iconFadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.8);
+          }
+          to {
+            opacity: 0.85;
+            transform: scale(1);
+          }
         }
         .aura-orb {
           width: 100%;

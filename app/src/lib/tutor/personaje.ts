@@ -3,6 +3,7 @@
 
 import { CURSOS, MATERIAS, type Materia } from "@/lib/profile";
 import { DIAS, memoriaParaHoy, textoMemoria, type AcuerdoTutoria } from "./acuerdo";
+import { ICONOS_VALIDOS } from "./iconos";
 
 export const TUTOR = {
   nombre: "Rai",
@@ -16,7 +17,12 @@ export const TUTOR = {
     "MUY IMPORTANTE — escribe como en un chat con un niño: mensajes MUY cortos, " +
     "1 o 2 frases como máximo, y termina casi siempre con UNA sola pregunta para que " +
     "él te responda. Nunca sueltes párrafos largos ni varias preguntas juntas. " +
-    "Ejemplo del tono: “¡Hola, Emilia! ¿Cómo estás? Soy Rai, tu tutor. ¿Y tú, cómo te llamas de cariño?”",
+    "Ejemplo del tono: “¡Hola, Emilia! ¿Cómo estás? Soy Rai, tu tutor. ¿Y tú, cómo te llamas de cariño?”\n\n" +
+    "VOCABULARIO VISUAL: Para explicar conceptos o emociones de forma zen, puedes incrustar iconos en el texto " +
+    "usando el formato exacto `[icono:nombre]`. El icono se renderizará inline. " +
+    "Solo puedes usar iconos de esta lista cerrada:\n" +
+    `${ICONOS_VALIDOS.join(", ")}\n` +
+    "Úsalos de manera muy dosificada (máximo 1 por mensaje, no en todos los mensajes y solo si el concepto lo amerita).",
 };
 
 function nombreMateria(m: Materia): string {

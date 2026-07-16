@@ -85,6 +85,7 @@ export function Tutor({
   // la esquina para dar espacio a la conversación (transición fluida).
   const [compacta, setCompacta] = useState(false);
   const [sesionTerminada, setSesionTerminada] = useState(false);
+  const [estadoRai, setEstadoRai] = useState<string | undefined>(undefined);
   const finRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
   const inicioSesion = useRef(Date.now());
@@ -99,11 +100,14 @@ export function Tutor({
     scrollAlFinal();
   }, [mensajes, cargando]);
 
-  // Rai INICIA la conversación al entrar (una sola vez).
+  // Rai INICIA la conversación al entrar (una sola vez) y saluda con un icono
   useEffect(() => {
     if (inicioPedido.current) return;
     inicioPedido.current = true;
+    setEstadoRai("saludo");
+    const t = setTimeout(() => setEstadoRai(undefined), 4000);
     void saludar();
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -543,6 +547,9 @@ export function Tutor({
     if (!ej || ej.respondido) return;
     const ok = evaluarEjercicio(ej, seleccion);
 
+    setEstadoRai(ok ? "celebracion" : "incorrecto");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+
     setMensajes((m) =>
       m.map((msg, i) =>
         i === msgIdx && msg.ejercicio
@@ -566,6 +573,10 @@ export function Tutor({
   function responderIntruso(msgIdx: number, acerto: boolean, elegido: string) {
     const it = mensajes[msgIdx]?.intruso;
     if (!it) return;
+
+    setEstadoRai(acerto ? "celebracion" : "incorrecto");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+
     if (acuerdo) {
       const tema = it.enunciado.slice(0, 40);
       const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
@@ -610,9 +621,35 @@ export function Tutor({
   function responderConector(msgIdx: number, acerto: boolean) {
     const c = mensajes[msgIdx]?.conector;
     if (!c || !acuerdo) return;
+
+    setEstadoRai(acerto ? "celebracion" : "incorrecto");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+
     const tema = c.enunciado.slice(0, 40);
     const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
     onGuardarPerfil?.({ ...perfil, tutoria });
+  }
+
+  function responderSopa(msgIdx: number) {
+    setEstadoRai("celebracion");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+    const s = mensajes[msgIdx]?.sopa;
+    if (s && acuerdo) {
+      const tema = s.palabras[0]?.clean || "sopa de letras";
+      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
+      onGuardarPerfil?.({ ...perfil, tutoria });
+    }
+  }
+
+  function responderRueda(msgIdx: number) {
+    setEstadoRai("celebracion");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+    const r = mensajes[msgIdx]?.rueda;
+    if (r && acuerdo) {
+      const tema = r.respuesta;
+      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
+      onGuardarPerfil?.({ ...perfil, tutoria });
+    }
   }
 
   // ¿La selección del niño es correcta? Todo o nada.
@@ -807,7 +844,12 @@ export function Tutor({
             : "justify-center pt-4 pb-4")
         }
       >
-        <AuraOrb materia={materia} activa={cargando} size={compacta ? 60 : 128} />
+        <AuraOrb
+          materia={materia}
+          activa={cargando}
+          size={compacta ? 60 : 128}
+          estado={estadoRai || (cargando ? "cerebro" : undefined)}
+        />
         {cargando && (
           <span className="text-[14px] italic text-ink-soft animate-pulse">
             Rai está escribiendo…
@@ -829,6 +871,8 @@ export function Tutor({
               responderIntruso(i, acerto, elegido)
             }
             onResponderConector={(acerto) => responderConector(i, acerto)}
+            onResponderSopa={() => responderSopa(i)}
+            onResponderRueda={() => responderRueda(i)}
           />
         ))}
 
@@ -952,6 +996,8 @@ const Linea = memo(function Linea({
   onResponderEjercicio,
   onResponderIntruso,
   onResponderConector,
+  onResponderSopa,
+  onResponderRueda,
 }: {
   m: Mensaje;
   animar?: boolean;
@@ -959,6 +1005,8 @@ const Linea = memo(function Linea({
   onResponderEjercicio?: (seleccion: string[]) => void;
   onResponderIntruso?: (acerto: boolean, elegido: string) => void;
   onResponderConector?: (acerto: boolean) => void;
+  onResponderSopa?: () => void;
+  onResponderRueda?: () => void;
 }) {
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
@@ -1000,12 +1048,12 @@ const Linea = memo(function Linea({
         // escapa el max-w-[40ch] del mensaje para ocupar ~90% de la PANTALLA
         // (con un tope en tablet), centrado bajo el texto de Rai.
         <div className="mt-3 w-[90vw] max-w-[520px]">
-          <SopaLetras datos={m.sopa} />
+          <SopaLetras datos={m.sopa} onCompleta={onResponderSopa} />
         </div>
       )}
       {m.rueda && (
         <div className="mt-3 w-[85vw] max-w-[420px]">
-          <RuedaLetras datos={m.rueda} />
+          <RuedaLetras datos={m.rueda} onCompleta={onResponderRueda} />
         </div>
       )}
       {m.intruso && (

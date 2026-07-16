@@ -1,0 +1,47 @@
+// Lista oficial de iconos de línea (Tabler Icons) disponibles en el proyecto.
+// Guardada en la carpeta pública del servidor en `/public/iconos/{nombre}.svg`.
+export const ICONOS_VALIDOS = [
+  // Emociones/Estados de Rai
+  "cerebro",
+  "saludo",
+  "celebracion",
+  "hablando",
+  "idea",
+  "pregunta",
+  "correcto",
+  "incorrecto",
+  "trofeo",
+  
+  // Asignaturas / Conceptos
+  "libro",
+  "calculadora",
+  "atomo",
+  "planeta",
+  "adn",
+  "planta",
+  "perro",
+  "gato",
+  "manzana",
+  "reloj",
+  "brujula",
+  "lapiz",
+  "mapa",
+  "triangulo",
+  "circulo",
+  "cuadrado",
+  "microscopio",
+  "corazon",
+  "estrella",
+  "sol",
+  "luna",
+  "nube",
+  "agua",
+  "fuego",
+  "rayo",
+  "musica",
+  "paleta",
+  "premio",
+  "escuela",
+  "persona",
+  "grupo"
+];
