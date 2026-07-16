@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ICONOS_VALIDOS } from "@/lib/tutor/iconos";
+import { ICONOS_VALIDOS, normalizarIcono } from "@/lib/tutor/iconos";
 
 // Caché en memoria a nivel de módulo para evitar re-fetch del mismo icono en la sesión
 const cacheIconos = new Map<string, string>();
@@ -21,8 +21,9 @@ export function IconoZen({
 }: IconoZenProps) {
   const [svgContent, setSvgContent] = useState<string | null>(null);
 
-  // Normalizar nombre a minúsculas
-  const nombreLimpio = nombre.trim().toLowerCase();
+  // Normalizar: minúsculas SIN tildes (los archivos y la whitelist son sin
+  // tilde). Así "círculo" → "circulo" y "átomo" → "atomo" también matchean.
+  const nombreLimpio = normalizarIcono(nombre);
 
   useEffect(() => {
     // Si no está en la lista de iconos válidos, caemos al fallback (retorna null)

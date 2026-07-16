@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{content_type}\" \"http://localhost:3001/iconos/sol.svg\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:3001/iconos/volcan.svg\")"
+    ]
+  }
+}
