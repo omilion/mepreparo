@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { Fireworks } from "./Fireworks";
 
 // Rueda de letras para FORMAR LA RESPUESTA a una pregunta de Rai. Arriba la
 // pregunta y las casillas vacías de la respuesta; abajo, en un círculo, las
@@ -45,14 +46,21 @@ export function RuedaLetras({
   const R = 34;
   const CX = 50;
   const CY = 50;
+  const n = letras.length;
+  // radio de cada ficha adaptado a cuántas letras hay: si son muchas, se achican
+  // para no solaparse (la separación entre vecinas es 2·R·sin(π/n)). Tope 9.
+  const rFicha = useMemo(() => {
+    if (n <= 1) return 11;
+    const separacion = 2 * R * Math.sin(Math.PI / n);
+    return Math.max(6, Math.min(9, separacion * 0.42));
+  }, [n]);
   const posiciones = useMemo<Punto[]>(() => {
-    const n = letras.length;
     return letras.map((_, i) => {
       if (n === 1) return { x: CX, y: CY };
       const ang = (Math.PI * 2 * i) / n - Math.PI / 2; // arranca arriba
       return { x: CX + R * Math.cos(ang), y: CY + R * Math.sin(ang) };
     });
-  }, [letras]);
+  }, [letras, n]);
 
   const palabraActual = useMemo(
     () => seleccion.map((i) => letras[i]).join(""),
@@ -114,27 +122,33 @@ export function RuedaLetras({
   const trazo = seleccion.map((i) => posiciones[i]);
 
   return (
-    <div className="flex w-full flex-col items-center gap-4 text-center">
+    <div className="relative flex w-full flex-col items-center gap-4 text-center">
+      {resuelto && <Fireworks />}
+
       {/* PREGUNTA */}
       <p className="font-serif text-[18px] leading-[1.3] text-ink">
         {datos.enunciado}
       </p>
 
-      {/* CASILLAS DE LA RESPUESTA — se van llenando con lo que se forma */}
+      {/* CASILLAS DE LA RESPUESTA — se van llenando con lo que se forma.
+          Vacías: borde punteado visible (antes eran casi invisibles). El tamaño
+          se achica si la palabra es larga, para no desbordar en móvil. */}
       <div className="flex flex-wrap justify-center gap-1.5">
         {respuesta.split("").map((letra, i) => {
           const actual = palabraActual[i];
           const mostrar = resuelto ? letra : actual ?? "";
+          const chico = respuesta.length > 7;
           return (
             <span
               key={i}
               className={
-                "flex h-9 w-9 items-center justify-center rounded-md text-[17px] font-[600] transition-colors " +
+                "flex items-center justify-center rounded-md border-2 font-[600] transition-colors " +
+                (chico ? "h-8 w-8 text-[15px] " : "h-10 w-10 text-[18px] ") +
                 (resuelto
-                  ? "bg-gold-soft text-gold"
+                  ? "border-gold bg-gold-soft text-gold"
                   : actual
-                    ? "bg-gold-soft/60 text-gold"
-                    : "bg-surface/60 text-ink")
+                    ? "border-gold/60 bg-gold-soft/50 text-gold"
+                    : "border-dashed border-hair bg-surface/40 text-ink")
               }
             >
               {mostrar}
@@ -151,7 +165,9 @@ export function RuedaLetras({
           </span>
         )}
         {resuelto && (
-          <span className="text-[15px] font-[600] text-gold">¡Correcto! 🎆</span>
+          <span className="relative text-[16px] font-[600] text-gold">
+            ¡Correcto!
+          </span>
         )}
       </div>
 
@@ -191,7 +207,7 @@ export function RuedaLetras({
                 data-idx={i}
                 cx={p.x}
                 cy={p.y}
-                r={9}
+                r={rFicha}
                 fill={activa ? "var(--gold-soft)" : "var(--surface)"}
                 stroke={activa ? "var(--gold)" : "var(--hair)"}
                 strokeWidth={activa ? 1.5 : 1}
@@ -202,7 +218,7 @@ export function RuedaLetras({
                 y={p.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={9}
+                fontSize={rFicha}
                 fontWeight={600}
                 fill={activa ? "var(--gold)" : "var(--ink)"}
                 style={{ pointerEvents: "none" }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { Fireworks } from "./Fireworks";
 
 // Coordenada de celda en el grid.
 export interface Celda {
@@ -143,7 +144,8 @@ export function SopaLetras({
   const listo = encontradas.size === datos.palabras.length;
 
   return (
-    <div className="flex w-full flex-col items-center gap-3">
+    <div className="relative flex w-full flex-col items-center gap-3">
+      {listo && <Fireworks />}
       {/* PALABRAS A BUSCAR — arriba y más grandes. Al encontrarlas cambian a
           gold (el color propio de la sopa) además de tacharse. */}
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
@@ -224,8 +226,8 @@ export function SopaLetras({
       </div>
 
       {listo && (
-        <p className="text-[14px] font-[600] text-gold">
-          ¡Las encontraste todas! 🎆
+        <p className="relative text-[14px] font-[600] text-gold">
+          ¡Las encontraste todas!
         </p>
       )}
     </div>
