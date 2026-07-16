@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 
@@ -43,13 +43,18 @@ export function Conector({
   onResponder?: (acerto: boolean) => void;
 }) {
   const n = datos.pares.length;
-  // columna izquierda en orden; derecha barajada (una sola vez, al montar)
-  const izquierda = datos.pares.map((p) => p.izq);
+  // columna izquierda en orden; derecha barajada (una sola vez, al montar).
+  // MEMOIZADAS: si se recrean en cada render, el useLayoutEffect de abajo (que
+  // las tiene como dependencia) entra en bucle infinito de setState.
+  const izquierda = useMemo(() => datos.pares.map((p) => p.izq), [datos.pares]);
   const [derecha] = useState(() => revolver(datos.pares.map((p) => p.der)));
 
   // para saber si una unión izq→der es correcta: mapa der(texto) → izq(texto)
-  const correctoDe: Record<string, string> = {};
-  for (const p of datos.pares) correctoDe[p.der] = p.izq;
+  const correctoDe = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of datos.pares) map[p.der] = p.izq;
+    return map;
+  }, [datos.pares]);
 
   const [uniones, setUniones] = useState<Union[]>([]);
   const [seleccionIzq, setSeleccionIzq] = useState<number | null>(null);
