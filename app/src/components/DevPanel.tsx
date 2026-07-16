@@ -35,6 +35,7 @@ export function DevPanel({
     lanzarRueda: () => void;
     lanzarIntruso: () => void;
     lanzarConector: () => void;
+    lanzarClasificador: () => void;
   } | null;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -119,6 +120,12 @@ export function DevPanel({
                   className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
                 >
                   El conector
+                </button>
+                <button
+                  onClick={accionesTutor.lanzarClasificador}
+                  className="flex-1 rounded-md border border-hair px-2 py-1 text-[12px] hover:border-sage"
+                >
+                  El clasificador
                 </button>
               </div>
             </div>

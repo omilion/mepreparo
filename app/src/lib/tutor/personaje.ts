@@ -144,6 +144,8 @@ export const INSTRUCCION_EJERCICIO =
   "menos uno, y el niño toca el que sobra. Rápido y divertido para clasificar. Ej: <<INTRUSO:mamiferos>>.\n" +
   "- <<CONECTOR:tema>> → 'unir con líneas': dos columnas donde el niño une cada elemento con su " +
   "par (operación↔resultado, palabra↔tipo, órgano↔función). Ej: <<CONECTOR:tablas_de_multiplicar>>.\n" +
+  "- <<CLASIFICADOR:tema>> → 'arrastrar a grupos': el niño arrastra tarjetas a 2 o 3 grupos " +
+  "(pares/impares, animales/plantas, sustantivo/verbo). Ideal para clasificar. Ej: <<CLASIFICADOR:pares_impares>>.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +
   "tú la actividad: el marcador hace que aparezca una real. Para preguntas de respuesta corta o " +
   "abierta NO uses marcador: pregúntale directo en la conversación. Las actividades son un DULCE " +

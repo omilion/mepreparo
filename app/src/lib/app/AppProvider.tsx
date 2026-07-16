@@ -53,6 +53,7 @@ export type AccionesDevTutor = {
   lanzarRueda: () => void;
   lanzarIntruso: () => void;
   lanzarConector: () => void;
+  lanzarClasificador: () => void;
 } | null;
 
 interface AppState {

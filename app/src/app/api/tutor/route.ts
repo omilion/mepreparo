@@ -267,6 +267,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         ruedaTema,
         intrusoTema,
         conectorTema,
+        clasificadorTema,
       } = separarEjercicio(sinHorario);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
@@ -278,6 +279,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         !ruedaTema &&
         !intrusoTema &&
         !conectorTema &&
+        !clasificadorTema &&
         preguntaNormalizada.length > 5 &&
         body.materia &&
         body.curso &&
@@ -306,6 +308,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         ruedaTema, // presente si Rai lanzó una rueda de letras
         intrusoTema, // presente si Rai lanzó "el intruso"
         conectorTema, // presente si Rai lanzó "el conector"
+        clasificadorTema, // presente si Rai lanzó "el clasificador"
         modo: "gemini",
       });
     } catch (e) {
@@ -337,6 +340,7 @@ function separarEjercicio(cruda: string): {
   ruedaTema?: string;
   intrusoTema?: string;
   conectorTema?: string;
+  clasificadorTema?: string;
 } {
   let texto = cruda;
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "_") || undefined;
@@ -373,6 +377,14 @@ function separarEjercicio(cruda: string): {
     texto = texto.replace(mc[0], "");
   }
 
+  // <<CLASIFICADOR:tema>> → "el clasificador" (arrastrar a grupos)
+  let clasificadorTema: string | undefined;
+  const mcl = texto.match(/<<CLASIFICADOR:([a-zñáéíóú_ ]+?)>>/i);
+  if (mcl) {
+    clasificadorTema = norm(mcl[1]);
+    texto = texto.replace(mcl[0], "");
+  }
+
   // <<SELECCION:tema>> → selección múltiple (varias correctas)
   let ejercicioTema: string | undefined;
   let ejercicioFormato: string | undefined;
@@ -401,6 +413,7 @@ function separarEjercicio(cruda: string): {
     ruedaTema,
     intrusoTema,
     conectorTema,
+    clasificadorTema,
   };
 }
 

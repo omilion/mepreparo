@@ -23,6 +23,7 @@ import { SopaLetras, type DatosSopa } from "./SopaLetras";
 import { RuedaLetras, type DatosRueda } from "./RuedaLetras";
 import { Intruso, type DatosIntruso } from "./Intruso";
 import { Conector, type DatosConector } from "./Conector";
+import { Clasificador, type DatosClasificador } from "./Clasificador";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
@@ -55,6 +56,8 @@ interface Mensaje {
   intruso?: DatosIntruso;
   // si Rai lanzó "el conector" (unir columnas con líneas), va embebido
   conector?: DatosConector;
+  // si Rai lanzó "el clasificador" (arrastrar a grupos), va embebido
+  clasificador?: DatosClasificador;
 }
 
 export function Tutor({
@@ -212,6 +215,7 @@ export function Tutor({
     ruedaTema?: string;
     intrusoTema?: string;
     conectorTema?: string;
+    clasificadorTema?: string;
   }) {
     // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
@@ -224,6 +228,9 @@ export function Tutor({
     const intruso = data.intrusoTema ? await obtenerIntruso(data.intrusoTema) : null;
     const conector = data.conectorTema
       ? await obtenerConector(data.conectorTema)
+      : null;
+    const clasificador = data.clasificadorTema
+      ? await obtenerClasificador(data.clasificadorTema)
       : null;
 
     setMensajes((m) => [
@@ -238,6 +245,7 @@ export function Tutor({
         rueda: rueda ?? undefined,
         intruso: intruso ?? undefined,
         conector: conector ?? undefined,
+        clasificador: clasificador ?? undefined,
       },
     ]);
 
@@ -248,9 +256,12 @@ export function Tutor({
       data.sopaTema ||
       data.ruedaTema ||
       data.intrusoTema ||
-      data.conectorTema
+      data.conectorTema ||
+      data.clasificadorTema
     );
-    const llegoActividad = !!(ejercicio || sopa || rueda || intruso || conector);
+    const llegoActividad = !!(
+      ejercicio || sopa || rueda || intruso || conector || clasificador
+    );
     if (prometioActividad && !llegoActividad) {
       setMensajes((m) => [
         ...m,
@@ -429,6 +440,41 @@ export function Tutor({
     }
   }
 
+  // Pide "el clasificador" del tema (grupos + items). Devuelve los datos listos
+  // o null si no se pudo generar.
+  async function obtenerClasificador(
+    tema: string
+  ): Promise<DatosClasificador | null> {
+    try {
+      const params = new URLSearchParams({
+        materia,
+        curso: perfil.curso,
+        dificultad: "2",
+        tema,
+      });
+      const res = await fetch(`/api/clasificador/generar?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const c = data.clasificador;
+      const ok =
+        typeof c?.enunciado === "string" &&
+        Array.isArray(c?.grupos) &&
+        c.grupos.length >= 2 &&
+        Array.isArray(c?.items) &&
+        c.items.length >= 4 &&
+        c.items.every(
+          (it: unknown) =>
+            !!it &&
+            typeof (it as { texto?: unknown }).texto === "string" &&
+            c.grupos.includes((it as { grupo?: unknown }).grupo)
+        );
+      if (!ok) return null;
+      return { enunciado: c.enunciado, grupos: c.grupos, items: c.items };
+    } catch {
+      return null;
+    }
+  }
+
   // DEV ONLY: lanza un ejercicio sin pasar por Rai, para probar la tarjeta
   // on-demand. `formato` = "opcion_multiple" | "seleccion_multiple".
   async function lanzarEjercicioDev(formato: string = "opcion_multiple") {
@@ -512,6 +558,25 @@ export function Tutor({
     }
   }
 
+  // DEV ONLY: lanza "el clasificador" sin pasar por Rai.
+  async function lanzarClasificadorDev() {
+    const clasificador = await obtenerClasificador("prueba");
+    setMensajes((m) => [
+      ...m,
+      {
+        de: "rai",
+        texto: "(dev) El clasificador 👇",
+        clasificador: clasificador ?? undefined,
+      },
+    ]);
+    if (!clasificador) {
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: "(dev) No se pudo generar el clasificador." },
+      ]);
+    }
+  }
+
   // Publica las acciones dev en el panel dev GLOBAL mientras el tutor está en
   // pantalla, y las quita al salir. Así los botones viven en un solo lugar (el
   // panel flotante) en vez de ensuciar el chat. Usamos refs para que el efecto no
@@ -521,11 +586,13 @@ export function Tutor({
   const lanzarRuedaRef = useRef(lanzarRuedaDev);
   const lanzarIntrusoRef = useRef(lanzarIntrusoDev);
   const lanzarConectorRef = useRef(lanzarConectorDev);
+  const lanzarClasificadorRef = useRef(lanzarClasificadorDev);
   lanzarSopaRef.current = lanzarSopaDev;
   lanzarEjercicioRef.current = lanzarEjercicioDev;
   lanzarRuedaRef.current = lanzarRuedaDev;
   lanzarIntrusoRef.current = lanzarIntrusoDev;
   lanzarConectorRef.current = lanzarConectorDev;
+  lanzarClasificadorRef.current = lanzarClasificadorDev;
   useEffect(() => {
     if (!devToolsActivas()) return;
     setAccionesDevTutor({
@@ -535,6 +602,7 @@ export function Tutor({
       lanzarRueda: () => void lanzarRuedaRef.current(),
       lanzarIntruso: () => void lanzarIntrusoRef.current(),
       lanzarConector: () => void lanzarConectorRef.current(),
+      lanzarClasificador: () => void lanzarClasificadorRef.current(),
     });
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
@@ -620,6 +688,20 @@ export function Tutor({
   // explique — la tarjeta ya muestra en rojo las uniones equivocadas.
   function responderConector(msgIdx: number, acerto: boolean) {
     const c = mensajes[msgIdx]?.conector;
+    if (!c || !acuerdo) return;
+
+    setEstadoRai(acerto ? "celebracion" : "incorrecto");
+    setTimeout(() => setEstadoRai(undefined), 3500);
+
+    const tema = c.enunciado.slice(0, 40);
+    const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
+    onGuardarPerfil?.({ ...perfil, tutoria });
+  }
+
+  // El niño terminó "el clasificador": registra evidencia. La tarjeta ya muestra
+  // en verde/rojo qué quedó bien, así que Rai no necesita explicar.
+  function responderClasificador(msgIdx: number, acerto: boolean) {
+    const c = mensajes[msgIdx]?.clasificador;
     if (!c || !acuerdo) return;
 
     setEstadoRai(acerto ? "celebracion" : "incorrecto");
@@ -873,6 +955,7 @@ export function Tutor({
             onResponderConector={(acerto) => responderConector(i, acerto)}
             onResponderSopa={() => responderSopa(i)}
             onResponderRueda={() => responderRueda(i)}
+            onResponderClasificador={(acerto) => responderClasificador(i, acerto)}
           />
         ))}
 
@@ -998,6 +1081,7 @@ const Linea = memo(function Linea({
   onResponderConector,
   onResponderSopa,
   onResponderRueda,
+  onResponderClasificador,
 }: {
   m: Mensaje;
   animar?: boolean;
@@ -1007,6 +1091,7 @@ const Linea = memo(function Linea({
   onResponderConector?: (acerto: boolean) => void;
   onResponderSopa?: () => void;
   onResponderRueda?: () => void;
+  onResponderClasificador?: (acerto: boolean) => void;
 }) {
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
@@ -1064,6 +1149,14 @@ const Linea = memo(function Linea({
       {m.conector && (
         <div className="mt-3 w-[85vw] max-w-[480px]">
           <Conector datos={m.conector} onResponder={onResponderConector} />
+        </div>
+      )}
+      {m.clasificador && (
+        <div className="mt-3 w-[85vw] max-w-[480px]">
+          <Clasificador
+            datos={m.clasificador}
+            onResponder={onResponderClasificador}
+          />
         </div>
       )}
     </div>
