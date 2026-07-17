@@ -42,6 +42,8 @@ interface Body {
   historial?: Turno[]; // conversación previa (para dar continuidad)
   // si el niño entró desde el mapa de etapas: la lección se centra en este tema
   temaFoco?: string;
+  // true cuando la sesión se acerca a su fin: Rai debe empezar a despedirse
+  cerrandoSesion?: boolean;
 }
 
 function normalizarPregunta(texto: string): string {
@@ -210,6 +212,21 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       "Centra la lección en ese tema: explícalo paso a paso con ejemplos cercanos, " +
       "proponle mini-desafíos mentales y, cuando lo notes listo, anímalo a rendir " +
       "la prueba de la etapa desde su camino. No cambies de tema salvo que él lo pida.";
+  }
+
+  // CIERRE NATURAL: la sesión se acerca a su fin. Rai NO corta en seco: redondea
+  // con calma, felicita por el trabajo, resume en una frase qué avanzaron hoy y se
+  // despide con cariño invitando a volver. NO abre temas nuevos ni lanza más
+  // actividades (nada de marcadores <<...>>).
+  if (body.cerrandoSesion) {
+    sistema +=
+      "\n\nIMPORTANTE — ESTAMOS CERRANDO LA SESIÓN DE HOY: ya trabajaron bastante " +
+      "y es hora de terminar con calma. En tus próximos mensajes ve redondeando: " +
+      "termina la idea en la que están, felicítalo por su esfuerzo, recuérdale en " +
+      "una frase qué lograron hoy y despídete con cariño invitándolo a volver la " +
+      "próxima. NO empieces temas nuevos ni lances actividades ni ejercicios " +
+      "(ningún marcador). Si te hace una pregunta corta, respóndela breve y vuelve " +
+      "a cerrar. Mantén el tono cálido y sereno.";
   }
 
   // --- RAG solo cuando hay una pregunta concreta ---

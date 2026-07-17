@@ -13,7 +13,7 @@ import {
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { IconoZen } from "./IconoZen";
-import { ICONOS_VALIDOS } from "@/lib/tutor/iconos";
+import { tieneIcono } from "@/lib/tutor/iconos";
 
 export interface DatosSecuencia {
   enunciado: string; // consigna (ej: "Ciclo de vida de la mariposa")
@@ -27,7 +27,7 @@ function TarjetaPaso({ texto, id, index }: { texto: string; id: string; index: n
     id: id,
   });
 
-  const tieneIcono = ICONOS_VALIDOS.includes(texto.trim().toLowerCase());
+  const conIcono = tieneIcono(texto);
 
   const style = transform
     ? {
@@ -46,7 +46,7 @@ function TarjetaPaso({ texto, id, index }: { texto: string; id: string; index: n
         isDragging ? "opacity-40 border-gold" : ""
       }`}
     >
-      {tieneIcono ? (
+      {conIcono ? (
         <>
           <IconoZen nombre={texto} size={32} className="text-ink" />
           <span className="text-[12px] font-[600] capitalize text-ink-soft">{texto}</span>
@@ -74,7 +74,7 @@ function CasillaDestino({
     id: id,
   });
 
-  const tieneIcono = contenido ? ICONOS_VALIDOS.includes(contenido.trim().toLowerCase()) : false;
+  const conIcono = contenido ? tieneIcono(contenido) : false;
 
   return (
     <div
@@ -83,8 +83,8 @@ function CasillaDestino({
         isOver
           ? "border-gold bg-gold-soft/30 scale-105"
           : contenido
-            ? "border-sage bg-sage-soft/10"
-            : "border-hair bg-surface-dark/20 border-dotted"
+            ? "border-sage bg-sage/10"
+            : "border-hair bg-surface/40 border-dotted"
       }`}
     >
       {/* Indicador del número de paso */}
@@ -98,7 +98,7 @@ function CasillaDestino({
           title="Toca para quitar de este paso"
           className="flex flex-col items-center justify-center gap-0.5 cursor-pointer w-full h-full p-2"
         >
-          {tieneIcono ? (
+          {conIcono ? (
             <>
               <IconoZen nombre={contenido} size={28} className="text-sage-deep" />
               <span className="text-[11px] font-[600] capitalize text-sage-deep truncate max-w-full">
@@ -231,8 +231,8 @@ export function Secuencia({
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         {/* Contenedor de Casillas (Timeline) */}
         <div
-          className={`flex flex-wrap justify-center gap-2.5 p-3 rounded-2xl bg-surface-dark/10 border-2 border-hair transition-all duration-300 ${
-            errorFeedback ? "animate-[bounce_0.2s_ease-in-out_3] border-clay/40 bg-clay-soft/5" : ""
+          className={`flex flex-wrap justify-center gap-2.5 p-3 rounded-2xl bg-surface/30 border-2 border-hair transition-all duration-300 ${
+            errorFeedback ? "animate-[bounce_0.2s_ease-in-out_3] border-clay/40 bg-clay/5" : ""
           }`}
         >
           {slots.map((s, i) => (
@@ -260,7 +260,7 @@ export function Secuencia({
       {!resuelto && todoLleno && (
         <button
           onClick={verificar}
-          className="rounded-full bg-gold hover:bg-gold-deep text-ink-dark font-semibold px-6 py-2 text-[14px] transition-all hover:scale-105 shadow-sm active:scale-95"
+          className="rounded-full bg-sage-deep text-white font-semibold px-6 py-2 text-[14px] transition-all hover:scale-105 hover:opacity-90 shadow-sm active:scale-95"
         >
           Verificar secuencia
         </button>

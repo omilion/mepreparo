@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { IconoZen } from "./IconoZen";
-import { ICONOS_VALIDOS } from "@/lib/tutor/iconos";
+import { tieneIcono } from "@/lib/tutor/iconos";
 
 interface Tarjeta {
   frente: string;
@@ -68,9 +68,7 @@ export function Flashcards({
     }
   }
 
-  const tieneIcono = tarjetaActual
-    ? ICONOS_VALIDOS.includes(tarjetaActual.frente.trim().toLowerCase())
-    : false;
+  const conIcono = tarjetaActual ? tieneIcono(tarjetaActual.frente) : false;
 
   return (
     <div className="relative flex flex-col items-center gap-6 text-center select-none w-full max-w-[340px] mx-auto py-2">
@@ -86,14 +84,14 @@ export function Flashcards({
           {/* Tarjeta 3 (Sombra lejana, si quedan >=3 tarjetas) */}
           {restantes >= 3 && (
             <div 
-              className="absolute inset-0 rounded-2xl border border-hair bg-surface/40 transform translate-y-3 scale-92 opacity-40 -z-30 pointer-events-none"
+              className="absolute inset-0 rounded-2xl border border-hair bg-surface/40 transform translate-y-3 scale-90 opacity-40 -z-30 pointer-events-none"
             />
           )}
 
           {/* Tarjeta 2 (Sombra media, si quedan >=2 tarjetas) */}
           {restantes >= 2 && (
             <div 
-              className="absolute inset-0 rounded-2xl border border-hair bg-surface/75 transform translate-y-1.5 scale-96 opacity-80 -z-20 pointer-events-none"
+              className="absolute inset-0 rounded-2xl border border-hair bg-surface/75 transform translate-y-1.5 scale-95 opacity-80 -z-20 pointer-events-none"
             />
           )}
 
@@ -109,7 +107,7 @@ export function Flashcards({
             >
               {/* CARA FRENTE */}
               <div className="absolute inset-0 w-full h-full backface-hidden rounded-2xl border-2 border-hair bg-surface flex flex-col items-center justify-center gap-2 p-6">
-                {tieneIcono ? (
+                {conIcono ? (
                   <>
                     <IconoZen nombre={tarjetaActual.frente} size={48} className="text-sage-deep" />
                     <span className="text-[20px] font-[600] capitalize text-ink">
@@ -127,7 +125,7 @@ export function Flashcards({
               </div>
 
               {/* CARA REVERSO */}
-              <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-2xl border-2 border-sage bg-sage-soft/5 flex flex-col items-center justify-center p-6">
+              <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-2xl border-2 border-sage bg-sage/5 flex flex-col items-center justify-center p-6">
                 <span className="text-[16px] font-medium leading-[1.4] text-ink font-serif text-center break-words px-2">
                   {tarjetaActual.reverso}
                 </span>
@@ -158,7 +156,7 @@ export function Flashcards({
             <div className="flex gap-3 justify-center animate-[fadeIn_0.3s_ease]">
               <button
                 onClick={() => responder(false)}
-                className="flex items-center gap-1.5 rounded-full border border-clay text-clay hover:bg-clay-soft/10 px-4 py-2 text-[13px] font-semibold transition-all"
+                className="flex items-center gap-1.5 rounded-full border border-clay text-clay hover:bg-clay/10 px-4 py-2 text-[13px] font-semibold transition-all"
               >
                 <IconoZen nombre="incorrecto" size={16} />
                 Repasar

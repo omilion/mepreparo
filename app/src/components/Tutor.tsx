@@ -169,9 +169,14 @@ export function Tutor({
 
     const turnosKid = historial.filter((m) => m.de === "nino").length;
     const duracionMs = Date.now() - inicioSesion.current;
+    const duracionMin = duracionMs / 60000;
 
-    // Verificar si esta respuesta supera el límite de presupuesto/duración
-    const limiteAlcanzado = turnosKid >= 10 || duracionMs >= 25 * 60 * 1000;
+    // Sesión de ~45 min / 30 turnos (una clase real; en 5 min un niño no aprende).
+    // FASE DE CIERRE: cuando se acerca el final, le pedimos a Rai que redondee con
+    // naturalidad (sin cortar en seco). Solo si el niño sigue más allá del TOPE
+    // DURO cerramos nosotros, como red de seguridad.
+    const cerrandose = turnosKid >= 26 || duracionMin >= 40;
+    const topeDuro = turnosKid >= 32 || duracionMin >= 48;
 
     try {
       const res = await fetch("/api/tutor", {
@@ -183,20 +188,16 @@ export function Tutor({
           materia,
           pregunta,
           historial,
+          cerrandoSesion: cerrandose, // Rai empieza a despedirse con calma
         }),
       });
       const data = await res.json();
 
-      if (limiteAlcanzado) {
+      if (topeDuro) {
+        // Red de seguridad: mostramos la respuesta de Rai (si la despedida ya vino
+        // en ella, mejor) y cerramos la sesión.
+        void agregarRai(data);
         setSesionTerminada(true);
-        setMensajes((m) => [
-          ...m,
-          {
-            de: "rai",
-            texto: "¡Hemos aprendido muchísimo hoy y trabajaste excelente! 🌟 Por hoy completamos nuestra meta de estudio. Es hora de descansar un ratito y jugar. ¡Presiona el botón de guardar progreso abajo!",
-            modo: "simulado",
-          },
-        ]);
       } else {
         void agregarRai(data);
         quizasGuardarHorario(data.horario);
