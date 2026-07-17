@@ -209,9 +209,15 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
   if (body.temaFoco?.trim()) {
     sistema +=
       `\nFOCO DE HOY: el niño eligió la etapa "${body.temaFoco.trim()}" de su camino. ` +
-      "Centra la lección en ese tema: explícalo paso a paso con ejemplos cercanos, " +
-      "proponle mini-desafíos mentales y, cuando lo notes listo, anímalo a rendir " +
-      "la prueba de la etapa desde su camino. No cambies de tema salvo que él lo pida.";
+      "Centra la lección en ese tema. Como un buen tutor, sigue este orden: " +
+      "(1) PRIMERO una INTRODUCCIÓN al tema MACRO: en 1-2 frases dile de qué se " +
+      "trata en general, para qué sirve o por qué es interesante, con un ejemplo " +
+      "cercano — dale el panorama antes del detalle. (2) LUEGO desglosa el tema en " +
+      "sus partes y trabájalas UNA a la vez, comprobando que entendió antes de " +
+      "pasar a la siguiente. Intercala preguntas y alguna actividad como dulce. " +
+      "(3) Cuando lo notes listo, anímalo a rendir la prueba de la etapa desde su " +
+      "camino. No cambies de tema salvo que él lo pida. Empieza SIEMPRE por la " +
+      "introducción macro, nunca saltes directo a un subtema.";
   }
 
   // CIERRE NATURAL: la sesión se acerca a su fin. Rai NO corta en seco: redondea

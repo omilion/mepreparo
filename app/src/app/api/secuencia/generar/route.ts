@@ -95,6 +95,11 @@ ${contextoRAG || "sin contexto"}`;
     if (!obj.enunciado || !Array.isArray(obj.pasosCorrectos) || obj.pasosCorrectos.length < 3) {
       return null;
     }
+    // pasos no vacíos y ÚNICOS (dos pasos iguales harían el orden ambiguo)
+    const norm = obj.pasosCorrectos.map((p) => String(p).trim().toLowerCase());
+    if (norm.some((p) => !p) || new Set(norm).size !== norm.length) {
+      return null;
+    }
     return {
       enunciado: obj.enunciado.trim(),
       pasosCorrectos: obj.pasosCorrectos.map((p) => p.trim()),

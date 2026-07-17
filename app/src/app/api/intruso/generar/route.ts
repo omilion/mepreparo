@@ -43,14 +43,20 @@ function revolver<T>(arr: T[]): T[] {
 
 // Valida que el objeto de Gemini sea jugable: 4-5 opciones, intruso incluido.
 function esValido(d: Partial<DatosIntruso>): d is DatosIntruso {
-  return (
-    typeof d.enunciado === "string" &&
-    Array.isArray(d.opciones) &&
-    d.opciones.length >= 4 &&
-    d.opciones.length <= 5 &&
-    typeof d.intruso === "string" &&
-    d.opciones.includes(d.intruso)
-  );
+  if (
+    typeof d.enunciado !== "string" ||
+    !Array.isArray(d.opciones) ||
+    d.opciones.length < 4 ||
+    d.opciones.length > 5 ||
+    typeof d.intruso !== "string" ||
+    !d.opciones.includes(d.intruso)
+  ) {
+    return false;
+  }
+  // sin opciones vacías ni repetidas (confunden al niño)
+  const norm = d.opciones.map((o) => String(o).trim().toLowerCase());
+  if (norm.some((o) => !o)) return false;
+  return new Set(norm).size === norm.length;
 }
 
 async function intrusoDeGemini(

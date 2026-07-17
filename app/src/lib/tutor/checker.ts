@@ -100,6 +100,16 @@ export async function validarEjercicio(
     return { esValido: false, razon: "Opción de ejercicio no es un array en opción múltiple" };
   }
 
+  // Ninguna opción vacía y NINGUNA duplicada (dos alternativas iguales confunden
+  // y, si una es la correcta, hay dos correctas). Normalizamos para comparar.
+  const opcNorm = ejercicio.opciones.map((o) => String(o).trim().toLowerCase());
+  if (opcNorm.some((o) => o.length === 0)) {
+    return { esValido: false, razon: "Hay una opción vacía" };
+  }
+  if (new Set(opcNorm).size !== opcNorm.length) {
+    return { esValido: false, razon: "Hay opciones duplicadas" };
+  }
+
   // Selección múltiple: valida el conjunto de correctas (subconjunto de opciones,
   // al menos una) en vez de una única respuesta.
   if (ejercicio.tipoPlantilla === "seleccion_multiple") {

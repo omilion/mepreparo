@@ -4009,7 +4009,7 @@
     "opciones": [
       "gerente",
       "jerente",
-      "gerente",
+      "gerentte",
       "guerente"
     ],
     "correcta": 0,
@@ -4121,7 +4121,7 @@
     "opciones": [
       "herbívoro",
       "herbíboro",
-      "herbívoro",
+      "erbívoro",
       "herbivoro"
     ],
     "correcta": 0,
@@ -4329,7 +4329,7 @@
     "opciones": [
       "acción",
       "asión",
-      "acción",
+      "accion",
       "ación"
     ],
     "correcta": 0,
@@ -4442,7 +4442,7 @@
       "hiperactivo",
       "iperactivo",
       "hyperactivo",
-      "hiperactivo"
+      "hiperactibo"
     ],
     "correcta": 0,
     "oa": "LE06 OA 21"
@@ -4648,9 +4648,9 @@
     "enunciado": "¿Cuál de las siguientes palabras se escribe con 'x'?",
     "opciones": [
       "conexión",
-      "conexión",
-      "conexión",
-      "conesión"
+      "conección",
+      "conesión",
+      "coneksión"
     ],
     "correcta": 0,
     "oa": "LE07 OA 17"
@@ -4761,8 +4761,8 @@
     "opciones": [
       "leyes",
       "leies",
-      "leyes",
-      "lelles"
+      "lelles",
+      "lellez"
     ],
     "correcta": 0,
     "oa": "LE07 OA 17"
@@ -4825,7 +4825,7 @@
     "opciones": [
       "hermano",
       "ermano",
-      "hermano",
+      "hermanno",
       "hemano"
     ],
     "correcta": 0,
@@ -4968,9 +4968,9 @@
     "enunciado": "¿Cuál de las siguientes palabras se escribe con 'b' por terminar en '-bilidad'?",
     "opciones": [
       "responsabilidad",
-      "responsabilidad",
-      "responsabilidad",
-      "responsavilidad"
+      "responsabilidád",
+      "responsavilidad",
+      "rresponsabilidad"
     ],
     "correcta": 0,
     "oa": "LE08 OA 17"
@@ -5001,7 +5001,7 @@
     "opciones": [
       "tú (pronombre)",
       "tu (posesivo)",
-      "tú (pronombre)",
+      "tu (pronombre)",
       "casa"
     ],
     "correcta": 0,
@@ -5082,7 +5082,7 @@
       "gestión",
       "jestión",
       "xestión",
-      "gestión"
+      "gextión"
     ],
     "correcta": 0,
     "oa": "LE08 OA 17"
