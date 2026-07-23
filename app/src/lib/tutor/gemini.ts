@@ -38,10 +38,11 @@ export async function generar(opts: {
       maxOutputTokens: opts.maxTokens ?? 300,
       temperature: 0.6,
       ...(opts.json ? { responseMimeType: "application/json" } : {}),
-      // gemini-2.5-flash es "thinking": sin límite, el razonamiento se come el
-      // presupuesto y el texto sale truncado. Para un tutor breve no hace falta
-      // pensar mucho: dejamos un presupuesto pequeño y fijo.
-      thinkingConfig: { thinkingBudget: 128 },
+      // El modelo es "thinking". Con un presupuesto pequeño (128) NO le alcanza
+      // para razonar en privado y termina "pensando en voz alta" DENTRO de la
+      // respuesta (fuga: "...? Yes: ...", checklists). Un tutor breve y cálido no
+      // necesita cadena de razonamiento: lo DESACTIVAMOS (0). Además va más rápido.
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
 
