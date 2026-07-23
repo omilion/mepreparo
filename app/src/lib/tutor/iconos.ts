@@ -100,6 +100,16 @@ export function iconosDe(categoria: string): readonly string[] {
   return ICONOS_POR_CATEGORIA[categoria as CategoriaIcono] ?? [];
 }
 
+// Normaliza los iconos inline del texto de Rai: a veces Gemini escribe "[pizza]"
+// en vez de "[icono:pizza]" y el icono no se renderiza (sale el texto literal).
+// Convertimos cualquier "[nombre]" suelto (sin ":") a "[icono:nombre]" SOLO si
+// es un icono válido. No toca los "[icono:x]" ya correctos (tienen ":").
+export function normalizarIconosInline(texto: string): string {
+  return texto.replace(/\[([^\[\]:]+)\]/g, (completo, nombre) =>
+    tieneIcono(nombre) ? `[icono:${normalizarIcono(nombre)}]` : completo
+  );
+}
+
 // Arma el texto de los catálogos por categoría para inyectar en el prompt de
 // Gemini (solo las categorías que sirven para poblar interactivos).
 export function catalogoParaPrompt(): string {

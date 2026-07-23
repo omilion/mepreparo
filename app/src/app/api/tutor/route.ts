@@ -15,6 +15,7 @@ import {
   fechaHoraLegible,
 } from "@/lib/tutor/personaje";
 import { generar, tieneClave, MODELO_CHAT, MODELO_LITE } from "@/lib/tutor/gemini";
+import { normalizarIconosInline } from "@/lib/tutor/iconos";
 import { recuperar } from "@/lib/tutor/rag";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
@@ -276,7 +277,10 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       const cruda = await generar({
         sistema,
         usuario,
-        maxTokens: esPrimera ? 640 : 560,
+        // Enseñar necesita más espacio que saludar: antes era al revés (560 en
+        // sesión) y cortaba las explicaciones a media frase. El saludo/primera
+        // charla es breve por diseño, así que le basta menos.
+        maxTokens: esPrimera ? 700 : 1000,
         model: modeloElegido,
       });
 
@@ -294,6 +298,10 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         secuenciaTema,
         flashcardsTema,
       } = separarEjercicio(sinHorario);
+
+      // Repara los iconos que Gemini a veces escribe como "[pizza]" en vez de
+      // "[icono:pizza]" (si no, se ven como texto literal en el chat).
+      const textoFinal = normalizarIconosInline(texto);
 
       // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
       // No cacheamos respuestas con actividad: la actividad es dinámica.
@@ -318,7 +326,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
             preguntaNormalizada,
             materia: body.materia,
             curso: body.curso,
-            respuesta: texto,
+            respuesta: textoFinal,
           });
         } catch (err) {
           console.error("Error al registrar respuesta en cache_respuestas:", err);
@@ -326,7 +334,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       }
 
       return NextResponse.json({
-        respuesta: texto,
+        respuesta: textoFinal,
         fuentes,
         horario,
         ejercicioTema, // presente si Rai lanzó un ejercicio

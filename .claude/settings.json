@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(curl -s -o /dev/null -w \"%{http_code} %{content_type}\" \"http://localhost:3001/iconos/sol.svg\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:3001/iconos/volcan.svg\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:3001/iconos/volcan.svg\")",
+      "Bash(tail -20 /tmp/devserver.log 2>&1)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -X POST http://localhost:3000/api/tutor -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(node -e 'let d=\"\";process.stdin.on\\(\"data\",c=>d+=c\\).on\\(\"end\",\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\(\"=== RESPUESTA DE RAI ===\"\\);console.log\\(j.respuesta\\);console.log\\(\"\"\\);console.log\\(\"=== longitud:\",j.respuesta.length,\"chars | ¿lanzó interactivo?:\",j.ejercicioTema||j.sopaTema||j.ruedaTema||j.intrusoTema||j.conectorTema||j.clasificadorTema||\"NO |\",\"¿termina con pregunta?:\",/\\\\?\\\\s*$/.test\\(j.respuesta.trim\\(\\)\\)?\"SÍ\":\"revisar\"\\);}catch\\(e\\){console.log\\(\"RAW:\",d.slice\\(0,500\\)\\)}}\\)')",
+      "Bash(node -e 'let d=\"\";process.stdin.on\\(\"data\",c=>d+=c\\).on\\(\"end\",\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\(j.respuesta\\);console.log\\(\"\"\\);const inter=j.ejercicioTema||j.sopaTema||j.ruedaTema||j.intrusoTema||j.conectorTema||j.clasificadorTema;console.log\\(\"=== ¿lanzó interactivo?:\",inter?\\(\"SÍ → \"+inter\\):\"no \\(solo pregunta\\)\",\"| termina invitando:\",/[?]\\\\s*$/.test\\(j.respuesta.trim\\(\\)\\)||inter?\"SÍ\":\"revisar\"\\);}catch\\(e\\){console.log\\(\"RAW:\",d.slice\\(0,400\\)\\)}}\\)')",
+      "Bash(node -e ' *)",
+      "Bash(node -e 'let d=\"\";process.stdin.on\\(\"data\",c=>d+=c\\).on\\(\"end\",\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\(\"=== RESPUESTA ===\"\\);console.log\\(j.respuesta\\);console.log\\(\"\"\\);const inter=j.ejercicioTema||j.sopaTema||j.ruedaTema||j.intrusoTema||j.conectorTema||j.clasificadorTema||j.secuenciaTema||j.flashcardsTema;const fuga=/Let.s use|Ends with|thought|Yes\\\\.|\\\\*\\\\s/.test\\(j.respuesta\\);console.log\\(\"=== ¿fuga de thinking?:\",fuga?\"SÍ ⚠️\":\"NO ✓\",\"| ¿lanzó interactivo?:\",inter?\\(\"SÍ → \"+inter\\):\"no\",\"| ¿[nombre] sin prefijo?:\",/\\\\[\\(?!icono:\\)[a-z]+\\\\]/i.test\\(j.respuesta\\)?\"SÍ ⚠️\":\"NO ✓\"\\);}catch\\(e\\){console.log\\(\"RAW:\",d.slice\\(0,600\\)\\)}}\\)')"
     ]
   }
 }

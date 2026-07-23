@@ -67,12 +67,18 @@ export async function generar(opts: {
   }
 
   const data = await res.json();
-  const texto =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-    data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text).join("") ??
-    "";
+  // Los modelos "thinking" devuelven partes de RAZONAMIENTO (thought:true) además
+  // de la respuesta. Hay que EXCLUIRLAS: si no, el razonamiento se filtra al texto
+  // visible (ej: "Let's use [icono:torta]. Ends with one clear question? Yes.").
+  const parts: { text?: string; thought?: boolean }[] =
+    data?.candidates?.[0]?.content?.parts ?? [];
+  const texto = parts
+    .filter((p) => !p.thought && typeof p.text === "string")
+    .map((p) => p.text)
+    .join("")
+    .trim();
   if (!texto) throw new Error("GEMINI_RESPUESTA_VACIA");
-  return texto.trim();
+  return texto;
 }
 
 // Modelo de embeddings vigente (text-embedding-004 fue retirado de la API).
