@@ -166,6 +166,18 @@ export function DiagnosticoMateria({
                 {op}
               </button>
             ))}
+
+            {/* "No lo sé": cuenta como NO acierto (índice -1 nunca coincide), así
+                el niño no adivina para acertar por suerte y el nivel real no se
+                falsea. Estilo secundario para no invitar a usarlo por pereza. */}
+            <button
+              type="button"
+              onClick={() => elegir(-1)}
+              disabled={cargando}
+              className="mt-1 self-center text-[13px] text-ink-soft underline underline-offset-4 transition-colors hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              No lo sé
+            </button>
           </div>
         </Reveal>
 

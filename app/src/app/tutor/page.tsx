@@ -19,13 +19,21 @@ export default function TutorRuta() {
 
   return (
     <Tutor
+      // key por niño: al cambiar de pupilo, el Tutor se remonta LIMPIO (no arrastra
+      // la conversación/sesión del niño anterior). La id no cambia al guardar el
+      // perfil del mismo niño, así que la sesión en curso no se reinicia.
+      key={pupilo.id}
       perfil={pupilo}
       temaFoco={foco?.tema}
       onVolver={() => router.push(pupilo.tutoria ? "/mapa" : "/plan")}
-      onGuardarPerfil={(p) => {
+      // PERSISTE sin navegar: evidencia de interactivos y cierre de sesión. Antes
+      // esto hacía router.push("/mapa") en CADA guardado → al terminar un
+      // interactivo sacaba al niño de la clase (bug). Ahora solo guarda.
+      onGuardarPerfil={(p) => guardarPupiloEnfocado(p)}
+      // Solo la primera vez, al fijar el horario: guarda y pasa a preparar mundos.
+      onHorarioCreado={(p) => {
         guardarPupiloEnfocado(p);
-        if (p.tutoria && !p.tutoria.planMaterias) router.push("/mundos");
-        else router.push("/mapa");
+        router.push("/mundos");
       }}
     />
   );

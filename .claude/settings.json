@@ -13,7 +13,14 @@
       "Bash(pkill -f \"next dev\")",
       "Read(//c/Users/flipe/.gemini/antigravity-ide/brain/1af4c26e-68fc-415b-a6b5-de71b180febe/scratch/**)",
       "Bash(timeout 240 node \"C:/Users/flipe/.gemini/antigravity-ide/brain/1af4c26e-68fc-415b-a6b5-de71b180febe/scratch/test_tutor_math_long.mjs\")",
-      "Bash(timeout 300 node \"C:/Users/flipe/AppData/Local/Temp/claude/c--Users-flipe-OneDrive-Documentos-mepreparo/ca950456-0444-4999-b96a-000ff75ca94b/scratchpad/run_math.mjs\")"
+      "Bash(timeout 300 node \"C:/Users/flipe/AppData/Local/Temp/claude/c--Users-flipe-OneDrive-Documentos-mepreparo/ca950456-0444-4999-b96a-000ff75ca94b/scratchpad/run_math.mjs\")",
+      "Bash(grep -niE \"costo|precio|token|gemini|clp|usd|\\\\\\\\\\\\$|margen|mrr|rentab|suscrip|pago\" docs/PLAN-siguiente-nivel.md)",
+      "Read(//c/Users/flipe/.gemini/**)",
+      "Bash(xargs grep -liE \"bolsa|minuto|prelector|waldorf|costo|elevenlabs|tts|precio|clp\")",
+      "Read(//c/Users/flipe/.gemini/antigravity/brain/424a08fe-8fab-4bf8-8157-2466d03678d6/browser/**)",
+      "Bash(echo \"=== archivos que mencionan prelector/waldorf/bolsa \\(el tema real\\) ===\" && grep -rliE \"prelector|waldorf|bolsa de minuto|bolsas de minuto\" \"C:/Users/flipe/.gemini\" 2>/dev/null | head && echo \"\" && echo \"=== scratch de la sesión actual \\(1af4c26e\\) ===\" && ls \"C:/Users/flipe/.gemini/antigravity-ide/brain/1af4c26e-68fc-415b-a6b5-de71b180febe/scratch/\" 2>/dev/null)",
+      "Read(//c/Users/flipe/.gemini/antigravity-ide/brain/1af4c26e-68fc-415b-a6b5-de71b180febe/**)",
+      "Read(//c/Users/flipe/.gemini/antigravity-ide/brain/1500f4a2-73f7-42cd-aadb-b15806deed45/**)"
     ]
   }
 }

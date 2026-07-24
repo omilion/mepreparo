@@ -70,12 +70,16 @@ export function Tutor({
   perfil,
   onVolver,
   onGuardarPerfil,
+  onHorarioCreado,
   temaFoco,
 }: {
   perfil: PerfilNino;
   onVolver: () => void;
-  // guarda cambios en el perfil (p.ej. el acuerdo de tutoría recién creado)
+  // PERSISTE cambios del perfil SIN navegar (evidencia de interactivos, cierre de
+  // sesión). No debe sacar al niño de la clase.
   onGuardarPerfil?: (p: PerfilNino) => void;
+  // Solo la PRIMERA vez, cuando se acuerda el horario: persiste y pasa a "mundos".
+  onHorarioCreado?: (p: PerfilNino) => void;
   // si viene del mapa de etapas: la lección se centra en este tema
   temaFoco?: string;
 }) {
@@ -225,27 +229,30 @@ export function Tutor({
     clasificadorTema?: string;
     secuenciaTema?: string;
     flashcardsTema?: string;
+    actividadMateria?: string;
   }) {
     // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
-    // de un índice numérico, que llegaba desfasado.
+    // de un índice numérico, que llegaba desfasado. La materia del interactivo es
+    // la que Rai ENSEÑA (data.actividadMateria), no la agendada del día.
+    const mat = data.actividadMateria || materia;
     const ejercicio = data.ejercicioTema
-      ? await obtenerEjercicio(data.ejercicioTema, data.ejercicioFormato)
+      ? await obtenerEjercicio(data.ejercicioTema, data.ejercicioFormato, mat)
       : null;
-    const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema) : null;
-    const rueda = data.ruedaTema ? await obtenerRueda(data.ruedaTema) : null;
-    const intruso = data.intrusoTema ? await obtenerIntruso(data.intrusoTema) : null;
+    const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema, mat) : null;
+    const rueda = data.ruedaTema ? await obtenerRueda(data.ruedaTema, mat) : null;
+    const intruso = data.intrusoTema ? await obtenerIntruso(data.intrusoTema, mat) : null;
     const conector = data.conectorTema
-      ? await obtenerConector(data.conectorTema)
+      ? await obtenerConector(data.conectorTema, mat)
       : null;
     const clasificador = data.clasificadorTema
-      ? await obtenerClasificador(data.clasificadorTema)
+      ? await obtenerClasificador(data.clasificadorTema, mat)
       : null;
     const secuencia = data.secuenciaTema
-      ? await obtenerSecuencia(data.secuenciaTema)
+      ? await obtenerSecuencia(data.secuenciaTema, mat)
       : null;
     const flashcards = data.flashcardsTema
-      ? await obtenerFlashcards(data.flashcardsTema)
+      ? await obtenerFlashcards(data.flashcardsTema, mat)
       : null;
 
     setMensajes((m) => [
@@ -299,11 +306,12 @@ export function Tutor({
   // NO toca el estado: quien llama decide dónde lo adjunta.
   async function obtenerEjercicio(
     tema: string,
-    formato: string = "opcion_multiple"
+    formato: string = "opcion_multiple",
+    mat: string = materia
   ): Promise<EjercicioChat | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -349,10 +357,10 @@ export function Tutor({
 
   // Pide una sopa de letras del tema a la biblioteca/generador. Devuelve los
   // datos listos (grid + palabras con su path) o null si no se pudo armar.
-  async function obtenerSopa(tema: string): Promise<DatosSopa | null> {
+  async function obtenerSopa(tema: string, mat: string = materia): Promise<DatosSopa | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -372,10 +380,10 @@ export function Tutor({
 
   // Pide una rueda de letras del tema (pregunta + respuesta a formar). Devuelve
   // los datos listos o null si no se pudo generar.
-  async function obtenerRueda(tema: string): Promise<DatosRueda | null> {
+  async function obtenerRueda(tema: string, mat: string = materia): Promise<DatosRueda | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -398,10 +406,10 @@ export function Tutor({
 
   // Pide "el intruso" del tema (consigna + opciones + cuál sobra). Devuelve los
   // datos listos o null si no se pudo generar.
-  async function obtenerIntruso(tema: string): Promise<DatosIntruso | null> {
+  async function obtenerIntruso(tema: string, mat: string = materia): Promise<DatosIntruso | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -430,10 +438,10 @@ export function Tutor({
 
   // Pide "el conector" del tema (consigna + pares izq↔der). Devuelve los datos
   // listos o null si no se pudo generar.
-  async function obtenerConector(tema: string): Promise<DatosConector | null> {
+  async function obtenerConector(tema: string, mat: string = materia): Promise<DatosConector | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -462,11 +470,12 @@ export function Tutor({
   // Pide "el clasificador" del tema (grupos + items). Devuelve los datos listos
   // o null si no se pudo generar.
   async function obtenerClasificador(
-    tema: string
+    tema: string,
+    mat: string = materia
   ): Promise<DatosClasificador | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -494,10 +503,10 @@ export function Tutor({
     }
   }
 
-  async function obtenerSecuencia(tema: string): Promise<DatosSecuencia | null> {
+  async function obtenerSecuencia(tema: string, mat: string = materia): Promise<DatosSecuencia | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -523,10 +532,10 @@ export function Tutor({
     }
   }
 
-  async function obtenerFlashcards(tema: string): Promise<DatosFlashcards | null> {
+  async function obtenerFlashcards(tema: string, mat: string = materia): Promise<DatosFlashcards | null> {
     try {
       const params = new URLSearchParams({
-        materia,
+        materia: mat,
         curso: perfil.curso,
         dificultad: "2",
         tema,
@@ -928,7 +937,9 @@ export function Tutor({
       sesiones: [],
     };
     const nuevo = sembrarTemasDesdeDiagnostico(base, perfil.diagnostico);
-    onGuardarPerfil?.({ ...perfil, tutoria: nuevo });
+    // Primera vez: persiste y navega a "mundos". Si no hay callback dedicado,
+    // cae al de persistir (compatibilidad).
+    (onHorarioCreado ?? onGuardarPerfil)?.({ ...perfil, tutoria: nuevo });
   }
 
   function quizasGuardarHorario(horario?: AcuerdoTutoria["horario"]) {
@@ -1150,10 +1161,64 @@ function CajaTexto({
   tutorNombre: string;
 }) {
   const [texto, setTexto] = useState("");
+  const [escuchando, setEscuchando] = useState(false);
+  const [soportaVoz, setSoportaVoz] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setSoportaVoz(true);
+        const rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = true;
+        rec.lang = "es-CL";
+
+        rec.onresult = (e: any) => {
+          const transcript = Array.from(e.results)
+            .map((result: any) => result[0].transcript)
+            .join("");
+          setTexto(transcript);
+        };
+
+        rec.onerror = (e: any) => {
+          console.warn("Error en el micrófono", e);
+          setEscuchando(false);
+        };
+
+        rec.onend = () => {
+          setEscuchando(false);
+        };
+
+        recognitionRef.current = rec;
+      }
+    }
+  }, []);
+
+  function toggleEscuchar() {
+    if (!recognitionRef.current) return;
+    if (escuchando) {
+      recognitionRef.current.stop();
+      setEscuchando(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setEscuchando(true);
+      } catch (err) {
+        console.error("No se pudo iniciar el micrófono", err);
+      }
+    }
+  }
 
   function enviar() {
     const pregunta = texto.trim();
     if (!pregunta || cargando) return;
+    if (escuchando && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setEscuchando(false);
+    }
     onEnviar(pregunta);
     setTexto("");
   }
@@ -1163,6 +1228,22 @@ function CajaTexto({
     // tipografía más grande — pensado para que el niño lo vea claro en tablet.
     <div className="flex flex-none justify-center py-3">
       <div className="flex w-[90%] items-center gap-2 rounded-2xl border border-hair bg-surface/60 px-3 py-1.5 transition-colors focus-within:border-sage">
+        {soportaVoz && (
+          <button
+            type="button"
+            onClick={toggleEscuchar}
+            disabled={cargando}
+            title={escuchando ? "Detener micrófono" : "Hablar con el micrófono"}
+            aria-label="Hablar por micrófono"
+            className={`flex h-11 w-11 flex-none items-center justify-center rounded-full text-[19px] transition-all ${
+              escuchando
+                ? "bg-red-500 text-white animate-pulse shadow-lg scale-105"
+                : "bg-surface-elevated text-sage-deep hover:bg-sage/20"
+            }`}
+          >
+            🎙️
+          </button>
+        )}
         <input
           type="text"
           value={texto}
@@ -1177,7 +1258,11 @@ function CajaTexto({
             )
           }
           placeholder={
-            esPrimera ? "Responde a Rai…" : `Escríbele a ${tutorNombre}…`
+            escuchando
+              ? "Te estoy escuchando..."
+              : esPrimera
+              ? "Responde a Rai o usa el micrófono…"
+              : `Escríbele o háblale a ${tutorNombre}…`
           }
           className="flex-1 border-none bg-transparent px-1 py-2 text-[19px] text-ink outline-none focus:outline-none focus:ring-0 placeholder:text-ink-soft/60"
         />

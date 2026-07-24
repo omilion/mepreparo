@@ -161,7 +161,11 @@ export const INSTRUCCION_EJERCICIO =
   "- <<CLASIFICADOR:tema>> → 'arrastrar a grupos': el niño arrastra tarjetas a 2 o 3 grupos. Ej: <<CLASIFICADOR:pares_impares>>.\n" +
   "- <<SECUENCIA:tema>> → 'ordenar secuencia': bloques de pasos o etapas que el niño debe arrastrar y ordenar de primero a último (ciclos de vida, cronologías o procesos). Ej: <<SECUENCIA:ciclo_del_agua>>.\n" +
   "- <<FLASHCARDS:tema>> → 'fichas de estudio': mazo de tarjetas con conceptos al frente (que muestran iconos si existen) y definiciones breves al reverso para memorizar. Ej: <<FLASHCARDS:cuerpo_humano>>.\n" +
-  "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). No escribas " +
+  "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). " +
+  "IMPORTANTE — MATERIA: pon SIEMPRE la materia que estás enseñando ANTES del tema, así: " +
+  "<<TIPO:materia:tema>>. La materia debe ser EXACTAMENTE una de: matematica, lenguaje, " +
+  "ciencias, historia, ingles. Ejemplos: <<SOPA:ingles:animales>>, <<EJERCICIO:matematica:fracciones>>, " +
+  "<<CONECTOR:ciencias:organos>>. Así la actividad sale en la materia correcta. No escribas " +
   "tú la actividad: el marcador hace que aparezca una real. Para preguntas de respuesta corta o " +
   "abierta NO uses marcador: pregúntale directo en la conversación. Las actividades son un DULCE " +
   "ocasional: úsalas como parte del ritmo de la clase, 1 o 2 veces por sesión, no en cada mensaje. ";

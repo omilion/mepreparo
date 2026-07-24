@@ -297,6 +297,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         clasificadorTema,
         secuenciaTema,
         flashcardsTema,
+        actividadMateria,
       } = separarEjercicio(sinHorario);
 
       // Repara los iconos que Gemini a veces escribe como "[pizza]" en vez de
@@ -346,6 +347,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         clasificadorTema, // presente si Rai lanzó "el clasificador"
         secuenciaTema, // presente si Rai lanzó una secuencia
         flashcardsTema, // presente si Rai lanzó flashcards
+        actividadMateria, // materia del interactivo, si Rai la especificó
         modo: "gemini",
       });
     } catch (e) {
@@ -369,6 +371,8 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
 
 // Extrae el marcador <<EJERCICIO:tema>> del mensaje de Rai. Devuelve el texto
 // limpio y el tema del ejercicio (si lo hubo), para que el front lo pida.
+const MATERIAS_IDS = ["matematica", "lenguaje", "ciencias", "historia", "ingles"];
+
 function separarEjercicio(cruda: string): {
   texto: string;
   ejercicioTema?: string;
@@ -380,84 +384,43 @@ function separarEjercicio(cruda: string): {
   clasificadorTema?: string;
   secuenciaTema?: string;
   flashcardsTema?: string;
+  // materia de la actividad que Rai lanzó (si la incluyó en el marcador). Así el
+  // interactivo se genera en la materia que Rai ENSEÑA, no en la agendada del día.
+  actividadMateria?: string;
 } {
   let texto = cruda;
+  let actividadMateria: string | undefined;
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "_") || undefined;
 
-  // <<SOPA:tema>> → sopa de letras
-  let sopaTema: string | undefined;
-  const ms = texto.match(/<<SOPA:([a-zñáéíóú_ ]+?)>>/i);
-  if (ms) {
-    sopaTema = norm(ms[1]);
-    texto = texto.replace(ms[0], "");
-  }
-
-  // <<RUEDA:tema>> → rueda de letras (formar la respuesta)
-  let ruedaTema: string | undefined;
-  const mr = texto.match(/<<RUEDA:([a-zñáéíóú_ ]+?)>>/i);
-  if (mr) {
-    ruedaTema = norm(mr[1]);
-    texto = texto.replace(mr[0], "");
-  }
-
-  // <<INTRUSO:tema>> → "el intruso" (tocar el que no encaja)
-  let intrusoTema: string | undefined;
-  const mi = texto.match(/<<INTRUSO:([a-zñáéíóú_ ]+?)>>/i);
-  if (mi) {
-    intrusoTema = norm(mi[1]);
-    texto = texto.replace(mi[0], "");
-  }
-
-  // <<CONECTOR:tema>> → "el conector" (unir dos columnas con líneas)
-  let conectorTema: string | undefined;
-  const mc = texto.match(/<<CONECTOR:([a-zñáéíóú_ ]+?)>>/i);
-  if (mc) {
-    conectorTema = norm(mc[1]);
-    texto = texto.replace(mc[0], "");
-  }
-
-  // <<CLASIFICADOR:tema>> → "el clasificador" (arrastrar a grupos)
-  let clasificadorTema: string | undefined;
-  const mcl = texto.match(/<<CLASIFICADOR:([a-zñáéíóú_ ]+?)>>/i);
-  if (mcl) {
-    clasificadorTema = norm(mcl[1]);
-    texto = texto.replace(mcl[0], "");
-  }
-
-  // <<SECUENCIA:tema>> → secuencias a ordenar
-  let secuenciaTema: string | undefined;
-  const msec = texto.match(/<<SECUENCIA:([a-zñáéíóú_ ]+?)>>/i);
-  if (msec) {
-    secuenciaTema = norm(msec[1]);
-    texto = texto.replace(msec[0], "");
-  }
-
-  // <<FLASHCARDS:tema>> → mazo de flashcards
-  let flashcardsTema: string | undefined;
-  const mflash = texto.match(/<<FLASHCARDS:([a-zñáéíóú_ ]+?)>>/i);
-  if (mflash) {
-    flashcardsTema = norm(mflash[1]);
-    texto = texto.replace(mflash[0], "");
-  }
-
-  // <<SELECCION:tema>> → selección múltiple (varias correctas)
-  let ejercicioTema: string | undefined;
-  let ejercicioFormato: string | undefined;
-  const msel = texto.match(/<<SELECCION:([a-zñáéíóú_ ]+?)>>/i);
-  if (msel) {
-    ejercicioTema = norm(msel[1]);
-    ejercicioFormato = "seleccion_multiple";
-    texto = texto.replace(msel[0], "");
-  }
-
-  // <<EJERCICIO:tema>> → opción múltiple (tolera un :sufijo antiguo y lo ignora)
-  if (!ejercicioTema) {
-    const me = texto.match(/<<EJERCICIO:([a-zñáéíóú_ ]+?)(?::[a-z_]+)?>>/i);
-    if (me) {
-      ejercicioTema = norm(me[1]);
-      ejercicioFormato = "opcion_multiple";
-      texto = texto.replace(me[0], "");
+  // Extrae <<TIPO:tema>> o <<TIPO:materia:tema>> (materia opcional, validada). Si
+  // trae materia, la guarda en actividadMateria. Devuelve el tema normalizado.
+  function sacar(tipo: string): string | undefined {
+    const re = new RegExp(`<<${tipo}:([a-zñáéíóú_ :]+?)>>`, "i");
+    const m = texto.match(re);
+    if (!m) return undefined;
+    texto = texto.replace(m[0], "");
+    const partes = m[1].split(":").map((s) => s.trim()).filter(Boolean);
+    if (partes.length >= 2 && MATERIAS_IDS.includes(partes[0].toLowerCase())) {
+      actividadMateria = partes[0].toLowerCase();
+      return norm(partes.slice(1).join(" "));
     }
+    return norm(partes.join(" "));
+  }
+
+  const sopaTema = sacar("SOPA");
+  const ruedaTema = sacar("RUEDA");
+  const intrusoTema = sacar("INTRUSO");
+  const conectorTema = sacar("CONECTOR");
+  const clasificadorTema = sacar("CLASIFICADOR");
+  const secuenciaTema = sacar("SECUENCIA");
+  const flashcardsTema = sacar("FLASHCARDS");
+
+  // Ejercicio: selección múltiple tiene prioridad sobre opción múltiple.
+  let ejercicioTema = sacar("SELECCION");
+  let ejercicioFormato = ejercicioTema ? "seleccion_multiple" : undefined;
+  if (!ejercicioTema) {
+    ejercicioTema = sacar("EJERCICIO");
+    if (ejercicioTema) ejercicioFormato = "opcion_multiple";
   }
 
   return {
@@ -471,6 +434,7 @@ function separarEjercicio(cruda: string): {
     clasificadorTema,
     secuenciaTema,
     flashcardsTema,
+    actividadMateria,
   };
 }
 

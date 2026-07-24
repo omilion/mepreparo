@@ -237,6 +237,26 @@ function NodoEtapa({
             </button>
           </div>
         )}
+
+        {/* Un tema superado NO queda bloqueado: el niño puede volver a repasarlo
+            o rendir la prueba cuando quiera (antes no tenía forma de retomarlo). */}
+        {etapa.estado === "superada" && (
+          <div className="mt-2 flex flex-wrap gap-4">
+            <button
+              onClick={onEstudiar}
+              className="text-[12.5px] underline underline-offset-4 transition-colors hover:text-ink"
+              style={{ color: "var(--materia-primary-deep)" }}
+            >
+              Repasar con Rai
+            </button>
+            <button
+              onClick={onPrueba}
+              className="text-[12.5px] text-ink-soft underline underline-offset-4 transition-colors hover:text-ink"
+            >
+              Repetir la prueba
+            </button>
+          </div>
+        )}
       </div>
 
       <style jsx>{`

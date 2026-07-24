@@ -105,9 +105,14 @@ export function iconosDe(categoria: string): readonly string[] {
 // Convertimos cualquier "[nombre]" suelto (sin ":") a "[icono:nombre]" SOLO si
 // es un icono válido. No toca los "[icono:x]" ya correctos (tienen ":").
 export function normalizarIconosInline(texto: string): string {
-  return texto.replace(/\[([^\[\]:]+)\]/g, (completo, nombre) =>
-    tieneIcono(nombre) ? `[icono:${normalizarIcono(nombre)}]` : completo
-  );
+  return texto.replace(/\[([^\[\]]+)\]/g, (completo, contenido) => {
+    // Gemini escribe el icono de varias formas: "[icono:correcto]" (ok),
+    // "[icono correcto]" (espacio), "[icono: correcto]" (dos puntos + espacio),
+    // o "[correcto]" (nombre suelto). Quitamos el prefijo "icono" si viene y nos
+    // quedamos con el nombre. Si es un icono válido, lo dejamos bien formado.
+    const sinPrefijo = contenido.replace(/^\s*icono\s*:?\s*/i, "").trim();
+    return tieneIcono(sinPrefijo) ? `[icono:${normalizarIcono(sinPrefijo)}]` : completo;
+  });
 }
 
 // Arma el texto de los catálogos por categoría para inyectar en el prompt de
