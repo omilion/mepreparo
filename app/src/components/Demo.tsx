@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { MATERIAS, type Materia } from "@/lib/profile";
 import { TUTOR } from "@/lib/tutor/personaje";
 import { AuraOrb } from "./AuraOrb";
+import { useExpresionRai } from "@/lib/tutor/useExpresionRai";
 import { TextoRevelado } from "./TextoRevelado";
 import { Reveal } from "./Reveal";
 
@@ -42,7 +43,26 @@ export function Demo({
   const [aciertos, setAciertos] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const orbeActivo = cargando;
+  // La esfera de la demo se rige igual que en la clase real (misma gramática):
+  // reacción puntual > pensando mientras carga > hablando/escuchando.
+  const { reaccion, reaccionar } = useExpresionRai();
+  const [faseBase, setFaseBase] = useState<"reposo" | "hablando" | "escuchando">(
+    "reposo"
+  );
+
+  // Rai habla mientras su mensaje se revela y después queda escuchando.
+  useEffect(() => {
+    if (!mensajeRai) return;
+    const palabras = mensajeRai.trim().split(/\s+/).length;
+    setFaseBase("hablando");
+    const t = setTimeout(
+      () => setFaseBase("escuchando"),
+      Math.min(8000, 700 + palabras * 90)
+    );
+    return () => clearTimeout(t);
+  }, [mensajeRai]);
+
+  const estadoOrbe = reaccion ?? (cargando ? "pensando" : faseBase);
 
   // --- gate de email → guarda lead y arranca ---
   async function comenzarDemo() {
@@ -62,6 +82,7 @@ export function Demo({
       /* no bloqueamos la demo si el lead falla */
     }
     setFase("bienvenida");
+    reaccionar(["saludo", 4200]); // el primer encuentro con Rai: se abre y saluda
     await pedirRai("bienvenida");
     setFase("materia");
     setCargando(false);
@@ -82,6 +103,7 @@ export function Demo({
       const data = await res.json();
       setMensajeRai(data.respuesta || "");
     } catch {
+      reaccionar(["ausente", 4000]); // se cortó: Rai se aleja y se apaga
       setMensajeRai(`¡Sigamos, ${nombre || "amigo"}!`);
     } finally {
       setCargando(false);
@@ -146,6 +168,8 @@ export function Demo({
     const nuevo = idxEjercicio + 1;
     if (nuevo >= TOTAL_EJERCICIOS) {
       setFase("cierre");
+      // cierre de la clase de prueba: celebra lo que logró, o se despide tibia
+      reaccionar(aciertos > 0 ? ["celebracion", 3000] : ["saludo", 3000]);
       return;
     }
     setIdxEjercicio(nuevo);
@@ -154,7 +178,7 @@ export function Demo({
 
   // ------------------------------------------------------------------ render
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col px-[22px] pb-16">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-16">
       {/* barra: salir */}
       <div className="flex items-center py-2">
         <button
@@ -221,7 +245,7 @@ export function Demo({
       {/* ESFERA + MENSAJE DE RAI (bienvenida / materia / lección / cierre) */}
       {fase !== "email" && fase !== "ejercicios" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-          <AuraOrb materia={materia} activa={orbeActivo} size={96} />
+          <AuraOrb materia={materia} estado={estadoOrbe} size={96} />
           {mensajeRai && (
             <p className="mx-auto max-w-[36ch] whitespace-pre-line font-serif text-[24px] leading-[1.35] text-ink">
               <TextoRevelado texto={mensajeRai} />

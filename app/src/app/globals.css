@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer components {
+  /* EL ANCHO DE LA APP. Un solo lugar para todas las vistas.
+     En teléfono, la columna zen de 560px (medida pensada para leer sin cansar).
+     En tablet y desktop la app se ENSANCHA: 560px en una pantalla de 1024 se ve
+     como una app de teléfono estirada al medio, con dos márgenes enormes.
+     Los bloques de TEXTO que deban seguir angostos se limitan por dentro con su
+     propio max-w-[NNch] — el ancho de página no es el ancho de lectura. */
+  .zen-page {
+    @apply mx-auto w-full max-w-zen px-[22px] md:max-w-[700px] lg:max-w-[880px];
+  }
   .input {
     @apply w-full border-0 border-b border-hair bg-transparent px-0.5 py-2 text-[16px] text-ink transition-colors;
   }

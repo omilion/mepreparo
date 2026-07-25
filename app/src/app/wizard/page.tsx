@@ -8,23 +8,27 @@ import { StepFade } from "@/components/StepFade";
 import { TopBar } from "@/components/TopBar";
 
 export default function WizardRuta() {
-  const { nuevos, wizIdx, alConfigurarHijo } = useApp();
+  const { nuevos, wizIdx, onboardingListo, alConfigurarHijo } = useApp();
   const router = useRouter();
 
-  // Guard: sin nuevos, al inicio
+  // Guard: sin hijos por configurar, al inicio. Espera a que el Provider
+  // termine de recuperar un onboarding a medias — si no, al recargar aquí
+  // saldríamos disparados antes de saber que sí había algo pendiente.
   useEffect(() => {
-    if (nuevos.length === 0) {
+    if (onboardingListo && nuevos.length === 0) {
       router.replace("/");
     }
-  }, [nuevos, router]);
+  }, [onboardingListo, nuevos, router]);
 
-  if (nuevos.length === 0 || wizIdx >= nuevos.length) return null;
+  if (!onboardingListo || nuevos.length === 0 || wizIdx >= nuevos.length) {
+    return null;
+  }
 
   const perfilActual = nuevos[wizIdx];
 
   return (
     <main className="min-h-screen">
-      <TopBar />
+      <TopBar mostrarHome={false} />
       <StepFade stepKey={`wiz-${wizIdx}`} direction="next">
         <WizardHijo
           key={perfilActual.id}
@@ -32,6 +36,9 @@ export default function WizardRuta() {
           indice={wizIdx}
           total={nuevos.length}
           onListo={alConfigurarHijo}
+          // Solo en el primer hijo: aún no se ha configurado a nadie, así que
+          // volver a los nombres no descarta trabajo hecho.
+          onSalir={wizIdx === 0 ? () => router.push("/registro") : undefined}
         />
       </StepFade>
     </main>

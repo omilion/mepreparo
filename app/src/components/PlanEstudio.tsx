@@ -79,7 +79,7 @@ export function PlanEstudio({
     : "Repaso General";
 
   return (
-    <div className="mx-auto flex max-w-zen flex-col gap-[26px] px-[22px] pb-24 pt-10">
+    <div className="zen-page flex flex-col gap-[26px] pb-24 pt-10">
       {/* Racha y Saludo de Alumno (D1) */}
       <Reveal variant="lead" delay={80}>
         <div className="flex items-center justify-between rounded-xl bg-sage/5 border border-hair p-4 mb-2">
@@ -178,6 +178,8 @@ export function PlanEstudio({
           <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-ink-soft">
             Tus materias y etapas
           </div>
+          {/* en tablet, dos materias por fila */}
+          <div className="grid gap-3 md:grid-cols-2">
           {plan.materias
             .slice()
             .sort((a, b) => a.prioridad - b.prioridad)
@@ -211,11 +213,12 @@ export function PlanEstudio({
                 </div>
               );
             })}
+          </div>
         </div>
       </Reveal>
 
       <Reveal delay={860}>
-        <div className="flex flex-col gap-3">
+        <div className="mx-auto flex w-full max-w-[420px] flex-col gap-3">
           <button type="button" className="premium-glow-button animate-moving-border" onClick={onTutor}>
             Empezar a estudiar con el tutor
           </button>

@@ -14,7 +14,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+
+// Herramientas internas que se abren escribiendo la URL a mano. El arranque no
+// debe rutearlas: si no, entras y te rebota al home antes de ver nada.
+const RUTAS_LIBRES = ["/rai"];
 import { authClient } from "@/lib/auth-client";
 import {
   leerCuenta,
@@ -24,6 +28,9 @@ import {
   sincronizarConServidor,
   leerSesionAlumno,
   borrarSesionAlumno,
+  leerOnboarding,
+  guardarOnboarding,
+  borrarOnboarding,
   type SesionAlumno,
 } from "@/lib/storage";
 import {
@@ -71,6 +78,9 @@ interface AppState {
   // onboarding multi-hijo
   nuevos: PerfilNino[];
   wizIdx: number;
+  // ¿ya intentamos recuperar un onboarding a medias del almacenamiento? El
+  // wizard debe esperar esto antes de decidir que no hay nada que configurar.
+  onboardingListo: boolean;
 
   // setters expuestos
   setCuenta: (c: Cuenta | null) => void;
@@ -108,6 +118,7 @@ export function useApp(): AppState {
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
+  const pathname = usePathname();
 
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   const [enfocado, setEnfocado] = useState(0);
@@ -118,11 +129,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [sesionAlumno, setSesionAlumno] = useState<SesionAlumno | null>(null);
   const [pinBloqueado, setPinBloqueado] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [onboardingListo, setOnboardingListo] = useState(false);
   const [accionesDevTutor, setAccionesDevTutor] = useState<AccionesDevTutor>(null);
   // evita re-ejecutar el ruteo inicial en cada render
   const arranqueHecho = useRef(false);
 
   const pupilo = cuenta?.pupilos[enfocado] ?? null;
+
+  // Recupera un onboarding a medias (hijos anotados que aún no pasan por el
+  // wizard). Va en un efecto y no en el useState inicial a propósito: en el
+  // servidor no existe localStorage y el HTML no coincidiría al hidratar.
+  useEffect(() => {
+    const pendiente = leerOnboarding();
+    if (pendiente) {
+      setNuevos(pendiente.pupilos);
+      setWizIdx(pendiente.idx);
+    }
+    setOnboardingListo(true);
+  }, []);
 
   // sincronización en segundo plano actualiza la cuenta en memoria
   useEffect(() => {
@@ -146,6 +170,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isPending) return;
     if (arranqueHecho.current) {
+      setCargando(false);
+      return;
+    }
+    // herramientas internas (/rai): se quedan donde están
+    if (RUTAS_LIBRES.includes(pathname)) {
+      arranqueHecho.current = true;
       setCargando(false);
       return;
     }
@@ -181,24 +211,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // 3) apoderado con sesión → sincroniza y va a panel o registro
     const user = session.user;
-    const local = leerCuenta() || nuevaCuenta();
+
+    // DISPOSITIVO COMPARTIDO: lo que hay en este navegador puede ser de OTRO
+    // apoderado (usó la tablet, su sesión venció y no cerró sesión). Si el
+    // correo guardado no es el de quien entra ahora, se descarta: si no, sus
+    // hijos se subirían al servidor dentro de la cuenta equivocada.
+    const guardada = leerCuenta();
+    const esDeOtro =
+      !!guardada?.apoderado?.email && guardada.apoderado.email !== user.email;
+    if (esDeOtro) {
+      borrarCuenta();
+      borrarOnboarding();
+      setNuevos([]);
+      setWizIdx(0);
+    }
+    const local = (esDeOtro ? null : guardada) || nuevaCuenta();
+
     const base: Cuenta = {
       ...local,
       apoderado: { nombre: user.name || "Apoderado", email: user.email },
     };
     setCuenta(base);
     arranqueHecho.current = true;
+
+    // Si quedó un wizard a medias, se retoma ahí (aunque ya haya hijos listos:
+    // el panel haría creer que el registro terminó).
+    const pendiente = esDeOtro ? null : leerOnboarding();
+    const destino = (cuentaSinc: Cuenta) =>
+      pendiente ? "/wizard" : cuentaSinc.pupilos.length > 0 ? "/panel" : "/registro";
+
     sincronizarConServidor(base)
       .then((sinc) => {
         setCuenta(sinc);
         setCargando(false);
-        router.replace(sinc.pupilos.length > 0 ? "/panel" : "/registro");
+        router.replace(destino(sinc));
       })
       .catch(() => {
         setCargando(false);
-        router.replace(base.pupilos.length > 0 ? "/panel" : "/registro");
+        router.replace(destino(base));
       });
-  }, [session, isPending, router]);
+  }, [session, isPending, router, pathname]);
 
   // --- transiciones ---
   const irAPupilo = useCallback(
@@ -216,6 +268,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (pupilosNuevos: PerfilNino[]) => {
       setNuevos(pupilosNuevos);
       setWizIdx(0);
+      // desde aquí y hasta terminar el wizard, los hijos anotados sobreviven a
+      // una recarga o a que se cierre la pestaña
+      guardarOnboarding({ pupilos: pupilosNuevos, idx: 0 });
       router.push("/wizard");
     },
     [router]
@@ -228,10 +283,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCuenta(actualizada);
       if (wizIdx < nuevos.length - 1) {
         setWizIdx(wizIdx + 1);
+        guardarOnboarding({ pupilos: nuevos, idx: wizIdx + 1 });
       } else {
+        // se configuraron todos: el onboarding terminó
+        borrarOnboarding();
+        setNuevos([]);
+        setWizIdx(0);
         const idx = actualizada.pupilos.findIndex((p) => p.id === nuevos[0]?.id);
         setEnfocado(idx >= 0 ? idx : 0);
-        router.push("/panel");
+        // En el primer onboarding no hay nada que elegir: el siguiente paso
+        // conocido es el diagnóstico. Con varios estudiantes, el panel deja
+        // que el apoderado decida con cuál continuar.
+        router.push(actualizada.pupilos.length === 1 ? "/diagnostico" : "/panel");
       }
     },
     [cuenta, wizIdx, nuevos, router]
@@ -239,6 +302,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const agregarHijo = useCallback(() => {
     setNuevos([]);
+    setWizIdx(0);
+    borrarOnboarding();
     router.push("/registro");
   }, [router]);
 
@@ -275,9 +340,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [cuenta, enfocado, foco, router]
   );
 
+  // Al cerrar sesión no queda NADA de este apoderado en el dispositivo: ni la
+  // cuenta ni un onboarding a medias (si no, el siguiente que entre se
+  // encontraría configurando hijos que no son suyos).
   const alCerrarSesionAuth = useCallback(() => {
     borrarCuenta();
+    borrarOnboarding();
     setCuenta(null);
+    setNuevos([]);
+    setWizIdx(0);
     void authClient.signOut();
     router.replace("/landing");
   }, [router]);
@@ -285,8 +356,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const alSalirModoAlumno = useCallback(() => {
     borrarSesionAlumno();
     borrarCuenta();
+    borrarOnboarding();
     setSesionAlumno(null);
     setCuenta(null);
+    setNuevos([]);
+    setWizIdx(0);
     router.replace("/landing");
   }, [router]);
 
@@ -301,16 +375,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const cargarPrueba = useCallback(() => {
     const c = cuentaDePrueba();
     guardarCuenta(c);
+    borrarOnboarding();
     setCuenta(c);
     setNuevos([]);
+    setWizIdx(0);
     setEnfocado(0);
     router.push("/panel");
   }, [router]);
 
   const limpiarTodo = useCallback(() => {
     borrarCuenta();
+    borrarOnboarding();
     setCuenta(null);
     setNuevos([]);
+    setWizIdx(0);
     setEnfocado(0);
     router.push("/registro");
   }, [router]);
@@ -326,6 +404,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     cargando: cargando || isPending,
     nuevos,
     wizIdx,
+    onboardingListo,
     setCuenta,
     setFoco,
     setEnfocado,

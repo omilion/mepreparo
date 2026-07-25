@@ -69,7 +69,7 @@ export function MapaEtapas({
 
   return (
     <div
-      className="mx-auto flex max-w-zen flex-col gap-7 px-[22px] pb-24 pt-8"
+      className="zen-page flex flex-col gap-7 pb-24 pt-8"
       style={{
         "--materia-primary": theme.primary,
         "--materia-primary-deep": theme.primaryDeep,
@@ -133,7 +133,7 @@ export function MapaEtapas({
         </Reveal>
       ) : (
         <Reveal delay={300}>
-          <ol className="relative mx-auto flex w-full max-w-[420px] flex-col">
+          <ol className="relative mx-auto flex w-full max-w-[420px] flex-col md:max-w-[540px]">
             {etapas.map((e, i) => (
               <NodoEtapa
                 key={e.tema}

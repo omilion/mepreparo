@@ -30,7 +30,7 @@ export function PanelHijos({
 }) {
   const [pupiloAcceso, setPupiloAcceso] = useState<PerfilNino | null>(null);
   return (
-    <div className="mx-auto flex max-w-zen flex-col gap-[26px] px-[22px] pb-24 pt-10">
+    <div className="zen-page flex flex-col gap-[26px] pb-24 pt-10">
       <Reveal variant="lead" delay={80}>
         <header>
           <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
@@ -45,7 +45,9 @@ export function PanelHijos({
       </Reveal>
 
       <Reveal delay={480}>
-        <div className="flex flex-col gap-3">
+        {/* en tablet las tarjetas se reparten en dos columnas: una lista de
+            tarjetas anchas apiladas desperdicia el ancho que ahora tenemos */}
+        <div className="grid gap-3 md:grid-cols-2">
           {cuenta.pupilos.map((p, i) => (
             <TarjetaPupilo
               key={p.id}
@@ -60,7 +62,9 @@ export function PanelHijos({
             onClick={onAgregar}
             className="rounded-zen border border-dashed border-hair px-5 py-4 text-[14px] text-sage-deep transition-colors hover:border-sage"
           >
-            + Agregar otro estudiante
+            {cuenta.pupilos.length === 0
+              ? "+ Agregar un estudiante"
+              : "+ Agregar otro estudiante"}
           </button>
         </div>
       </Reveal>

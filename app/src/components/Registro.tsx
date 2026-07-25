@@ -33,7 +33,7 @@ export function Registro({
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col items-center justify-center gap-[30px] px-[22px] pb-24 pt-10 text-center">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-[30px] pb-24 pt-10 text-center">
       <header>
         <Reveal variant="lead" delay={80}>
           <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
@@ -52,7 +52,7 @@ export function Registro({
       </header>
 
       <Reveal delay={950}>
-      <section className="flex w-[300px] max-w-full flex-col gap-3 text-left">
+      <section className="flex w-[300px] max-w-full flex-col gap-3 text-left md:w-[400px]">
         {nombres.map((nombre, i) => (
           <div key={i} className="flex items-center gap-3">
             <span className="w-6 text-center font-mono text-[13px] tabular-nums text-ink-soft">
@@ -93,7 +93,7 @@ export function Registro({
       </Reveal>
 
       <Reveal delay={1150}>
-        <div className="w-[280px] max-w-full">
+        <div className="w-[280px] max-w-full md:w-[360px]">
           <button
             type="button"
             onClick={continuar}

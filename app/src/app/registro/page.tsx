@@ -9,7 +9,7 @@ export default function RegistroRuta() {
 
   return (
     <main className="min-h-screen">
-      <TopBar />
+      <TopBar mostrarHome={false} />
       <Registro onListo={alRegistrar} />
     </main>
   );

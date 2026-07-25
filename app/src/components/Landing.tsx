@@ -1,12 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Reveal } from "./Reveal";
 import { calcularPrecio, clp, DESCUENTO_ANUAL } from "@/lib/precios";
+import { AuraOrb } from "./AuraOrb";
+import { TextoRevelado } from "./TextoRevelado";
+import { IconoZen } from "./IconoZen";
 
-// Landing de venta. Se muestra en "/" a visitantes sin sesión. El CTA lleva al
-// registro (AuthForm). Regla de marca: NUNCA decir "inteligencia artificial" —
-// hablamos de un "tutor inteligente" que conoce a cada niño.
+// Typewriter helper para la demo de Rai en el Hero
+function TypewriterText({ texto, velocidad = 50 }: { texto: string; velocidad?: number }) {
+  const [visible, setVisible] = useState("");
+  useEffect(() => {
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < texto.length) {
+        setVisible(texto.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(interval);
+      }
+    }, velocidad);
+    return () => clearInterval(interval);
+  }, [texto, velocidad]);
+
+  return <span>{visible}</span>;
+}
+
+// Helper para animación de entrada palabra por palabra (fade-up por palabra)
+function FadeUpWords({ texto, delayBase = 300, stagger = 180 }: { texto: string; delayBase?: number; stagger?: number }) {
+  const words = texto.split(" ");
+  return (
+    <span className="inline-block">
+      {words.map((word, i) => (
+        <span
+          key={i}
+          className="inline-block opacity-0 animate-fade-up-word mr-[0.25em]"
+          style={{
+            animationDelay: `${delayBase + i * stagger}ms`,
+            animationFillMode: "forwards",
+          }}
+        >
+          {word}
+        </span>
+      ))}
+      <style jsx>{`
+        @keyframes fadeUpWord {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-up-word {
+          animation: fadeUpWord 0.9s cubic-bezier(.22, 1, .36, 1);
+        }
+      `}</style>
+    </span>
+  );
+}
 
 export function Landing({
   onComenzar,
@@ -16,86 +70,60 @@ export function Landing({
   onProbar: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-zen px-[22px] pb-28">
+    <div className="zen-page pb-28">
       <Hero onComenzar={onComenzar} onProbar={onProbar} />
       <RumboAlExamen />
-      <Valor />
+      <SeccionTutor />
+      <SeccionPlanExamen />
+      <SeccionValorTypewriter />
+      <SeccionApoderado />
       <ComoFunciona />
       <Precios onComenzar={onComenzar} />
+      <SeccionSonidoFoco />
+      <Faq />
       <CierreCTA onComenzar={onComenzar} />
     </div>
   );
 }
 
-// ---------------------------------------------------------------- Rumbo al examen
-// El examen libre ES la meta: esta sección organiza la promesa alrededor de
-// la fecha y los temarios oficiales, no del producto.
-const RUMBO = [
-  {
-    titulo: "La fecha del examen manda",
-    texto:
-      "Ingresas la fecha en que tu hijo rinde y el plan calcula cuántas horas necesita por materia para llegar a tiempo. Si el tiempo aprieta, te lo decimos altiro.",
-    urgente: true,
-  },
-  {
-    titulo: "Se estudia lo que el examen evalúa",
-    texto:
-      "Trabajamos sobre los temarios oficiales de los exámenes de validación de estudios y las bases curriculares de cada curso. Nada de contenido de relleno.",
-    urgente: false,
-  },
-  {
-    titulo: "Primero, cerrar las brechas",
-    texto:
-      "Un diagnóstico corto detecta exactamente qué le falta a tu hijo para el examen, y el estudio parte por ahí: lo urgente primero.",
-    urgente: false,
-  },
-];
-
 function RumboAlExamen() {
   return (
-    <section className="border-t border-hair py-16">
-      <Reveal delay={80}>
-        <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-clay">
-          La meta
+    <section className="border-t border-hair py-20 text-center">
+      <Reveal delay={150}>
+        <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-clay">
+          Respaldo Curricular
         </div>
       </Reveal>
-      <Reveal delay={140}>
-        <h2 className="mb-10 max-w-[22ch] text-[28px]">
-          Todo apunta a un solo día: el del examen
+      <Reveal delay={400}>
+        <h2 className="mx-auto mb-8 max-w-[28ch] font-serif text-[32px] sm:text-[40px] leading-[1.15]">
+          Preparación oficial y rigurosa alineada al currículum del MINEDUC
         </h2>
       </Reveal>
+      <Reveal delay={800}>
+        <p className="mx-auto mb-12 max-w-[62ch] text-[17px] leading-[1.6] text-ink-soft">
+          El examen de validación de estudios es exigente y evalúa contenidos específicos.
+          Por eso, estructuramos todo el material basándonos directamente en las <strong>Bases Curriculares vigentes de Chile</strong>
+          y los temarios oficiales de la Unidad de Currículum y Evaluación (UCE) del Ministerio de Educación. Tu hijo no perderá tiempo
+          con materias de relleno; estudiará exactamente lo que mide la prueba.
+        </p>
+      </Reveal>
 
-      <div className="flex flex-col gap-8">
-        {RUMBO.map((r, i) => (
-          <Reveal key={r.titulo} delay={220 + i * 100}>
-            <div className="flex gap-4">
-              <div
-                className={
-                  "mt-1.5 h-[10px] w-[10px] flex-none rounded-full " +
-                  (r.urgente ? "bg-clay" : "bg-sage")
-                }
-                aria-hidden
-              />
-              <div>
-                <h3 className="text-[18px]">{r.titulo}</h3>
-                <p className="mt-1.5 max-w-[52ch] text-[14.5px] leading-[1.5] text-ink-soft">
-                  {r.texto}
-                </p>
-              </div>
+      <div className="mx-auto flex max-w-[450px] flex-col items-center gap-4 text-center text-[16.5px] sm:text-[18px] font-medium text-ink">
+        {[
+          "100% Bases Curriculares MINEDUC",
+          "Temarios oficiales vigentes",
+          "Enfoque en rendimiento y aprobación",
+          "Pensado para niños de todas las edades.",
+          "Se estudia lo que el examen evalúa",
+          "Primero, cerramos las brechas",
+        ].map((bullet, i) => (
+          <Reveal key={bullet} delay={1200 + i * 350}>
+            <div className="flex items-center gap-2">
+              <span className="text-sage-deep">✓</span> {bullet}
             </div>
           </Reveal>
         ))}
       </div>
-
-      {/* franja de datos duros del examen */}
-      <Reveal delay={560}>
-        <div className="mt-10 flex flex-wrap gap-x-7 gap-y-2 border-t border-hair pt-6 text-[13px] text-ink-soft">
-          <span>· 5 materias del examen</span>
-          <span>· 1° a 8° básico</span>
-          <span>· Temarios oficiales de validación de estudios</span>
-          <span>· Plan calculado según tu fecha</span>
-        </div>
-      </Reveal>
     </section>
   );
 }
@@ -109,27 +137,26 @@ function Hero({
   onProbar: () => void;
 }) {
   return (
-    <section className="flex flex-col items-center pt-14 pb-20 text-center">
-      <Reveal variant="lead" delay={60}>
+    <section className="flex min-h-[100vh] flex-col items-center justify-center pt-14 pb-20 text-center">
+      <Reveal variant="lead" delay={150}>
         <div className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.16em] text-sage-deep">
           Exámenes libres · Educación básica 1° a 8° · Chile 2026
         </div>
       </Reveal>
-      <Reveal variant="lead" delay={120}>
-        <h1 className="max-w-[15ch] text-[40px] leading-[1.08] sm:text-[52px]">
-          Que tu hijo apruebe su examen libre
+      <Reveal variant="lead" delay={400}>
+        <h1 className="max-w-[20ch] text-[40px] leading-[1.08] sm:text-[52px]">
+          Exámenes Libres 2026: Que tu hijo apruebe con un plan a su medida
         </h1>
       </Reveal>
-      <Reveal delay={480}>
+      <Reveal delay={900}>
         <p className="mt-6 max-w-[46ch] text-[16.5px] leading-[1.5] text-ink-soft">
-          Con Rai, un tutor inteligente que lo conoce y lo acompaña con un plan
-          a la medida hasta el día del examen. Con el respaldo de las bases
-          curriculares vigentes y los temarios oficiales de los{" "}
-          <strong>exámenes libres en Chile</strong>, tu hijo estudiará en casa
-          con rumbo, calma y confianza.
+          Con Rai, un tutor inteligente que lo acompaña con un plan a la medida
+          y soporte oficial de las bases curriculares de los{" "}
+          <strong>exámenes libres en Chile</strong>. Tu hijo estudiará en casa con rumbo,
+          calma y confianza (¡con soporte de micrófono y voz para pre-lectores!).
         </p>
       </Reveal>
-      <Reveal delay={640}>
+      <Reveal delay={1400}>
         <div className="mt-9 flex flex-col items-center gap-3">
           <button onClick={onComenzar} className="cta px-9">
             Comienza gratis
@@ -149,55 +176,7 @@ function Hero({
   );
 }
 
-// ---------------------------------------------------------------- Valor
-const BENEFICIOS = [
-  {
-    titulo: "Te conoce y te recuerda",
-    texto:
-      "Rai arma contigo un horario semanal, recuerda de qué hablaron la última vez y retoma justo donde quedaron.",
-  },
-  {
-    titulo: "Bases curriculares y profesores expertos",
-    texto:
-      "Nuestros tutores son expertos profesores que estructuran cada clase y explicación según las bases curriculares vigentes para cada curso y los temarios oficiales de exámenes libres en Chile para este año escolar 2026.",
-  },
-  {
-    titulo: "Un plan según la fecha del examen",
-    texto:
-      "Un diagnóstico corto detecta el nivel de tu hijo y calcula cuántas horas necesita por materia para llegar a tiempo.",
-  },
-  {
-    titulo: "El apoderado ve todo",
-    texto:
-      "Sigues el avance de cada hijo: horario, resumen de cada sesión, tiempo de estudio y en qué necesita apoyo.",
-  },
-];
-
-function Valor() {
-  return (
-    <section className="border-t border-hair py-16">
-      <Reveal delay={80}>
-        <h2 className="mb-10 max-w-[22ch] text-[28px]">
-          No es una app de ejercicios. Es alguien que estudia con tu hijo hasta
-          el examen.
-        </h2>
-      </Reveal>
-      <div className="grid gap-x-8 gap-y-9 sm:grid-cols-2">
-        {BENEFICIOS.map((b, i) => (
-          <Reveal key={b.titulo} delay={200 + i * 90}>
-            <div>
-              <div className="mb-2 h-[3px] w-8 rounded-full bg-sage" />
-              <h3 className="text-[18px]">{b.titulo}</h3>
-              <p className="mt-2 text-[14.5px] leading-[1.5] text-ink-soft">
-                {b.texto}
-              </p>
-            </div>
-          </Reveal>
-        ))}
-      </div>
-    </section>
-  );
-}
+// Valor y beneficios integrados directamente como secciones completas.
 
 // ---------------------------------------------------------------- Cómo funciona
 const PASOS = [
@@ -221,17 +200,17 @@ const PASOS = [
 function ComoFunciona() {
   return (
     <section className="border-t border-hair py-16">
-      <Reveal delay={80}>
+      <Reveal delay={150}>
         <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
           Cómo funciona
         </div>
       </Reveal>
-      <Reveal delay={140}>
+      <Reveal delay={400}>
         <h2 className="mb-10 text-[28px]">En tres pasos simples</h2>
       </Reveal>
       <div className="grid gap-8 sm:grid-cols-3">
         {PASOS.map((p, i) => (
-          <Reveal key={p.n} delay={220 + i * 100}>
+          <Reveal key={p.n} delay={800 + i * 400}>
             <div className="flex flex-col gap-2">
               <span className="font-serif text-[34px] text-sage">{p.n}</span>
               <h3 className="text-[18px]">{p.titulo}</h3>
@@ -252,23 +231,23 @@ function Precios({ onComenzar }: { onComenzar: () => void }) {
 
   return (
     <section className="border-t border-hair py-16">
-      <Reveal delay={80}>
+      <Reveal delay={150}>
         <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
           Precios
         </div>
       </Reveal>
-      <Reveal delay={140}>
+      <Reveal delay={400}>
         <h2 className="mb-3 text-[28px]">Un precio justo por familia</h2>
       </Reveal>
-      <Reveal delay={200}>
+      <Reveal delay={800}>
         <p className="mb-8 max-w-[44ch] text-[15px] leading-[1.5] text-ink-soft">
           {clp(9990)} por estudiante al mes. Con más de un hijo, cada uno paga
           menos. Y pagando al año, un {Math.round(DESCUENTO_ANUAL * 100)}%
-          adicional de descuento.
+          adicional de descuento. Opcional: Add-on de Voz Completa para pre-lectores por {clp(5990)} al mes.
         </p>
       </Reveal>
 
-      <Reveal delay={280}>
+      <Reveal delay={1200}>
         <div className="rounded-[18px] border border-hair bg-surface/60 p-6 sm:p-8">
           {/* Toggle mensual / anual — muy claro */}
           <div className="mb-7 flex justify-center">
@@ -349,7 +328,7 @@ function Precios({ onComenzar }: { onComenzar: () => void }) {
         </div>
       </Reveal>
 
-      <Reveal delay={360}>
+      <Reveal delay={1600}>
         <p className="mt-5 text-center text-[12.5px] text-ink-soft">
           Descuento familiar: 2° estudiante 10% · 3° 15% · 4° o más 20% cada uno.
         </p>
@@ -385,16 +364,319 @@ function BotonN({
   );
 }
 
+// ---------------------------------------------------------------- Seccion Tutor (Rai)
+function SeccionTutor() {
+  const [mostrarTexto, setMostrarTexto] = useState(false);
+
+  return (
+    <section className="border-t border-hair py-20 bg-surface/10 rounded-[24px] my-4 px-6 sm:px-10">
+      <div className="flex flex-col items-center text-center">
+        <Reveal delay={150}>
+          <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
+            El Acompañante de Estudio
+          </div>
+        </Reveal>
+        <Reveal delay={400}>
+          <h2 className="mb-6 text-[32px] sm:text-[40px] max-w-[24ch] font-serif">
+            Te conoce, te escucha y te recuerda
+          </h2>
+        </Reveal>
+        <Reveal delay={800}>
+          <p className="mb-8 max-w-[62ch] text-[16.5px] leading-[1.6] text-ink-soft">
+            Rai no es un software estático; es un tutor interactivo que acompaña de forma cercana a tu hijo en cada paso:
+          </p>
+        </Reveal>
+
+        <div className="mb-10 flex flex-col items-center gap-4 text-[16px] text-ink-soft font-medium max-w-[500px]">
+          <Reveal delay={1100}>
+            <div className="flex items-start gap-2.5 text-left">
+              <span className="text-sage-deep mt-0.5">✦</span>
+              <span><strong className="text-ink">Plan Personalizado:</strong> Diseña y ajusta el ritmo de estudio según las fortalezas y necesidades de aprendizaje de tu hijo.</span>
+            </div>
+          </Reveal>
+          <Reveal delay={1450}>
+            <div className="flex items-start gap-2.5 text-left">
+              <span className="text-sage-deep mt-0.5">✦</span>
+              <span><strong className="text-ink">Ejercicios Interactivos:</strong> Genera dinámicas dinámicas (como sopas de letras y conectores) para evitar la fatiga y mantener el foco.</span>
+            </div>
+          </Reveal>
+          <Reveal delay={1800}>
+            <div className="flex items-start gap-2.5 text-left">
+              <span className="text-sage-deep mt-0.5">✦</span>
+              <span><strong className="text-ink">Soporte de Voz:</strong> Los niños más pequeños (1° y 2° básico) conversan usando el micrófono, eliminando barreras de lectura.</span>
+            </div>
+          </Reveal>
+        </div>
+
+        <Reveal 
+          delay={2600} 
+          onVisible={() => {
+            setTimeout(() => {
+              setMostrarTexto(true);
+            }, 800);
+          }}
+        >
+          <div className="flex flex-col items-center gap-4 my-4 min-w-[280px] sm:min-w-[400px]">
+            <AuraOrb materia="matematica" activa size={120} />
+            <p className="font-serif text-[21px] text-sage-deep min-h-[32px] italic mt-2 text-center">
+              {mostrarTexto ? <TextoRevelado texto="Hola, soy Rai. Hoy nos toca Matemática." stagger={0.25} /> : ""}
+            </p>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- Plan según fecha
+function SeccionPlanExamen() {
+  return (
+    <section className="border-t border-hair py-20 text-center">
+      <Reveal delay={150}>
+        <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-clay">
+          Planificación Inteligente
+        </div>
+      </Reveal>
+      <Reveal delay={400}>
+        <h2 className="mx-auto mb-6 max-w-[24ch] font-serif text-[32px] sm:text-[40px]">
+          Un plan según la fecha del examen
+        </h2>
+      </Reveal>
+      <Reveal delay={800}>
+        <p className="mx-auto mb-10 max-w-[62ch] text-[16.5px] leading-[1.6] text-ink-soft">
+          Calculamos la ruta de estudio exacta para que tu hijo rinde con calma y preparación completa:
+        </p>
+      </Reveal>
+
+      <div className="mx-auto flex max-w-[500px] flex-col items-center gap-4 text-center text-[16px] text-ink font-medium">
+        <Reveal delay={1150}>
+          <div className="flex items-start gap-3 text-left bg-surface/30 p-4 rounded-xl w-full">
+            <span className="text-clay font-bold text-[18px]">1.</span>
+            <div>
+              <h4 className="text-[17px] font-semibold text-ink">Diagnóstico Adaptativo</h4>
+              <p className="text-[14px] text-ink-soft mt-1 leading-[1.4]">Una prueba corta y guiada detecta el nivel real en cada asignatura en pocos minutos.</p>
+            </div>
+          </div>
+        </Reveal>
+        <Reveal delay={1500}>
+          <div className="flex items-start gap-3 text-left bg-surface/30 p-4 rounded-xl w-full">
+            <span className="text-clay font-bold text-[18px]">2.</span>
+            <div>
+              <h4 className="text-[17px] font-semibold text-ink">Cálculo de Horas Semanales</h4>
+              <p className="text-[14px] text-ink-soft mt-1 leading-[1.4]">El motor procesa el tiempo disponible hasta el examen y planifica cuántas horas necesita estudiar por materia.</p>
+            </div>
+          </div>
+        </Reveal>
+        <Reveal delay={1850}>
+          <div className="flex items-start gap-3 text-left bg-surface/30 p-4 rounded-xl w-full">
+            <span className="text-clay font-bold text-[18px]">3.</span>
+            <div>
+              <h4 className="text-[17px] font-semibold text-ink">Alerta Preventiva</h4>
+              <p className="text-[14px] text-ink-soft mt-1 leading-[1.4]">Si los plazos son demasiado cortos o el ritmo de estudio no es suficiente, te lo notificamos altiro para ajustar el rumbo.</p>
+            </div>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- Valor (Tutor AI vs App ejercicios)
+function SeccionValorTypewriter() {
+  return (
+    <section className="border-t border-hair py-24 text-center bg-surface/5 rounded-[24px] my-4 px-6">
+      <h2 className="mx-auto max-w-[32ch] text-[34px] sm:text-[46px] font-serif leading-[1.25] text-ink">
+        <FadeUpWords 
+          texto="No es una app de ejercicios. Es tutor que estudia con tu hijo hasta el examen." 
+          delayBase={300}
+          stagger={300}
+        />
+      </h2>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- Apoderado
+function SeccionApoderado() {
+  return (
+    <section className="border-t border-hair py-20 text-center">
+      <Reveal delay={150}>
+        <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
+          Panel de Control
+        </div>
+      </Reveal>
+      <Reveal delay={400}>
+        <h2 className="mx-auto mb-6 max-w-[24ch] font-serif text-[32px] sm:text-[40px]">
+          El apoderado ve todo
+        </h2>
+      </Reveal>
+      <Reveal delay={800}>
+        <p className="mx-auto mb-10 max-w-[62ch] text-[16.5px] leading-[1.6] text-ink-soft">
+          Acompaña el progreso de tus hijos con total claridad y sin necesidad de supervisión intrusiva:
+        </p>
+      </Reveal>
+
+      <div className="mx-auto flex max-w-[480px] flex-col items-center gap-5 text-center text-[16px] text-ink-soft font-medium">
+        <Reveal delay={1150}>
+          <div className="flex items-start gap-3 text-left">
+            <span className="text-sage-deep text-[20px] leading-none">✓</span>
+            <div>
+              <strong className="text-ink">Reporte de Sesión:</strong> Un resumen pedagógico automático redactado por Rai al final de cada tutoría.
+            </div>
+          </div>
+        </Reveal>
+        <Reveal delay={1500}>
+          <div className="flex items-start gap-3 text-left">
+            <span className="text-sage-deep text-[20px] leading-none">✓</span>
+            <div>
+              <strong className="text-ink">Hábitos y Tiempos:</strong> Monitoreo simple del tiempo de estudio diario y cumplimiento de metas semanales.
+            </div>
+          </div>
+        </Reveal>
+        <Reveal delay={1850}>
+          <div className="flex items-start gap-3 text-left">
+            <span className="text-sage-deep text-[20px] leading-none">✓</span>
+            <div>
+              <strong className="text-ink">Foco en Brechas:</strong> Visualización directa de qué objetivos de aprendizaje (OA) específicos necesitan más apoyo.
+            </div>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- Sonidos de Foco / Concentración
+function SeccionSonidoFoco() {
+  return (
+    <section className="border-t border-hair py-20 text-center bg-surface/5 rounded-[24px] my-4 px-6 sm:px-10">
+      <Reveal delay={150}>
+        <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-clay">
+          Foco y Calma
+        </div>
+      </Reveal>
+      <Reveal delay={400}>
+        <h2 className="mx-auto mb-6 max-w-[24ch] font-serif text-[32px] sm:text-[40px]">
+          Sonido ambiental para la concentración
+        </h2>
+      </Reveal>
+      <Reveal delay={800}>
+        <p className="mx-auto mb-10 max-w-[62ch] text-[16.5px] leading-[1.6] text-ink-soft">
+          Integramos un sistema de sonido con base científica diseñado para niños que necesitan aislar distracciones y calmar la ansiedad:
+        </p>
+      </Reveal>
+
+      <div className="mx-auto flex max-w-[460px] flex-col items-center gap-4 text-[16px] text-ink-soft font-medium">
+        <Reveal delay={1150}>
+          <div className="flex items-center justify-between w-full bg-surface/30 px-5 py-3 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <IconoZen nombre="musica" size={20} className="text-sage-deep" />
+              <span className="text-ink font-semibold">Lira Clásica</span>
+            </div>
+            <span className="text-[13.5px] text-ink-soft">Estímulo armónico y relajante</span>
+          </div>
+        </Reveal>
+        <Reveal delay={1500}>
+          <div className="flex items-center justify-between w-full bg-surface/30 px-5 py-3 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <IconoZen nombre="viento" size={20} className="text-sage-deep" />
+              <span className="text-ink font-semibold">Ruido Blanco</span>
+            </div>
+            <span className="text-[13.5px] text-ink-soft">Aislamiento acústico del entorno</span>
+          </div>
+        </Reveal>
+        <Reveal delay={1850}>
+          <div className="flex items-center justify-between w-full bg-surface/30 px-5 py-3 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <IconoZen nombre="agua" size={20} className="text-sage-deep" />
+              <span className="text-ink font-semibold">Lluvia Natural</span>
+            </div>
+            <span className="text-[13.5px] text-ink-soft">Sonido orgánico de fondo constante</span>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- Q&A / FAQs
+const PREGUNTAS_FRECUENTES = [
+  {
+    pregunta: "¿Qué son los exámenes libres y a quiénes están dirigidos?",
+    respuesta: "Los exámenes libres son un mecanismo oficial del Ministerio de Educación de Chile (MINEDUC) que permite certificar estudios de educación básica o media a personas que no asisten al sistema regular escolar, ya sea por opción familiar (homeschooling, pedagogías alternativas), deporte de alto rendimiento, arte, o salud.",
+  },
+  {
+    pregunta: "¿Cómo se asegura Rai de cubrir los temarios oficiales?",
+    respuesta: "Rai se conecta directamente con una base de datos documental que contiene las Bases Curriculares oficiales de Chile y los temarios vigentes publicados por el MINEDUC. El plan de estudio se adapta a esos objetivos de aprendizaje (OA) específicos, enfocándose estrictamente en lo que el examen de validación de estudios va a medir.",
+  },
+  {
+    pregunta: "¿Cómo funciona la interacción por voz para niños que no saben leer?",
+    respuesta: "Para niños de 1° y 2° básico (o quienes lo requieran), ofrecemos el Add-on de Voz Completa. El niño simplemente presiona un botón de micrófono, habla directamente a Rai (Rai procesa el audio y entiende la respuesta) y Rai le contesta hablando con voz clara y pausada. Esto elimina las barreras de lectura y la frustración tecnológica.",
+  },
+  {
+    pregunta: "¿El primer mes es realmente gratuito? ¿Necesito tarjeta de crédito?",
+    respuesta: "Sí, el primer mes es 100% gratuito para que puedas probar la metodología y el tutor con tranquilidad. No solicitamos tarjetas de crédito ni datos bancarios para iniciar. Si decides continuar después del mes de prueba, podrás seleccionar y pagar el plan mensual o anual que prefieras.",
+  },
+  {
+    pregunta: "¿Qué control tiene el apoderado sobre el proceso?",
+    respuesta: "Los padres tienen acceso a un panel de control exclusivo donde pueden ver en tiempo real la cantidad de sesiones realizadas, el tiempo de estudio diario, los resúmenes pedagógicos que genera Rai al final de cada tutoría, los temas dominados y las brechas que necesitan mayor apoyo académico.",
+  },
+];
+
+function Faq() {
+  const [abierto, setAbierto] = useState<number | null>(null);
+
+  return (
+    <section className="border-t border-hair py-20">
+      <Reveal delay={150}>
+        <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
+          Preguntas Frecuentes
+        </div>
+      </Reveal>
+      <Reveal delay={400}>
+        <h2 className="mb-10 text-[32px] sm:text-[40px] font-serif">Dudas frecuentes</h2>
+      </Reveal>
+
+      <div className="flex flex-col gap-4">
+        {PREGUNTAS_FRECUENTES.map((faq, i) => {
+          const isOpen = abierto === i;
+          return (
+            <Reveal key={i} delay={800 + i * 350}>
+              <div className="border-b border-hair/60 pb-4">
+                <button
+                  type="button"
+                  onClick={() => setAbierto(isOpen ? null : i)}
+                  className="flex w-full items-center justify-between text-left py-2 focus:outline-none"
+                >
+                  <span className="text-[17px] font-medium text-ink">{faq.pregunta}</span>
+                  <span className="text-[20px] text-sage-deep">{isOpen ? "−" : "+"}</span>
+                </button>
+                <div
+                  className={`mt-2 text-[14.5px] leading-[1.6] text-ink-soft overflow-hidden transition-all duration-300 ${
+                    isOpen ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+                  }`}
+                >
+                  {faq.respuesta}
+                </div>
+              </div>
+            </Reveal>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------- Cierre
 function CierreCTA({ onComenzar }: { onComenzar: () => void }) {
   return (
     <section className="border-t border-hair py-16 text-center">
-      <Reveal delay={80}>
+      <Reveal delay={150}>
         <h2 className="mx-auto max-w-[22ch] text-[30px]">
           El examen tiene fecha. La preparación empieza hoy.
         </h2>
       </Reveal>
-      <Reveal delay={220}>
+      <Reveal delay={500}>
         <button onClick={onComenzar} className="cta mt-8 px-9">
           Crear mi cuenta
         </button>

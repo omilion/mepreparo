@@ -71,7 +71,7 @@ export function Diagnostico({
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col items-center justify-center gap-[26px] px-[22px] pb-24 pt-6 text-center">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-[26px] pb-24 pt-6 text-center">
       <Reveal variant="lead" delay={80}>
         <header>
           <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
@@ -91,7 +91,7 @@ export function Diagnostico({
       </Reveal>
 
       <Reveal delay={560}>
-        <div className="flex w-[320px] max-w-full flex-col gap-2.5">
+        <div className="flex w-[320px] max-w-full flex-col gap-2.5 md:w-[440px]">
           {materias.map((m) => {
             const label = MATERIAS.find((x) => x.id === m)?.label ?? m;
             const superada = !!hechas[m];
@@ -123,7 +123,7 @@ export function Diagnostico({
       </Reveal>
 
       <Reveal delay={760}>
-        <div className="flex w-[300px] max-w-full flex-col items-center gap-3">
+        <div className="flex w-[300px] max-w-full flex-col items-center gap-3 md:w-[380px]">
           <p className="text-[12.5px] tabular-nums text-ink-soft">
             {completas} de {materias.length} completadas
           </p>
@@ -131,7 +131,7 @@ export function Diagnostico({
             type="button"
             onClick={verResultados}
             disabled={!todasListas}
-            className="cta w-[280px] max-w-full disabled:cursor-not-allowed disabled:opacity-40"
+            className="cta w-[280px] max-w-full disabled:cursor-not-allowed disabled:opacity-40 md:w-[360px]"
           >
             Ver mis resultados
           </button>

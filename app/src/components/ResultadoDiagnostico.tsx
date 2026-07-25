@@ -49,7 +49,7 @@ export function ResultadoDiagnostico({
   const materias = perfil.examen.materias;
 
   return (
-    <div className="mx-auto flex max-w-zen flex-col gap-[26px] px-[22px] pb-24 pt-10">
+    <div className="zen-page flex flex-col gap-[26px] pb-24 pt-10">
       <Reveal variant="lead" delay={80}>
         <header>
           <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
@@ -64,7 +64,7 @@ export function ResultadoDiagnostico({
       </Reveal>
 
       <Reveal delay={520}>
-        <div className="flex flex-col gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {materias.map((m) => (
             <FilaMateria key={m} materia={m} r={diag[m]} />
           ))}
@@ -72,7 +72,7 @@ export function ResultadoDiagnostico({
       </Reveal>
 
       <Reveal delay={760}>
-        <div className="flex flex-col gap-3">
+        <div className="mx-auto flex w-full max-w-[420px] flex-col gap-3">
           <button type="button" className="cta" onClick={onVerPlan}>
             Ver el plan de estudio
           </button>

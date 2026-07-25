@@ -100,7 +100,7 @@ export function DiagnosticoMateria({
 
   if (cargando && !pregunta) {
     return (
-      <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen items-center justify-center px-[22px]">
+      <div className="zen-page flex min-h-[calc(100vh-58px)] items-center justify-center">
         <p className="text-ink-soft">Preparando pregunta…</p>
       </div>
     );
@@ -108,14 +108,14 @@ export function DiagnosticoMateria({
 
   if (!pregunta) {
     return (
-      <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen items-center justify-center px-[22px]">
+      <div className="zen-page flex min-h-[calc(100vh-58px)] items-center justify-center">
         <p className="text-ink-soft">Finalizando diagnóstico…</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col px-[22px] pb-20">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-20">
       {/* avance dentro de la materia */}
       <div className="flex h-12 items-center justify-center gap-1.5" aria-hidden>
         {Array.from({ length: 8 }).map((_, i) => (
@@ -151,7 +151,7 @@ export function DiagnosticoMateria({
         </Reveal>
 
         <Reveal delay={D_CUERPO}>
-          <div className="mt-8 flex w-[320px] max-w-full flex-col gap-2.5 text-left">
+          <div className="mt-8 flex w-[320px] max-w-full flex-col gap-2.5 text-left md:w-[460px]">
             {pregunta.opciones.map((op, i) => (
               <button
                 key={i}

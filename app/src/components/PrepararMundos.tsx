@@ -82,7 +82,7 @@ export function PrepararMundos({
 
   return (
     <div
-      className="mx-auto flex max-w-zen flex-col items-center justify-center gap-8 px-[22px] text-center"
+      className="zen-page flex flex-col items-center justify-center gap-8 text-center"
       style={{ height: "100dvh" }}
     >
       <AuraOrb materia={materiaEsfera} activa size={132} />

@@ -5,11 +5,19 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/app/AppProvider";
 
 // Header sin contenedor: logo + botones flotando sobre el fondo, sin borde ni blur.
-export function TopBar() {
+export function TopBar({
+  // Durante el onboarding (anotar hijos y configurarlos) el Home se oculta: ahí
+  // saca al apoderado del flujo y los hijos que aún no pasan por el wizard
+  // quedan botados sin que se entere. Ese camino tiene sus propias salidas.
+  mostrarHome = true,
+}: {
+  mostrarHome?: boolean;
+}) {
   const router = useRouter();
   const { sesionAlumno, setPinBloqueado } = useApp();
 
-  const handleHome = sesionAlumno ? undefined : () => router.push("/panel");
+  const handleHome =
+    sesionAlumno || !mostrarHome ? undefined : () => router.push("/panel");
   const handleCuenta = sesionAlumno ? undefined : () => router.push("/cuenta");
   const handleLock =
     sesionAlumno && sesionAlumno.tienePin
@@ -18,7 +26,7 @@ export function TopBar() {
   const nombreAlumno = sesionAlumno ? sesionAlumno.nombre : undefined;
 
   return (
-    <div className="mx-auto flex h-[58px] max-w-zen items-center justify-between px-[22px]">
+    <div className="zen-page flex h-[58px] items-center justify-between">
       <div className="flex items-center gap-2.5 font-serif text-[19px]">
         <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" aria-hidden>
           <path

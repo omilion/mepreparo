@@ -118,7 +118,7 @@ export function AuthForm({
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col items-center justify-center gap-[30px] px-[22px] pb-24 pt-10 text-center">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-[30px] pb-24 pt-10 text-center">
       <header>
         <Reveal variant="lead" delay={80}>
           <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
@@ -140,7 +140,7 @@ export function AuthForm({
       </header>
 
       <Reveal delay={600}>
-        <form onSubmit={handleSubmit} className="flex w-[320px] max-w-full flex-col gap-4 text-left">
+        <form onSubmit={handleSubmit} className="flex w-[320px] max-w-full flex-col gap-4 text-left md:w-[420px]">
           {error && (
             <div className="rounded-lg bg-clay/10 p-3 text-[13px] text-clay border border-clay/20 leading-snug">
               {error}

@@ -13,9 +13,11 @@ import { IconoZen } from "./IconoZen";
 export const TextoRevelado = memo(function TextoRevelado({
   texto,
   onTick,
+  stagger = 0.09,
 }: {
   texto: string;
   onTick?: () => void;
+  stagger?: number;
 }) {
   useEffect(() => {
     // Al inyectarse todo el texto en el DOM, la altura final es instantánea.
@@ -48,7 +50,7 @@ export const TextoRevelado = memo(function TextoRevelado({
             key={idx}
             className="palabra-zen-fade"
             style={{
-              animationDelay: `${currentDelayIndex * 0.09}s`,
+              animationDelay: `${currentDelayIndex * stagger}s`,
             }}
           >
             {matchIcono ? (

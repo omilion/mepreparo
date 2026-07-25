@@ -7,6 +7,7 @@ import type { Cuenta, PerfilNino } from "./profile";
 
 const KEY = "mp-cuenta";
 const ALUMNO_KEY = "mp-alumno-sesion";
+const ONBOARDING_KEY = "mp-onboarding";
 
 export interface SesionAlumno {
   token: string;
@@ -41,6 +42,45 @@ export function borrarSesionAlumno(): void {
 
 function disponible(): boolean {
   return typeof window !== "undefined" && !!window.localStorage;
+}
+
+// --- Onboarding en curso (hijos anotados que aún no pasan por el wizard) ---
+//
+// Antes esto vivía SOLO en memoria: si el apoderado recargaba, se le iba la
+// señal o cerraba la pestaña a mitad del wizard, los hijos pendientes
+// desaparecían sin aviso (y con varios hijos, el arranque lo mandaba al panel
+// como si hubiera terminado). Lo persistimos hasta que el wizard se completa.
+
+export interface OnboardingPendiente {
+  pupilos: PerfilNino[]; // los perfiles anotados en /registro, en orden
+  idx: number; // en cuál va el wizard
+}
+
+export function leerOnboarding(): OnboardingPendiente | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(ONBOARDING_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as OnboardingPendiente;
+    if (!data || !Array.isArray(data.pupilos) || data.pupilos.length === 0) return null;
+    // idx fuera de rango = onboarding ya terminado o corrupto
+    if (typeof data.idx !== "number" || data.idx < 0 || data.idx >= data.pupilos.length) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarOnboarding(pendiente: OnboardingPendiente): void {
+  if (!disponible()) return;
+  window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify(pendiente));
+}
+
+export function borrarOnboarding(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(ONBOARDING_KEY);
 }
 
 // --- Cuenta completa ---

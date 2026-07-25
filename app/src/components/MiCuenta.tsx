@@ -31,7 +31,7 @@ export function MiCuenta({
   }
 
   return (
-    <div className="mx-auto flex max-w-zen flex-col gap-[30px] px-[22px] pb-24 pt-10">
+    <div className="zen-page flex flex-col gap-[30px] pb-24 pt-10">
       <Reveal variant="lead" delay={80}>
         <header className="flex items-center justify-between">
           <div>

@@ -117,7 +117,7 @@ export function PruebaEtapa({
     const totalReal = Math.max(1, n);
     const paso = correctos / totalReal >= UMBRAL && totalReal >= 4;
     return (
-      <div className="relative mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col items-center justify-center gap-6 px-[22px] text-center">
+      <div className="zen-page relative flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-6 text-center">
         {paso && <Fireworks />}
         <Reveal variant="lead" delay={80}>
           <h1 className="max-w-[16ch] text-[30px]">
@@ -142,7 +142,7 @@ export function PruebaEtapa({
 
   // --- pregunta en curso ---
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col px-[22px] pb-16">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-16">
       <div className="flex items-center justify-between py-2">
         <button
           onClick={onSalir}
@@ -165,7 +165,7 @@ export function PruebaEtapa({
             <p className="mx-auto max-w-[30ch] font-serif text-[23px] leading-[1.3] text-ink">
               {pregunta.enunciado}
             </p>
-            <div className="flex w-full max-w-[360px] flex-col gap-2.5">
+            <div className="flex w-full max-w-[360px] flex-col gap-2.5 md:max-w-[480px]">
               {pregunta.opciones.map((op, i) => {
                 const esCorrecta = feedback && i === feedback.indiceCorrecto;
                 const esElegidaMala = feedback && i === eleccion && !feedback.acierto;

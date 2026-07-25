@@ -15,6 +15,7 @@ import {
   type RecuerdoNino,
 } from "@/lib/tutor/acuerdo";
 import { AuraOrb } from "./AuraOrb";
+import { useExpresionRai } from "@/lib/tutor/useExpresionRai";
 import { TextoRevelado } from "./TextoRevelado";
 import { HomeButton } from "./HomeButton";
 import { SoundToggle } from "./SoundToggle";
@@ -98,7 +99,13 @@ export function Tutor({
   // la esquina para dar espacio a la conversación (transición fluida).
   const [compacta, setCompacta] = useState(false);
   const [sesionTerminada, setSesionTerminada] = useState(false);
-  const [estadoRai, setEstadoRai] = useState<string | undefined>(undefined);
+  // Lo que EXPRESA la esfera. Dos capas (ver useExpresionRai):
+  //  · `reaccion` — puntual: asiente, celebra, anima, tiene una idea.
+  //  · `faseBase` — de fondo: qué está haciendo Rai en la conversación.
+  const { reaccion, reaccionar } = useExpresionRai();
+  const [faseBase, setFaseBase] = useState<
+    "reposo" | "hablando" | "duda" | "escuchando"
+  >("reposo");
   const finRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
   const inicioSesion = useRef(Date.now());
@@ -113,14 +120,42 @@ export function Tutor({
     scrollAlFinal();
   }, [mensajes, cargando]);
 
-  // Rai INICIA la conversación al entrar (una sola vez) y saluda con un icono
+  // EL FLUJO BASE DE LA ESFERA — se deduce de la conversación, nadie lo agenda:
+  //   habla mientras su texto se revela → si terminó preguntando, se ladea un
+  //   momento (duda) → y queda escuchando, gruesa y quieta, con la palabra en el
+  //   niño. Casi todo el tiempo de una clase Rai vive en estos tres estados.
+  useEffect(() => {
+    const ultimo = mensajes[mensajes.length - 1];
+    if (!ultimo || ultimo.de !== "rai") return;
+    // TextoRevelado revela ~1 palabra cada 90ms + 700ms de fundido de la última.
+    const palabras = ultimo.texto.trim().split(/\s+/).length;
+    const duracion = Math.min(8000, 700 + palabras * 90);
+    // Rai casi siempre cierra invitando a participar; si preguntó, la esfera se
+    // queda un instante en duda antes de abrirse a escuchar.
+    const pregunto = /\?\s*$/.test(ultimo.texto.trim());
+
+    setFaseBase("hablando");
+    const t1 = setTimeout(
+      () => setFaseBase(pregunto ? "duda" : "escuchando"),
+      duracion
+    );
+    const t2 = pregunto
+      ? setTimeout(() => setFaseBase("escuchando"), duracion + 1400)
+      : undefined;
+    return () => {
+      clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mensajes.length]);
+
+  // Rai INICIA la conversación al entrar (una sola vez): la esfera saluda —
+  // se abre, se entibia y lanza un anillo — mientras pide su primer mensaje.
   useEffect(() => {
     if (inicioPedido.current) return;
     inicioPedido.current = true;
-    setEstadoRai("saludo");
-    const t = setTimeout(() => setEstadoRai(undefined), 4000);
+    reaccionar(["saludo", 4200]);
     void saludar();
-    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -153,6 +188,10 @@ export function Tutor({
       void agregarRai(data);
       quizasGuardarHorario(data.horario);
     } catch {
+      // Sin conexión: Rai no está. Se aleja, pierde el color y se apaga de a
+      // poco. No niega — negar sería responderle algo al niño, y aquí no hay
+      // nadie respondiendo.
+      reaccionar(["ausente", 5000]);
       setMensajes([
         {
           de: "rai",
@@ -207,6 +246,7 @@ export function Tutor({
         quizasGuardarHorario(data.horario);
       }
     } catch {
+      reaccionar(["ausente", 5000]); // se cortó: Rai se aleja y se apaga
       setMensajes((m) => [
         ...m,
         { de: "rai", texto: "No pude conectarme. Intenta de nuevo en un momento." },
@@ -273,6 +313,29 @@ export function Tutor({
       },
     ]);
 
+    const llegoActividad = !!(
+      ejercicio || sopa || rueda || intruso || conector || clasificador || secuencia || flashcards
+    );
+
+    // CÓMO ENTRA EL MENSAJE DE RAI:
+    //  · si trae una actividad, la esfera destella una "idea" y lanza un anillo
+    //    justo cuando aparece la tarjeta (la novedad es el juego);
+    //  · si no, y Rai está respondiendo que SÍ o que NO a algo que preguntó el
+    //    niño, la esfera lo dice antes que el texto: asiente o niega. Miramos
+    //    solo el ARRANQUE del mensaje, que es donde va la respuesta directa.
+    const respuesta = (data.respuesta ?? "").trimStart();
+    if (llegoActividad) {
+      reaccionar(["idea", 1900]);
+    } else if (/^[¡"'“]*\s*no\b/i.test(respuesta)) {
+      reaccionar(["no", 1400]);
+    } else if (
+      /^[¡"'“]*\s*(s[íi]|claro|exacto|correcto|as[íi] es|eso es|justo|tal cual)\b/i.test(
+        respuesta
+      )
+    ) {
+      reaccionar(["si", 950]);
+    }
+
     // RED DE SEGURIDAD: Rai prometió una actividad pero no llegó una válida; que
     // no quede el niño esperando un juego que nunca aparece.
     const prometioActividad = !!(
@@ -285,10 +348,8 @@ export function Tutor({
       data.secuenciaTema ||
       data.flashcardsTema
     );
-    const llegoActividad = !!(
-      ejercicio || sopa || rueda || intruso || conector || clasificador || secuencia || flashcards
-    );
     if (prometioActividad && !llegoActividad) {
+      reaccionar(["ausente", 2200]); // se le perdió la actividad: se aleja un momento
       setMensajes((m) => [
         ...m,
         {
@@ -726,6 +787,18 @@ export function Tutor({
     return () => setAccionesDevTutor(null);
   }, [setAccionesDevTutor]);
 
+  // CÓMO REACCIONA RAI A UNA RESPUESTA DEL NIÑO. Un solo lugar para las ocho
+  // actividades, así ninguna se comporta distinto sin querer.
+  //   Acierto → ASIENTE ("sí, es esa") y recién después celebra. El orden
+  //   importa: primero te responde, después festeja.
+  //   Error   → NIEGA (la respuesta no era esa: hay que decírselo claro) y
+  //   enseguida se queda en ánimo — se adelgaza, baja el ritmo y acompaña. El
+  //   "no" es sobre la respuesta; lo que viene después es sobre el niño.
+  function reaccionarARespuesta(acerto: boolean) {
+    if (acerto) reaccionar(["si", 800], ["celebracion", 2600]);
+    else reaccionar(["no", 1300], ["animo", 2800]);
+  }
+
   // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
   // `seleccion` = opciones elegidas. En opción múltiple es 1; en selección
   // múltiple pueden ser varias (se valida el conjunto EXACTO: todo o nada).
@@ -734,8 +807,7 @@ export function Tutor({
     if (!ej || ej.respondido) return;
     const ok = evaluarEjercicio(ej, seleccion);
 
-    setEstadoRai(ok ? "celebracion" : "incorrecto");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    reaccionarARespuesta(ok);
 
     setMensajes((m) =>
       m.map((msg, i) =>
@@ -761,8 +833,7 @@ export function Tutor({
     const it = mensajes[msgIdx]?.intruso;
     if (!it) return;
 
-    setEstadoRai(acerto ? "celebracion" : "incorrecto");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    reaccionarARespuesta(acerto);
 
     if (acuerdo) {
       const tema = it.enunciado.slice(0, 40);
@@ -809,8 +880,7 @@ export function Tutor({
     const c = mensajes[msgIdx]?.conector;
     if (!c || !acuerdo) return;
 
-    setEstadoRai(acerto ? "celebracion" : "incorrecto");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    reaccionarARespuesta(acerto);
 
     const tema = c.enunciado.slice(0, 40);
     const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
@@ -823,8 +893,7 @@ export function Tutor({
     const c = mensajes[msgIdx]?.clasificador;
     if (!c || !acuerdo) return;
 
-    setEstadoRai(acerto ? "celebracion" : "incorrecto");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    reaccionarARespuesta(acerto);
 
     const tema = c.enunciado.slice(0, 40);
     const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
@@ -832,8 +901,8 @@ export function Tutor({
   }
 
   function responderSopa(msgIdx: number) {
-    setEstadoRai("celebracion");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
+    reaccionarARespuesta(true);
     const s = mensajes[msgIdx]?.sopa;
     if (s && acuerdo) {
       const tema = s.palabras[0]?.clean || "sopa de letras";
@@ -843,8 +912,8 @@ export function Tutor({
   }
 
   function responderRueda(msgIdx: number) {
-    setEstadoRai("celebracion");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
+    reaccionarARespuesta(true);
     const r = mensajes[msgIdx]?.rueda;
     if (r && acuerdo) {
       const tema = r.respuesta;
@@ -854,8 +923,8 @@ export function Tutor({
   }
 
   function responderSecuencia(msgIdx: number) {
-    setEstadoRai("celebracion");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
+    reaccionarARespuesta(true);
     const s = mensajes[msgIdx]?.secuencia;
     if (s && acuerdo) {
       const tema = s.pasosCorrectos[0] || "secuencia";
@@ -865,8 +934,8 @@ export function Tutor({
   }
 
   function responderFlashcards(msgIdx: number) {
-    setEstadoRai("celebracion");
-    setTimeout(() => setEstadoRai(undefined), 3500);
+    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
+    reaccionarARespuesta(true);
     const f = mensajes[msgIdx]?.flashcards;
     if (f && acuerdo) {
       const tema = f.enunciado.slice(0, 40);
@@ -965,6 +1034,9 @@ export function Tutor({
 
   // Al salir de la tutoría, cerramos sesión de forma estructurada si hubo interacción
   async function manejarVolver() {
+    // La despedida usa el mismo gesto que la llegada: la esfera se abre, se
+    // entibia y lanza un anillo. Rai se va como llegó.
+    reaccionar(["saludo", 2600]);
     const turnosNino = mensajes.filter((m) => m.de === "nino").length;
     // Si no hay acuerdo o el niño conversó menos de 2 turnos, no guardamos sesión
     if (turnosNino < 2 || !acuerdo) {
@@ -1049,7 +1121,7 @@ export function Tutor({
     // Ancho responsive: en móvil la columna zen (560px, buena legibilidad); en
     // tablet+ ocupa ~80% del ancho con un tope, para no dejar márgenes enormes.
     <div
-      className="mx-auto flex w-full max-w-zen flex-col px-[22px] md:w-[80%] md:max-w-[900px]"
+      className="zen-page flex flex-col"
       style={{ height: "100dvh", minHeight: "100dvh" }}
     >
       {/* Barra superior de herramientas idéntica a otras vistas */}
@@ -1071,9 +1143,10 @@ export function Tutor({
       >
         <AuraOrb
           materia={materia}
-          activa={cargando}
           size={compacta ? 60 : 128}
-          estado={estadoRai || (cargando ? "cerebro" : undefined)}
+          // Prioridad: la reacción puntual manda mientras dura; si no hay
+          // ninguna, la esfera muestra qué está haciendo Rai en la conversación.
+          estado={reaccion ?? (cargando ? "pensando" : faseBase)}
         />
         {cargando && (
           <span className="text-[14px] italic text-ink-soft animate-pulse">
@@ -1319,14 +1392,14 @@ const Linea = memo(function Linea({
   if (m.de === "nino") {
     // el texto del niño en el acento salvia, para distinguirlo del de Rai (tinta)
     return (
-      <p className="mx-auto max-w-[30ch] text-[17px] font-[600] leading-[1.4] text-sage-deep">
+      <p className="mx-auto max-w-[30ch] text-[17px] font-[600] leading-[1.4] text-sage-deep md:max-w-[40ch] md:text-[18px]">
         {m.texto}
       </p>
     );
   }
   return (
-    <div className="mx-auto flex w-[90%] max-w-[40ch] flex-col items-center gap-2">
-      <p className="whitespace-pre-line text-[26px] font-serif leading-[1.35] text-ink">
+    <div className="mx-auto flex w-[90%] max-w-[40ch] flex-col items-center gap-2 md:max-w-[46ch]">
+      <p className="whitespace-pre-line text-[26px] font-serif leading-[1.35] text-ink md:text-[29px]">
         {animar ? (
           <TextoRevelado texto={m.texto} onTick={onTick} />
         ) : (
@@ -1345,7 +1418,7 @@ const Linea = memo(function Linea({
       )}
       {m.ejercicio && (
         // escapa el max-w-[40ch] del mensaje para ocupar ~80% de la pantalla
-        <div className="mt-3 w-[80vw] max-w-[480px]">
+        <div className="mt-3 w-[80vw] max-w-[480px] md:w-full md:max-w-[620px]">
           <TarjetaEjercicioChat
             ejercicio={m.ejercicio}
             onResponder={onResponderEjercicio}
@@ -1355,27 +1428,27 @@ const Linea = memo(function Linea({
       {m.sopa && (
         // escapa el max-w-[40ch] del mensaje para ocupar ~90% de la PANTALLA
         // (con un tope en tablet), centrado bajo el texto de Rai.
-        <div className="mt-3 w-[90vw] max-w-[520px]">
+        <div className="mt-3 w-[90vw] max-w-[520px] md:w-full md:max-w-[660px]">
           <SopaLetras datos={m.sopa} onCompleta={onResponderSopa} />
         </div>
       )}
       {m.rueda && (
-        <div className="mt-3 w-[85vw] max-w-[420px]">
+        <div className="mt-3 w-[85vw] max-w-[420px] md:w-full md:max-w-[520px]">
           <RuedaLetras datos={m.rueda} onCompleta={onResponderRueda} />
         </div>
       )}
       {m.intruso && (
-        <div className="mt-3 w-[85vw] max-w-[480px]">
+        <div className="mt-3 w-[85vw] max-w-[480px] md:w-full md:max-w-[620px]">
           <Intruso datos={m.intruso} onResponder={onResponderIntruso} />
         </div>
       )}
       {m.conector && (
-        <div className="mt-3 w-[85vw] max-w-[480px]">
+        <div className="mt-3 w-[85vw] max-w-[480px] md:w-full md:max-w-[620px]">
           <Conector datos={m.conector} onResponder={onResponderConector} />
         </div>
       )}
       {m.clasificador && (
-        <div className="mt-3 w-[85vw] max-w-[480px]">
+        <div className="mt-3 w-[85vw] max-w-[480px] md:w-full md:max-w-[620px]">
           <Clasificador
             datos={m.clasificador}
             onResponder={onResponderClasificador}
@@ -1383,12 +1456,12 @@ const Linea = memo(function Linea({
         </div>
       )}
       {m.secuencia && (
-        <div className="mt-3 w-[90vw] max-w-[480px]">
+        <div className="mt-3 w-[90vw] max-w-[480px] md:w-full md:max-w-[620px]">
           <Secuencia datos={m.secuencia} onCompleta={onResponderSecuencia} />
         </div>
       )}
       {m.flashcards && (
-        <div className="mt-3 w-[90vw] max-w-[480px]">
+        <div className="mt-3 w-[90vw] max-w-[480px] md:w-full md:max-w-[620px]">
           <Flashcards datos={m.flashcards} onCompleta={onResponderFlashcards} />
         </div>
       )}

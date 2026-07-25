@@ -21,7 +21,7 @@ export function CelebracionMateria({
   const label = MATERIAS.find((m) => m.id === materia)?.label ?? materia;
 
   return (
-    <div className="relative mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col items-center justify-center gap-[26px] overflow-hidden px-[22px] pb-24 text-center">
+    <div className="zen-page relative flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-[26px] overflow-hidden pb-24 text-center">
       <Fireworks />
 
       {/* contenido por encima del canvas */}

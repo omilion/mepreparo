@@ -49,11 +49,16 @@ export function WizardHijo({
   indice,
   total,
   onListo,
+  onSalir,
 }: {
   perfilInicial: PerfilNino;
   indice: number; // 0-based, para "Hijo 2 de 3"
   total: number;
   onListo: (perfil: PerfilNino) => void;
+  // Salida del wizard desde el PRIMER paso (vuelve a anotar los nombres). Es la
+  // única puerta hacia atrás: durante el onboarding el Home está oculto porque
+  // botaba a los hijos pendientes sin avisar.
+  onSalir?: () => void;
 }) {
   const [p, setP] = useState<PerfilNino>(perfilInicial);
   const [i, setI] = useState(0);
@@ -66,7 +71,10 @@ export function WizardHijo({
     else onListo(p);
   }
   function volver() {
-    if (i === 0) return;
+    if (i === 0) {
+      onSalir?.(); // en el primer paso, atrás = volver a los nombres
+      return;
+    }
     setI(i - 1);
   }
 
@@ -77,14 +85,14 @@ export function WizardHijo({
   const dias = diasHastaExamen(p.examen.fecha);
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-58px)] max-w-zen flex-col px-[22px] pb-20 pt-4">
+    <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-20 pt-4">
       {/* barra superior del wizard: atrás + progreso */}
       <div className="flex h-10 items-center justify-between">
-        {i > 0 ? (
+        {i > 0 || onSalir ? (
           <button
             type="button"
             onClick={volver}
-            aria-label="Volver"
+            aria-label={i === 0 ? "Volver a los nombres" : "Volver"}
             className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full text-ink-soft transition-colors hover:text-ink"
           >
             ←
@@ -132,7 +140,7 @@ export function WizardHijo({
                 {nombre} será preciso y muy personal.
               </Sub>
               <Reveal delay={D_ACCION}>
-                <div className="mt-8 w-[280px] max-w-full">
+                <div className="mt-8 w-[280px] max-w-full md:w-[380px]">
                   <button type="button" onClick={avanzar} className="cta">
                     Empecemos
                   </button>
@@ -234,7 +242,7 @@ export function WizardHijo({
               <Titulo>¿Cuántas horas puede estudiar por semana?</Titulo>
               <Sub>Sé honesto: el plan se ajusta a la vida real, no al revés.</Sub>
               <Reveal delay={D_CUERPO}>
-                <div className="mt-8 flex w-[280px] max-w-full items-center gap-4">
+                <div className="mt-8 flex w-[280px] max-w-full items-center gap-4 md:w-[380px]">
                   <input
                     type="range"
                     min={1}
@@ -264,7 +272,7 @@ export function WizardHijo({
               <Titulo>¿Qué le gusta a {nombre}?</Titulo>
               <Sub>Esto le da personalidad al tutor. Puedes saltarlo.</Sub>
               <Reveal delay={D_CUERPO}>
-                <div className="mt-7 flex max-w-[380px] flex-wrap justify-center gap-2.5">
+                <div className="mt-7 flex max-w-[380px] flex-wrap justify-center gap-2.5 md:max-w-[520px]">
                   {INTERESES.map((it) => (
                     <Chip
                       key={it}
@@ -293,7 +301,7 @@ export function WizardHijo({
               <Titulo>¿Cómo aprende mejor?</Titulo>
               <Sub>Con esto el tutor sabrá cómo explicarle.</Sub>
               <Reveal delay={D_CUERPO}>
-                <div className="mt-7 flex max-w-[380px] flex-wrap justify-center gap-2.5">
+                <div className="mt-7 flex max-w-[380px] flex-wrap justify-center gap-2.5 md:max-w-[520px]">
                   {ESTILOS_APRENDIZAJE.map((es) => (
                     <Chip
                       key={es}
@@ -397,7 +405,7 @@ function ContinuarSuave({
 }) {
   return (
     <div
-      className="mt-9 w-[280px] max-w-full"
+      className="mt-9 w-[280px] max-w-full md:w-[380px]"
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(6px)",
