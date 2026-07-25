@@ -24,7 +24,7 @@ export function PanelHijos({
   onActualizarPupilo,
 }: {
   cuenta: Cuenta;
-  onEntrar: (indice: number) => void;
+  onEntrar: (id: string) => void;
   onAgregar: () => void;
   onActualizarPupilo?: (p: PerfilNino) => void;
 }) {
@@ -48,11 +48,11 @@ export function PanelHijos({
         {/* en tablet las tarjetas se reparten en dos columnas: una lista de
             tarjetas anchas apiladas desperdicia el ancho que ahora tenemos */}
         <div className="grid gap-3 md:grid-cols-2">
-          {cuenta.pupilos.map((p, i) => (
+          {cuenta.pupilos.map((p) => (
             <TarjetaPupilo
               key={p.id}
               p={p}
-              onEntrar={() => onEntrar(i)}
+              onEntrar={() => onEntrar(p.id)}
               onAbrirAcceso={() => setPupiloAcceso(p)}
             />
           ))}

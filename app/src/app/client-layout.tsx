@@ -14,7 +14,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     setPinBloqueado,
     alSalirModoAlumno,
     cuenta,
-    setEnfocado,
+    enfocarPupilo,
     cargarPrueba,
     limpiarTodo,
     accionesDevTutor,
@@ -39,8 +39,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           cuenta={cuenta}
           onCargarPrueba={cargarPrueba}
           onLimpiar={limpiarTodo}
-          onSaltar={(idx, etapa) => {
-            setEnfocado(idx);
+          onSaltar={(id, etapa) => {
+            enfocarPupilo(id);
             router.push("/" + etapa);
           }}
           accionesTutor={accionesDevTutor}

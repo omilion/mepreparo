@@ -26,7 +26,7 @@ export function DevPanel({
   onCargarPrueba: () => void;
   onLimpiar: () => void;
   // salta a `etapa` con el pupilo en el índice dado (o el panel si no aplica)
-  onSaltar: (indice: number, etapa: EtapaDev) => void;
+  onSaltar: (id: string, etapa: EtapaDev) => void;
   // acciones que solo existen mientras se está en el tutor (lanzar actividades)
   accionesTutor?: {
     lanzarSopa: () => void;
@@ -147,7 +147,7 @@ export function DevPanel({
 
           {cuenta && cuenta.pupilos.length > 0 ? (
             <div className="flex flex-col gap-3">
-              {cuenta.pupilos.map((p, i) => {
+              {cuenta.pupilos.map((p) => {
                 const diag =
                   !!p.diagnostico && Object.keys(p.diagnostico).length > 0;
                 return (
@@ -170,7 +170,7 @@ export function DevPanel({
                           <button
                             key={e.id}
                             disabled={bloqueada}
-                            onClick={() => onSaltar(i, e.id)}
+                            onClick={() => onSaltar(p.id, e.id)}
                             className="rounded border border-hair px-1.5 py-0.5 text-[11px] enabled:hover:border-sage disabled:opacity-30"
                             title={
                               bloqueada

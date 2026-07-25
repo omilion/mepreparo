@@ -1,13 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MATERIAS, type PerfilNino } from "@/lib/profile";
+import { MATERIAS, type Materia, type PerfilNino } from "@/lib/profile";
 import { AuraOrb } from "./AuraOrb";
 import type { PlanMateria } from "@/lib/tutor/acuerdo";
 
 // Pantalla intermedia tras el onboarding: mientras la IA prepara el plan de
 // etapas de cada materia ("los mundos"), el niño ve una animación con lenguaje
 // de videojuego. Al terminar, entrega el plan y se revela el mapa.
+//
+// LA ANIMACIÓN VA AL RITMO DEL TRABAJO REAL. Antes el guion corría con
+// temporizadores fijos (~10s) mientras el servidor generaba las materias en
+// serie (15-25s con 4 o 5): la animación ganaba la carrera, se llamaba onListo
+// con `null` y el plan personalizado se tiraba a la basura sin que nadie se
+// enterara — el niño terminaba con la ruta genérica del banco. Ahora se pide
+// UNA MATERIA A LA VEZ y cada mensaje espera a que esa materia esté lista, así
+// "Creando el mundo de Matemática…" es literal.
+
+// Aunque la IA responda al instante, cada mensaje se queda este mínimo en
+// pantalla: si no, el guion pasa de largo y no alcanza a leerse.
+const MIN_POR_PASO = 1300;
+// Techo por materia y techo total. Nadie se queda mirando la esfera para
+// siempre: lo que no alcance a llegar cae al orden del banco (que es un plan
+// válido, solo que no personalizado).
+const TOPE_POR_MATERIA = 30_000;
+const TOPE_TOTAL = 90_000;
 
 export function PrepararMundos({
   perfil,
@@ -20,11 +37,9 @@ export function PrepararMundos({
   const nombre = perfil.nombre.trim() || "estudiante";
   const materias = perfil.examen.materias;
   const [paso, setPaso] = useState(0);
-  const pedido = useRef(false);
-  const resultado = useRef<PlanMateria[] | null>(null);
-  const listoLlamado = useRef(false);
+  const arrancado = useRef(false);
 
-  // guion de mensajes: intro + una línea por materia + cierre
+  // guion: intro + una línea por materia + trazado + cierre
   const mensajes = [
     `Muy bien, ${nombre}. Estoy preparando tu aventura…`,
     ...materias.map(
@@ -34,58 +49,94 @@ export function PrepararMundos({
     "¡Todo listo! Este es tu camino ✨",
   ];
 
-  // dispara la generación real del plan (una sola vez)
   useEffect(() => {
-    if (pedido.current) return;
-    pedido.current = true;
-    (async () => {
+    if (arrancado.current) return;
+    arrancado.current = true;
+    let cancelado = false;
+
+    // Pide UNA materia. El endpoint ya cae al orden del banco si la IA falla,
+    // así que casi siempre devuelve algo usable.
+    async function generarMateria(m: Materia): Promise<PlanMateria | null> {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), TOPE_POR_MATERIA);
       try {
         const res = await fetch("/api/plan/generar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             curso: perfil.curso,
-            materias: perfil.examen.materias,
+            materias: [m],
             nombre: perfil.nombre,
             diagnostico: perfil.diagnostico,
           }),
+          signal: ctrl.signal,
         });
         const data = await res.json();
-        resultado.current = data.planMaterias ?? null;
+        return data.planMaterias?.[0] ?? null;
       } catch {
-        resultado.current = null;
+        return null; // esta materia se queda con la ruta del banco
+      } finally {
+        clearTimeout(t);
       }
+    }
+
+    const pausa = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const completarPaso = async (inicio: number) => {
+      const falta = MIN_POR_PASO - (Date.now() - inicio);
+      if (falta > 0) await pausa(falta);
+    };
+
+    (async () => {
+      const inicioTodo = Date.now();
+      const plan: PlanMateria[] = [];
+
+      await completarPaso(Date.now()); // la intro alcanza a leerse
+
+      for (let i = 0; i < materias.length; i++) {
+        if (cancelado) return;
+        setPaso(i + 1);
+        const inicio = Date.now();
+        // pasado el techo total dejamos de pedir, pero el guion se completa
+        if (Date.now() - inicioTodo < TOPE_TOTAL) {
+          const uno = await generarMateria(materias[i]);
+          if (uno) plan.push(uno);
+        }
+        if (cancelado) return;
+        await completarPaso(inicio);
+      }
+
+      if (cancelado) return;
+      setPaso(materias.length + 1); // "Trazando tus etapas…"
+      await pausa(1100);
+      if (cancelado) return;
+      setPaso(materias.length + 2); // "¡Todo listo!"
+      await pausa(1500);
+      if (cancelado) return;
+      onListo(plan.length > 0 ? plan : null);
     })();
+
+    return () => {
+      cancelado = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // avanza los mensajes en el tiempo; al llegar al final entrega el resultado
-  useEffect(() => {
-    if (paso >= mensajes.length - 1) {
-      // último mensaje: esperamos un momento y salimos (con lo que haya llegado)
-      const t = setTimeout(() => {
-        if (!listoLlamado.current) {
-          listoLlamado.current = true;
-          onListo(resultado.current);
-        }
-      }, 1400);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setPaso((p) => p + 1), 1500);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paso]);
 
   // materia "activa" para el color de la esfera según el paso
   const idxMateria = Math.min(Math.max(paso - 1, 0), materias.length - 1);
   const materiaEsfera = materias[idxMateria] ?? perfil.examen.materias[0];
+  const terminado = paso >= mensajes.length - 1;
 
   return (
     <div
       className="zen-page flex flex-col items-center justify-center gap-8 text-center"
       style={{ height: "100dvh" }}
     >
-      <AuraOrb materia={materiaEsfera} activa size={132} />
+      {/* Rai piensa mientras trabaja de verdad, y celebra cuando está listo */}
+      <AuraOrb
+        materia={materiaEsfera}
+        estado={terminado ? "celebracion" : "pensando"}
+        size={132}
+      />
 
       <div className="min-h-[80px] flex items-center">
         <p

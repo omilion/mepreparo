@@ -130,16 +130,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Obtener lista actualizada definitiva de pupilos en la BD
+    // 2. Obtener lista actualizada definitiva de pupilos en la BD.
+    // ORDER BY explícito: sin él, Postgres devuelve las filas en el orden que
+    // le acomode y un UPDATE puede moverlas. La app ya no depende del orden
+    // para saber a quién acompaña (usa el id), pero así la lista del panel no
+    // se reordena sola delante del apoderado.
     const listFinal = isStudentMode && studentPupiloId
       ? await db
           .select()
           .from(pupilosTable)
           .where(and(eq(pupilosTable.cuentaId, userId), eq(pupilosTable.id, studentPupiloId)))
+          .orderBy(pupilosTable.creadoEn)
       : await db
           .select()
           .from(pupilosTable)
-          .where(eq(pupilosTable.cuentaId, userId));
+          .where(eq(pupilosTable.cuentaId, userId))
+          .orderBy(pupilosTable.creadoEn);
 
     const finalPupilos: PerfilNino[] = listFinal.map((p) => ({
       id: p.id,

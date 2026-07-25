@@ -22,7 +22,10 @@ interface Body {
 }
 
 export async function POST(req: NextRequest) {
-  const limite = chequearLimite(req, { clave: "plan", max: 10, ventanaMs: 60_000 });
+  // "Preparar los mundos" pide UNA materia por llamada (así la animación puede
+  // ir al ritmo del trabajo real), o sea hasta 5 llamadas seguidas por niño.
+  // El tope contempla eso más un reintento, sin dejar la puerta abierta.
+  const limite = chequearLimite(req, { clave: "plan", max: 20, ventanaMs: 60_000 });
   if (limite) return limite;
 
   let body: Body;

@@ -51,6 +51,19 @@ import { cuentaDePrueba } from "@/lib/dev/seed";
 
 export type Foco = { materia: Materia; tema: string } | null;
 
+// A DÓNDE entra un niño según lo que le falta. El orden importa: sin
+// configuración no hay diagnóstico, sin diagnóstico no hay plan, y sin la
+// primera charla con Rai no hay horario ni memoria — por eso el mapa va último.
+// Antes la escalera no miraba `tutoria`: el niño que volvía a entrar tras el
+// diagnóstico caía en el mapa sin conocer a Rai, y al tocar una etapa recibía
+// la presentación en vez de la clase que pidió.
+function rutaSegunEstado(p: PerfilNino): string {
+  if (!configuracionCompleta(p)) return "/wizard";
+  if (!tieneDiagnostico(p)) return "/diagnostico";
+  if (!p.tutoria) return "/tutor";
+  return "/mapa";
+}
+
 // Acciones dev que el Tutor "publica" al panel dev global mientras está montado.
 // El DevPanel las muestra como botones solo si existen (o sea, solo en el tutor).
 export type AccionesDevTutor = {
@@ -68,7 +81,11 @@ export type AccionesDevTutor = {
 interface AppState {
   // datos
   cuenta: Cuenta | null;
-  enfocado: number;
+  // A QUIÉN estamos acompañando. Se guarda el ID, no la posición en la lista:
+  // el sync reemplaza el arreglo de pupilos con lo que devuelve la base de
+  // datos, y ese orden puede cambiar. Con un índice, un sync en segundo plano
+  // hacía que la app pasara a apuntar a OTRO hijo sin que nadie lo notara.
+  enfocadoId: string | null;
   pupilo: PerfilNino | null;
   foco: Foco;
   sesionAlumno: SesionAlumno | null;
@@ -85,12 +102,12 @@ interface AppState {
   // setters expuestos
   setCuenta: (c: Cuenta | null) => void;
   setFoco: (f: Foco) => void;
-  setEnfocado: (i: number) => void;
+  enfocarPupilo: (id: string) => void;
   setPinBloqueado: (v: boolean) => void;
   setModoAuth: (m: "login" | "registro") => void;
 
   // transiciones (navegan con el router)
-  irAPupilo: (indice: number) => void;
+  irAPupilo: (id: string) => void;
   alRegistrar: (pupilosNuevos: PerfilNino[]) => void;
   alConfigurarHijo: (perfil: PerfilNino) => void;
   agregarHijo: () => void;
@@ -121,7 +138,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
-  const [enfocado, setEnfocado] = useState(0);
+  const [enfocadoId, setEnfocadoId] = useState<string | null>(null);
   const [foco, setFoco] = useState<Foco>(null);
   const [nuevos, setNuevos] = useState<PerfilNino[]>([]);
   const [wizIdx, setWizIdx] = useState(0);
@@ -134,7 +151,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // evita re-ejecutar el ruteo inicial en cada render
   const arranqueHecho = useRef(false);
 
-  const pupilo = cuenta?.pupilos[enfocado] ?? null;
+  const pupilo = cuenta?.pupilos.find((p) => p.id === enfocadoId) ?? null;
 
   // Recupera un onboarding a medias (hijos anotados que aún no pasan por el
   // wizard). Va en un efecto y no en el useState inicial a propósito: en el
@@ -185,16 +202,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (alumno) {
       const c = leerCuenta();
       if (c && c.pupilos.length > 0) {
+        // El token del alumno dice QUIÉN es. Antes se enfocaba c.pupilos[0]:
+        // en una familia con dos hijos, la segunda entraba con su código y
+        // estudiaba el plan de su hermana.
+        const p = c.pupilos.find((x) => x.id === alumno.pupiloId) ?? c.pupilos[0];
         setSesionAlumno(alumno);
         setCuenta(c);
-        setEnfocado(0);
+        setEnfocadoId(p.id);
         setPinBloqueado(!!alumno.tienePin);
-        const p = c.pupilos[0];
         arranqueHecho.current = true;
         setCargando(false);
-        if (!configuracionCompleta(p)) router.replace("/wizard");
-        else if (!tieneDiagnostico(p)) router.replace("/diagnostico");
-        else router.replace("/mapa");
+        router.replace(rutaSegunEstado(p));
         return;
       }
       borrarSesionAlumno();
@@ -254,12 +272,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // --- transiciones ---
   const irAPupilo = useCallback(
-    (indice: number) => {
-      setEnfocado(indice);
-      const p = cuenta!.pupilos[indice];
-      if (!configuracionCompleta(p)) router.push("/wizard");
-      else if (!tieneDiagnostico(p)) router.push("/diagnostico");
-      else router.push("/mapa");
+    (id: string) => {
+      const p = cuenta?.pupilos.find((x) => x.id === id);
+      if (!p) return;
+      setEnfocadoId(id);
+      router.push(rutaSegunEstado(p));
     },
     [cuenta, router]
   );
@@ -289,8 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         borrarOnboarding();
         setNuevos([]);
         setWizIdx(0);
-        const idx = actualizada.pupilos.findIndex((p) => p.id === nuevos[0]?.id);
-        setEnfocado(idx >= 0 ? idx : 0);
+        setEnfocadoId(nuevos[0]?.id ?? actualizada.pupilos[0]?.id ?? null);
         // En el primer onboarding no hay nada que elegir: el siguiente paso
         // conocido es el diagnóstico. Con varios estudiantes, el panel deja
         // que el apoderado decida con cuál continuar.
@@ -309,19 +325,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const alTerminarDiagnostico = useCallback(
     (resultados: ResultadoMateria[]) => {
-      const p: PerfilNino = { ...cuenta!.pupilos[enfocado], diagnostico: {} };
+      if (!cuenta || !pupilo) return;
+      const p: PerfilNino = { ...pupilo, diagnostico: {} };
       for (const r of resultados) {
         p.diagnostico![r.materia] = { nivel: r.nivel, brechas: r.brechas };
       }
-      setCuenta(guardarPupilo(cuenta!, p));
+      setCuenta(guardarPupilo(cuenta, p));
       router.push("/resultado");
     },
-    [cuenta, enfocado, router]
+    [cuenta, pupilo, router]
   );
 
   const alTerminarPrueba = useCallback(
     (correctos: number, total: number) => {
-      const p = cuenta?.pupilos[enfocado];
+      const p = pupilo;
       if (!cuenta || !p || !foco) {
         router.push("/mapa");
         return;
@@ -337,7 +354,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setFoco(null);
       router.push("/mapa");
     },
-    [cuenta, enfocado, foco, router]
+    [cuenta, pupilo, foco, router]
   );
 
   // Al cerrar sesión no queda NADA de este apoderado en el dispositivo: ni la
@@ -379,7 +396,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCuenta(c);
     setNuevos([]);
     setWizIdx(0);
-    setEnfocado(0);
+    setEnfocadoId(c.pupilos[0]?.id ?? null);
     router.push("/panel");
   }, [router]);
 
@@ -389,13 +406,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCuenta(null);
     setNuevos([]);
     setWizIdx(0);
-    setEnfocado(0);
+    setEnfocadoId(null);
     router.push("/registro");
   }, [router]);
 
   const value: AppState = {
     cuenta,
-    enfocado,
+    enfocadoId,
     pupilo,
     foco,
     sesionAlumno,
@@ -407,7 +424,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     onboardingListo,
     setCuenta,
     setFoco,
-    setEnfocado,
+    enfocarPupilo: setEnfocadoId,
     setPinBloqueado,
     setModoAuth,
     irAPupilo,
