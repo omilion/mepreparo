@@ -3,11 +3,14 @@
 // Hoy usa localStorage; la API está aislada para migrar a IndexedDB/Supabase
 // (sincronización entre dispositivos) sin tocar las pantallas.
 
-import type { Cuenta, PerfilNino } from "./profile";
+import type { Cuenta, Materia, PerfilNino } from "./profile";
+import type { ResultadoMateria } from "./diagnostico/tipos";
 
 const KEY = "mp-cuenta";
 const ALUMNO_KEY = "mp-alumno-sesion";
 const ONBOARDING_KEY = "mp-onboarding";
+const DIAGNOSTICO_KEY = "mp-diagnostico-en-curso";
+const FOCO_KEY = "mp-foco";
 
 export interface SesionAlumno {
   token: string;
@@ -81,6 +84,89 @@ export function guardarOnboarding(pendiente: OnboardingPendiente): void {
 export function borrarOnboarding(): void {
   if (!disponible()) return;
   window.localStorage.removeItem(ONBOARDING_KEY);
+}
+
+// --- Diagnóstico a medias y etapa enfocada (SIEMPRE atados a un niño) ---
+//
+// Los dos guardan `pupiloId` y se leen pidiendo ese id: si el guardado no es del
+// niño que está estudiando ahora, se ignora. En una familia con dos hijas en la
+// misma tablet, un progreso que se filtre de una a otra es peor que perderlo.
+
+interface DiagnosticoEnCurso {
+  pupiloId: string;
+  hechas: Record<string, ResultadoMateria>;
+}
+
+// Materias ya rendidas del diagnóstico. Vivían solo en memoria: si el niño
+// completaba 3 de 5 y se recargaba, volvía a empezar de cero.
+export function leerDiagnosticoEnCurso(
+  pupiloId: string
+): Record<string, ResultadoMateria> | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(DIAGNOSTICO_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as DiagnosticoEnCurso;
+    if (!data || data.pupiloId !== pupiloId) return null;
+    if (!data.hechas || typeof data.hechas !== "object") return null;
+    return data.hechas;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarDiagnosticoEnCurso(
+  pupiloId: string,
+  hechas: Record<string, ResultadoMateria>
+): void {
+  if (!disponible()) return;
+  window.localStorage.setItem(
+    DIAGNOSTICO_KEY,
+    JSON.stringify({ pupiloId, hechas } satisfies DiagnosticoEnCurso)
+  );
+}
+
+export function borrarDiagnosticoEnCurso(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(DIAGNOSTICO_KEY);
+}
+
+// La etapa que el niño eligió en el mapa (materia + tema). Sobrevive a una
+// recarga para que al volver a entrar la clase siga siendo la que pidió.
+interface FocoGuardado {
+  pupiloId: string;
+  materia: Materia;
+  tema: string;
+}
+
+export function leerFoco(pupiloId: string): { materia: Materia; tema: string } | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(FOCO_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as FocoGuardado;
+    if (!data || data.pupiloId !== pupiloId) return null;
+    if (!data.materia || !data.tema) return null;
+    return { materia: data.materia, tema: data.tema };
+  } catch {
+    return null;
+  }
+}
+
+export function guardarFoco(
+  pupiloId: string,
+  foco: { materia: Materia; tema: string }
+): void {
+  if (!disponible()) return;
+  window.localStorage.setItem(
+    FOCO_KEY,
+    JSON.stringify({ pupiloId, ...foco } satisfies FocoGuardado)
+  );
+}
+
+export function borrarFoco(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(FOCO_KEY);
 }
 
 // --- Cuenta completa ---

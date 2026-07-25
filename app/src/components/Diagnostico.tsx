@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MATERIAS, type Materia, type PerfilNino } from "@/lib/profile";
 import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
+import {
+  leerDiagnosticoEnCurso,
+  guardarDiagnosticoEnCurso,
+  borrarDiagnosticoEnCurso,
+} from "@/lib/storage";
 import { DiagnosticoMateria } from "./DiagnosticoMateria";
 import { CelebracionMateria } from "./CelebracionMateria";
 import { Reveal } from "./Reveal";
@@ -21,23 +26,39 @@ export function Diagnostico({
   const nombre = perfil.nombre.trim() || "tu hijo";
   const materias = perfil.examen.materias;
 
-  // resultados acumulados por materia
+  // Resultados acumulados por materia. Se persisten a medida que el niño las
+  // rinde: antes vivían solo en memoria y completar 3 de 5 y recargar (o que se
+  // cierre la pestaña) obligaba a repetirlas todas. Son pruebas largas y quien
+  // las da es un niño de básica en una tablet.
   const [hechas, setHechas] = useState<Record<string, ResultadoMateria>>({});
   // materia actualmente en curso (null = estamos en el menú)
   const [enCurso, setEnCurso] = useState<Materia | null>(null);
   // materia recién completada que estamos celebrando (null = no celebrando)
   const [celebrando, setCelebrando] = useState<Materia | null>(null);
 
+  // Recupera lo ya rendido por ESTE niño (va en un efecto, no en el useState
+  // inicial: en el servidor no hay localStorage y no calzaría al hidratar).
+  useEffect(() => {
+    const guardado = leerDiagnosticoEnCurso(perfil.id);
+    if (guardado) setHechas(guardado);
+  }, [perfil.id]);
+
   const completas = materias.filter((m) => hechas[m]).length;
   const todasListas = completas === materias.length;
 
   function alTerminarMateria(r: ResultadoMateria) {
-    setHechas((h) => ({ ...h, [r.materia]: r }));
+    setHechas((h) => {
+      const actualizadas = { ...h, [r.materia]: r };
+      guardarDiagnosticoEnCurso(perfil.id, actualizadas);
+      return actualizadas;
+    });
     setEnCurso(null);
     setCelebrando(r.materia); // mostrar felicitación
   }
 
   function verResultados() {
+    // el diagnóstico queda guardado en el perfil: el borrador ya no hace falta
+    borrarDiagnosticoEnCurso();
     onListo(materias.map((m) => hechas[m]).filter(Boolean));
   }
 

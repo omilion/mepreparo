@@ -31,6 +31,10 @@ import {
   leerOnboarding,
   guardarOnboarding,
   borrarOnboarding,
+  leerFoco,
+  guardarFoco,
+  borrarFoco,
+  borrarDiagnosticoEnCurso,
   type SesionAlumno,
 } from "@/lib/storage";
 import {
@@ -139,7 +143,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   const [enfocadoId, setEnfocadoId] = useState<string | null>(null);
-  const [foco, setFoco] = useState<Foco>(null);
+  const [foco, setFocoState] = useState<Foco>(null);
   const [nuevos, setNuevos] = useState<PerfilNino[]>([]);
   const [wizIdx, setWizIdx] = useState(0);
   const [modoAuth, setModoAuth] = useState<"login" | "registro">("registro");
@@ -152,6 +156,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const arranqueHecho = useRef(false);
 
   const pupilo = cuenta?.pupilos.find((p) => p.id === enfocadoId) ?? null;
+
+  // La etapa elegida en el mapa se guarda atada al niño: si recarga, al volver
+  // a entrar la clase sigue siendo la que pidió y no una genérica.
+  const setFoco = useCallback(
+    (f: Foco) => {
+      setFocoState(f);
+      if (!enfocadoId) return;
+      if (f) guardarFoco(enfocadoId, f);
+      else borrarFoco();
+    },
+    [enfocadoId]
+  );
+
+  // Al saber a quién acompañamos, se recupera SU foco (y se suelta el del niño
+  // anterior: cambiar de hija nunca debe arrastrar la etapa de la otra).
+  useEffect(() => {
+    if (!enfocadoId) return;
+    setFocoState(leerFoco(enfocadoId));
+  }, [enfocadoId]);
 
   // Recupera un onboarding a medias (hijos anotados que aún no pasan por el
   // wizard). Va en un efecto y no en el useState inicial a propósito: en el
@@ -363,6 +386,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const alCerrarSesionAuth = useCallback(() => {
     borrarCuenta();
     borrarOnboarding();
+    borrarDiagnosticoEnCurso();
+    borrarFoco();
     setCuenta(null);
     setNuevos([]);
     setWizIdx(0);
@@ -374,6 +399,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     borrarSesionAlumno();
     borrarCuenta();
     borrarOnboarding();
+    borrarDiagnosticoEnCurso();
+    borrarFoco();
     setSesionAlumno(null);
     setCuenta(null);
     setNuevos([]);
@@ -403,6 +430,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const limpiarTodo = useCallback(() => {
     borrarCuenta();
     borrarOnboarding();
+    borrarDiagnosticoEnCurso();
+    borrarFoco();
     setCuenta(null);
     setNuevos([]);
     setWizIdx(0);
