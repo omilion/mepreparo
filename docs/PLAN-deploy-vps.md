@@ -1,16 +1,15 @@
-# PLAN — Deploy de PRUEBA de mepreparo a un VPS COMPARTIDO (para Gema)
+# PLAN — Deploy de mepreparo a un VPS COMPARTIDO (HazloMejor)
 
-> ⚠️ EL VPS YA TIENE OTRAS APPS Y DOMINIOS CORRIENDO. No se debe estropear nada
-> de eso. mepreparo va AISLADO en un puerto alto libre, SIN tocar 80/443, SIN
-> Caddy, con nombres y red propios (prefijo mepreparo_). Se accede por
-> `http://IP_DEL_VPS:PUERTO`. Todavía NO hay dominio.
+> ⚠️ EL VPS YA TIENE OTRAS APPS CORRIENDO. mepreparo va AISLADO en el puerto
+> alto **8090**, SIN tocar 80/443, con nombres y red propios (prefijo mepreparo_).
+> Se accede públicamente por: `http://144.91.88.57:8090`.
 >
-> Gema hace TODO por SSH. Secuencia ejecutable de arriba a abajo (salvo el
-> paso 3, que corre desde la máquina que tiene el archivo del RAG).
+> **Datos del VPS:**
+> - **IP o Hostname:** `144.91.88.57`
+> - **Usuario SSH:** `root`
+> - **Método de acceso:** Llave SSH configurada (sin contraseña).
 >
-> Usa `docker-compose.vps.yml` + `.env.vps` (NO el docker-compose.prod.yml, que
-> es para cuando haya dominio+HTTPS). Estado verificado (2026-07-12): build
-> standalone OK (server.js 23MB), 56 tests, SQL del esquema aplica limpio.
+> Usa `docker-compose.vps.yml` + `.env.vps`.
 
 ---
 
@@ -49,9 +48,7 @@ cd mepreparo
 gitignored. Copiarlo por scp/rsync **desde la máquina que lo tiene** al VPS:
 ```bash
 # correr esto en la máquina origen (el PC del dev), NO en el VPS:
-rsync -avz --progress \
-  base-documental/_rag/chunks.jsonl \
-  USUARIO@IP_VPS:~/mepreparo/base-documental/_rag/chunks.jsonl
+scp base-documental/_rag/chunks.jsonl root@144.91.88.57:~/mepreparo/base-documental/_rag/chunks.jsonl
 ```
 Verificar en el VPS que llegó completo:
 ```bash
@@ -69,12 +66,12 @@ echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)"
 nano .env.vps
 ```
 Rellenar en `.env.vps`:
-- `APP_PORT=8090`   (el puerto LIBRE elegido en el paso 1)
-- `NEXT_PUBLIC_APP_URL=http://IP_DEL_VPS:8090`  (IP real del VPS + el puerto)
-- `POSTGRES_PASSWORD=` … (el generado)
-- `GEMINI_API_KEY=` … (la key de producción nueva)
+- `APP_PORT=8090`
+- `NEXT_PUBLIC_APP_URL=http://144.91.88.57:8090`
+- `POSTGRES_PASSWORD=` … (el generado con openssl rand -base64 24)
+- `GEMINI_API_KEY=` … (la key de producción)
 - `GEMINI_MODEL=gemini-3.5-flash`
-- `DIAG_HMAC_SECRET=` … / `BETTER_AUTH_SECRET=` … (los generados)
+- `DIAG_HMAC_SECRET=` … / `BETTER_AUTH_SECRET=` … (los generados con openssl rand -hex 32)
 
 Confirmar que no se filtra: `git check-ignore .env.vps` → debe imprimir `.env.vps`.
 
@@ -119,7 +116,7 @@ curl -s "$IP_PUERTO/api/tutor" -X POST -H "Content-Type: application/json" \
   -d '{"accion":"saludo","acuerdo":null,"resumenPerfil":"test","materias":["matematica"],"horasSemana":6,"nombre":"Test"}' \
   | grep -o '"modo":"[a-z]*"'          # debe decir "modo":"gemini"
 ```
-- [ ] Abrir `http://IP_DEL_VPS:8090` en el navegador → landing.
+- [ ] Abrir `http://144.91.88.57:8090` en el navegador → landing.
 - [ ] Probar demo, tutor, mapa (NO necesitan login).
 - [ ] `modo":"gemini"` → key y RAG OK. Si dice `simulado`: revisar `GEMINI_API_KEY`
       y que el volumen del chunks esté montado

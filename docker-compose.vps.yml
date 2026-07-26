@@ -1,6 +1,6 @@
 # Deploy AISLADO para un VPS COMPARTIDO (otras apps/dominios ya corren ahí).
 # NO toca los puertos 80/443, NO levanta Caddy, NO usa un proxy central.
-# mepreparo queda accesible por  http://IP_DEL_VPS:${APP_PORT}  (puerto alto libre).
+# mepreparo queda accesible por  http://144.91.88.57:${APP_PORT}  (puerto alto libre).
 #
 # Uso:  docker compose -f docker-compose.vps.yml --env-file .env.vps up -d --build
 #
