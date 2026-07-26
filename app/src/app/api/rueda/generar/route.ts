@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { elegirNoUsado, idsExcluidos } from "@/lib/contenido/variedad";
 import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -101,14 +102,16 @@ export async function GET(req: NextRequest) {
           eq(contenidoValidado.estado, "publicada")
         )
       );
-    if (existentes.length > 0) {
-      const elegida = existentes[Math.floor(Math.random() * existentes.length)];
+    // Descarta lo que el niño ya vio en esta sesión; si no queda nada nuevo,
+    // sigue de largo y genera contenido fresco.
+    const elegida = elegirNoUsado(existentes, idsExcluidos(req));
+    if (elegida) {
       // revolvemos las letras en cada entrega para que no salga siempre igual
       const d = elegida.datos as { respuesta: string; enunciado: string };
       const letras = revolver(d.respuesta.split(""));
       return NextResponse.json({
         rueda: { enunciado: d.enunciado, respuesta: d.respuesta, letras },
-        fuente: "biblioteca_compartida",
+        fuente: "biblioteca_compartida", id: elegida.id,
       });
     }
 
@@ -133,10 +136,12 @@ export async function GET(req: NextRequest) {
     }
     const datos = { tipoPlantilla: "rueda", tema, enunciado: pregunta.enunciado, respuesta };
 
+    const nuevoId = `rueda-${crypto.randomUUID()}`;
+
     // 3. Guardar en la biblioteca para reutilizar gratis (best-effort).
     try {
       await db.insert(contenidoValidado).values({
-        id: `rueda-${crypto.randomUUID()}`,
+        id: nuevoId,
         materia,
         curso,
         oa,
@@ -154,7 +159,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       rueda: { enunciado: pregunta.enunciado, respuesta, letras: revolver(respuesta.split("")) },
-      fuente: "generada",
+      fuente: "generada", id: nuevoId,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";

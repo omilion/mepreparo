@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { elegirNoUsado, idsExcluidos } from "@/lib/contenido/variedad";
 import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -132,15 +133,17 @@ export async function GET(req: NextRequest) {
         )
       );
 
-    if (existentes.length > 0) {
-      const elegida = existentes[Math.floor(Math.random() * existentes.length)];
+    // Descarta lo que el niño ya vio en esta sesión; si no queda nada nuevo,
+    // sigue de largo y genera contenido fresco.
+    const elegida = elegirNoUsado(existentes, idsExcluidos(req));
+    if (elegida) {
       const d = elegida.datos as { enunciado: string; tarjetas: Tarjeta[] };
       return NextResponse.json({
         flashcards: {
           enunciado: d.enunciado,
           tarjetas: d.tarjetas,
         },
-        fuente: "biblioteca_compartida",
+        fuente: "biblioteca_compartida", id: elegida.id,
       });
     }
 
@@ -167,10 +170,12 @@ export async function GET(req: NextRequest) {
       tarjetas: datosMazo.tarjetas,
     };
 
+    const nuevoId = `flashcards-${crypto.randomUUID()}`;
+
     // 3. Cachear en la base de datos
     try {
       await db.insert(contenidoValidado).values({
-        id: `flashcards-${crypto.randomUUID()}`,
+        id: nuevoId,
         materia,
         curso,
         oa,
@@ -191,7 +196,7 @@ export async function GET(req: NextRequest) {
         enunciado: datosMazo.enunciado,
         tarjetas: datosMazo.tarjetas,
       },
-      fuente: "generada",
+      fuente: "generada", id: nuevoId,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";

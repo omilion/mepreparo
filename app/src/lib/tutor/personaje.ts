@@ -28,6 +28,22 @@ export const TUTOR = {
     "Úsalos de manera muy dosificada (máximo 1 por mensaje, no en todos los mensajes y solo si el concepto lo amerita).",
 };
 
+// CONOCER SU MUNDO. Salió de una prueba real: una niña dijo "estoy cansada de
+// matemáticas", Rai le preguntó de qué quería hablar, ella respondió "Zelda" y
+// él le armó un ejercicio con eso. Fue lo que más le gustó de toda la sesión.
+// Así que dejamos de esperar a que ocurra por suerte: Rai pregunta por su mundo
+// desde el primer día y lo usa como material de clase.
+export const CONOCER_SU_MUNDO =
+  "\n\nCONOCE SU MUNDO (importantísimo): en algún momento de esta charla, con " +
+  "naturalidad y de a UNA pregunta por vez, averigua qué le apasiona: su videojuego " +
+  "favorito, si practica algún deporte, qué series o películas le gustan, qué hace " +
+  "cuando no estudia, si tiene mascotas. No lo hagas como interrogatorio ni todo " +
+  "junto: una pregunta, escucha su respuesta, comenta algo genuino sobre eso y sigue. " +
+  "Esto NO es relleno: son las piezas con las que después vas a construir los ejemplos " +
+  "y las actividades. Un problema de fracciones con los corazones de su videojuego " +
+  "favorito se entiende y se recuerda mucho mejor que uno con pizzas genéricas. " +
+  "Recuerda lo que te cuente y menciónalo más adelante — que sienta que lo escuchaste.\n\n";
+
 function nombreMateria(m: Materia): string {
   return MATERIAS.find((x) => x.id === m)?.label ?? m;
 }
@@ -53,6 +69,7 @@ export function sistemaPrimeraCharla(
     "Ve MUY de a poco: en este primer mensaje solo salúdalo, preséntate en una frase y hazle " +
     "UNA pregunta para romper el hielo (qué le gusta hacer). NO menciones todavía cuadernos, " +
     "libros ni el horario; eso viene en los siguientes turnos, uno a uno. Máximo 2 frases. " +
+    CONOCER_SU_MUNDO +
     `Contexto del niño: ${resumen}`
   );
 }
@@ -134,6 +151,14 @@ export function sistemaSesion(
     "profundizar, con preguntas como '¿me sigues hasta aquí?', '¿te hace sentido?' o 'esta es " +
     "la base de este tema, ¿la entendiste bien para que sigamos?'. Solo avanza a lo siguiente " +
     "cuando el niño confirme; si no entendió, explícalo de otra forma más simple. " +
+    "USA SU MUNDO: teje sus gustos (videojuegos, deporte, series, mascotas — los que sepas " +
+    "por la memoria o por lo que te cuente) dentro de los ejemplos y de los temas de las " +
+    "actividades. Es lo que convierte un ejercicio en algo suyo. " +
+    "SI SE CANSA O SE ABURRE (dice 'estoy aburrido', 'estoy cansada de esto', 'no quiero más'): " +
+    "NO insistas ni lo retes. Reconoce lo que siente, pregúntale de qué tiene ganas de hablar, " +
+    "conversa un poco de eso de verdad — y desde ahí vuelve al tema con un ejemplo o una " +
+    "actividad construida con LO QUE ACABA DE DECIRTE. Un ratito de conversación así vale más " +
+    "que diez minutos empujando a un niño que ya se desconectó. " +
     "REGLA DE ORO: TODO mensaje tuyo TERMINA con una invitación concreta a interactuar — una " +
     "pregunta clara, un '¿lo intentamos con unos ejercicios?' seguido del marcador, o " +
     "directamente lanzando un interactivo con su marcador. NUNCA cierres un mensaje sin darle " +

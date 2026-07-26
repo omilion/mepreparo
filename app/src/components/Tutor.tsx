@@ -65,6 +65,9 @@ interface Mensaje {
   secuencia?: DatosSecuencia;
   // si Rai lanzó "flashcards" (fichas de estudio)
   flashcards?: DatosFlashcards;
+  // el niño ya terminó la actividad de este turno (los ejercicios además guardan
+  // si acertó en `ejercicio.respondido`)
+  resuelto?: boolean;
 }
 
 export function Tutor({
@@ -106,7 +109,16 @@ export function Tutor({
   const [faseBase, setFaseBase] = useState<
     "reposo" | "hablando" | "duda" | "escuchando"
   >("reposo");
+  // Contenidos que el niño YA vio en esta sesión. Se mandan a los generadores
+  // para que no le devuelvan lo mismo: la biblioteca cachea un interactivo por
+  // tema, así que sin esto el segundo juego del mismo tema salía idéntico.
+  const vistos = useRef<Set<string>>(new Set());
+  // Control de ritmo de las actividades: no dos seguidas, y nunca una encima de
+  // otra que el niño todavía no responde.
+  const actividadPendiente = useRef(false);
+  const turnosDesdeActividad = useRef(99);
   const finRef = useRef<HTMLDivElement>(null);
+  const ultimoRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
   const inicioSesion = useRef(Date.now());
 
@@ -116,9 +128,27 @@ export function Tutor({
     );
   }, []);
 
+  // Los mensajes de Rai pueden ser largos. Si la vista sigue el texto hasta el
+  // final, el niño queda mirando la ÚLTIMA línea y tiene que subir a mano para
+  // leer desde el principio. Alineamos el INICIO de su mensaje arriba, como
+  // abrir un libro; lo que venga debajo (incluido el juego) se lee bajando.
+  const mostrarInicioDeRai = useCallback(() => {
+    requestAnimationFrame(() =>
+      ultimoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+  }, []);
+
   useEffect(() => {
-    scrollAlFinal();
-  }, [mensajes, cargando]);
+    // mientras Rai piensa, abajo (para ver el "está escribiendo"); cuando habla,
+    // al principio de lo que dijo; si el último en hablar fue el niño, abajo.
+    if (cargando) return scrollAlFinal();
+    const ultimo = mensajes[mensajes.length - 1];
+    if (ultimo?.de === "rai") mostrarInicioDeRai();
+    else scrollAlFinal();
+    // `mensajes.length` y no `mensajes`: marcar una actividad como resuelta
+    // cambia el arreglo, y eso no debe mover la vista mientras el niño juega.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mensajes.length, cargando]);
 
   // EL FLUJO BASE DE LA ESFERA — se deduce de la conversación, nadie lo agenda:
   //   habla mientras su texto se revela → si terminó preguntando, se ladea un
@@ -172,8 +202,50 @@ export function Tutor({
     };
   }
 
+  // Qué actividad llevaba un turno de Rai, en una línea que la IA pueda leer.
+  // SIN ESTO el historial que ve Gemini es solo su propio texto: el marcador se
+  // le quita antes de guardarlo, así que no queda rastro de que el juego se
+  // entregó ni de cómo le fue al niño. Por eso volvía a pedir el MISMO
+  // interactivo turno tras turno hasta que se le pasaba.
+  function trazaActividad(m: Mensaje): string | null {
+    const tipos: [boolean, string][] = [
+      [!!m.ejercicio, "un ejercicio"],
+      [!!m.sopa, "una sopa de letras"],
+      [!!m.rueda, "una rueda de letras"],
+      [!!m.intruso, "el intruso"],
+      [!!m.conector, "el conector (unir columnas)"],
+      [!!m.clasificador, "el clasificador (arrastrar a grupos)"],
+      [!!m.secuencia, "una secuencia para ordenar"],
+      [!!m.flashcards, "un mazo de fichas"],
+    ];
+    const hallado = tipos.find(([hay]) => hay);
+    if (!hallado) return null;
+
+    const estado =
+      m.ejercicio?.respondido === "ok"
+        ? "el niño la respondió BIEN"
+        : m.ejercicio?.respondido === "no"
+          ? "el niño se equivocó"
+          : m.resuelto
+            ? "el niño la completó"
+            : "el niño todavía no la responde";
+    return `[YA le entregaste ${hallado[1]} en este turno — ${estado}. No lo repitas.]`;
+  }
+
   function historialPlano(): { de: "rai" | "nino"; texto: string }[] {
-    return mensajes.map((m) => ({ de: m.de, texto: m.texto }));
+    return mensajes.map((m) => {
+      const traza = trazaActividad(m);
+      return { de: m.de, texto: traza ? `${m.texto}
+${traza}` : m.texto };
+    });
+  }
+
+  // ¿Corresponde entregar una actividad ahora? Rai a veces insiste con el
+  // marcador varios turnos seguidos; esta es la garantía dura de que el niño no
+  // reciba el mismo juego una y otra vez.
+  function puedeLanzarActividad(): boolean {
+    if (actividadPendiente.current) return false; // la anterior sigue sin responder
+    return turnosDesdeActividad.current >= 2; // deja respirar la clase
   }
 
   async function saludar() {
@@ -207,6 +279,7 @@ export function Tutor({
     if (!pregunta || cargando) return;
     const historial = [...historialPlano(), { de: "nino" as const, texto: pregunta }];
     setMensajes((m) => [...m, { de: "nino", texto: pregunta }]);
+    turnosDesdeActividad.current++;
     setCargando(true);
     setCompacta(true); // primera (y siguientes) respuestas: esfera a la esquina
 
@@ -276,6 +349,25 @@ export function Tutor({
     // de un índice numérico, que llegaba desfasado. La materia del interactivo es
     // la que Rai ENSEÑA (data.actividadMateria), no la agendada del día.
     const mat = data.actividadMateria || materia;
+
+    // FRENO: si la actividad anterior sigue sin responder, o acaba de haber una,
+    // se ignora el marcador y queda solo el texto. Es la garantía dura contra el
+    // juego que aparecía una y otra vez mientras el niño ya lo tenía en pantalla.
+    const permitido = puedeLanzarActividad();
+    if (!permitido) {
+      data = {
+        ...data,
+        ejercicioTema: undefined,
+        sopaTema: undefined,
+        ruedaTema: undefined,
+        intrusoTema: undefined,
+        conectorTema: undefined,
+        clasificadorTema: undefined,
+        secuenciaTema: undefined,
+        flashcardsTema: undefined,
+      };
+    }
+
     const ejercicio = data.ejercicioTema
       ? await obtenerEjercicio(data.ejercicioTema, data.ejercicioFormato, mat)
       : null;
@@ -316,6 +408,12 @@ export function Tutor({
     const llegoActividad = !!(
       ejercicio || sopa || rueda || intruso || conector || clasificador || secuencia || flashcards
     );
+
+    // queda una actividad esperando respuesta: no se le encima otra
+    if (llegoActividad) {
+      actividadPendiente.current = true;
+      turnosDesdeActividad.current = 0;
+    }
 
     // CÓMO ENTRA EL MENSAJE DE RAI:
     //  · si trae una actividad, la esfera destella una "idea" y lanza un anillo
@@ -365,19 +463,33 @@ export function Tutor({
   // Pide un ejercicio a la biblioteca validada y lo devuelve listo (o null si no
   // hay uno válido). `formato` = "opcion_multiple" | "seleccion_multiple".
   // NO toca el estado: quien llama decide dónde lo adjunta.
+  // Params comunes de los generadores, con lo ya visto excluido.
+  function paramsActividad(tema: string, mat: string): URLSearchParams {
+    const p = new URLSearchParams({
+      materia: mat,
+      curso: perfil.curso,
+      dificultad: "2",
+      tema,
+    });
+    if (vistos.current.size > 0) {
+      p.set("excluir", Array.from(vistos.current).join(","));
+    }
+    return p;
+  }
+
+  // Anota el contenido entregado para no repetirlo más adelante en la sesión.
+  function anotarVisto(id?: string) {
+    if (id) vistos.current.add(id);
+  }
+
   async function obtenerEjercicio(
     tema: string,
     formato: string = "opcion_multiple",
     mat: string = materia
   ): Promise<EjercicioChat | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-        tipoPlantilla: formato,
-      });
+      const params = paramsActividad(tema, mat);
+      params.set("tipoPlantilla", formato);
       const res = await fetch(`/api/ejercicios/obtener?${params}`);
       const data = await res.json();
       const e = data.ejercicio;
@@ -402,6 +514,7 @@ export function Tutor({
             opciones.includes(respuestaFinal)
           );
       if (!esValido) return null;
+      anotarVisto(e?.id);
 
       return {
         tema,
@@ -420,15 +533,11 @@ export function Tutor({
   // datos listos (grid + palabras con su path) o null si no se pudo armar.
   async function obtenerSopa(tema: string, mat: string = materia): Promise<DatosSopa | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/sopa/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const s = data.sopa;
       const gridOk = Array.isArray(s?.grid) && s.grid.length > 0;
       const palabrasOk = Array.isArray(s?.palabras) && s.palabras.length >= 3;
@@ -443,15 +552,11 @@ export function Tutor({
   // los datos listos o null si no se pudo generar.
   async function obtenerRueda(tema: string, mat: string = materia): Promise<DatosRueda | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/rueda/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const r = data.rueda;
       const ok =
         typeof r?.enunciado === "string" &&
@@ -469,15 +574,11 @@ export function Tutor({
   // datos listos o null si no se pudo generar.
   async function obtenerIntruso(tema: string, mat: string = materia): Promise<DatosIntruso | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/intruso/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const it = data.intruso;
       const ok =
         typeof it?.enunciado === "string" &&
@@ -501,15 +602,11 @@ export function Tutor({
   // listos o null si no se pudo generar.
   async function obtenerConector(tema: string, mat: string = materia): Promise<DatosConector | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/conector/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const c = data.conector;
       const ok =
         typeof c?.enunciado === "string" &&
@@ -535,15 +632,11 @@ export function Tutor({
     mat: string = materia
   ): Promise<DatosClasificador | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/clasificador/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const c = data.clasificador;
       const ok =
         typeof c?.enunciado === "string" &&
@@ -566,15 +659,11 @@ export function Tutor({
 
   async function obtenerSecuencia(tema: string, mat: string = materia): Promise<DatosSecuencia | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/secuencia/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const s = data.secuencia;
       const ok =
         typeof s?.enunciado === "string" &&
@@ -595,15 +684,11 @@ export function Tutor({
 
   async function obtenerFlashcards(tema: string, mat: string = materia): Promise<DatosFlashcards | null> {
     try {
-      const params = new URLSearchParams({
-        materia: mat,
-        curso: perfil.curso,
-        dificultad: "2",
-        tema,
-      });
+      const params = paramsActividad(tema, mat);
       const res = await fetch(`/api/flashcards/generar?${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      anotarVisto(data.id);
       const f = data.flashcards;
       const ok =
         typeof f?.enunciado === "string" &&
@@ -794,6 +879,16 @@ export function Tutor({
   //   Error   → NIEGA (la respuesta no era esa: hay que decírselo claro) y
   //   enseguida se queda en ánimo — se adelgaza, baja el ritmo y acompaña. El
   //   "no" es sobre la respuesta; lo que viene después es sobre el niño.
+  // El niño terminó la actividad de ese turno: queda anotado para la traza del
+  // historial (así Rai sabe que ya la hizo y puede comentarla) y se libera el
+  // freno para que más adelante pueda proponer otra.
+  function marcarResuelto(msgIdx: number) {
+    actividadPendiente.current = false;
+    setMensajes((m) =>
+      m.map((msg, i) => (i === msgIdx ? { ...msg, resuelto: true } : msg))
+    );
+  }
+
   function reaccionarARespuesta(acerto: boolean) {
     if (acerto) reaccionar(["si", 800], ["celebracion", 2600]);
     else reaccionar(["no", 1300], ["animo", 2800]);
@@ -808,6 +903,7 @@ export function Tutor({
     const ok = evaluarEjercicio(ej, seleccion);
 
     reaccionarARespuesta(ok);
+    marcarResuelto(msgIdx);
 
     setMensajes((m) =>
       m.map((msg, i) =>
@@ -834,6 +930,7 @@ export function Tutor({
     if (!it) return;
 
     reaccionarARespuesta(acerto);
+    marcarResuelto(msgIdx);
 
     if (acuerdo) {
       const tema = it.enunciado.slice(0, 40);
@@ -881,6 +978,7 @@ export function Tutor({
     if (!c || !acuerdo) return;
 
     reaccionarARespuesta(acerto);
+    marcarResuelto(msgIdx);
 
     const tema = c.enunciado.slice(0, 40);
     const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
@@ -894,6 +992,7 @@ export function Tutor({
     if (!c || !acuerdo) return;
 
     reaccionarARespuesta(acerto);
+    marcarResuelto(msgIdx);
 
     const tema = c.enunciado.slice(0, 40);
     const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
@@ -903,6 +1002,7 @@ export function Tutor({
   function responderSopa(msgIdx: number) {
     // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
     reaccionarARespuesta(true);
+    marcarResuelto(msgIdx);
     const s = mensajes[msgIdx]?.sopa;
     if (s && acuerdo) {
       const tema = s.palabras[0]?.clean || "sopa de letras";
@@ -914,6 +1014,7 @@ export function Tutor({
   function responderRueda(msgIdx: number) {
     // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
     reaccionarARespuesta(true);
+    marcarResuelto(msgIdx);
     const r = mensajes[msgIdx]?.rueda;
     if (r && acuerdo) {
       const tema = r.respuesta;
@@ -925,6 +1026,7 @@ export function Tutor({
   function responderSecuencia(msgIdx: number) {
     // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
     reaccionarARespuesta(true);
+    marcarResuelto(msgIdx);
     const s = mensajes[msgIdx]?.secuencia;
     if (s && acuerdo) {
       const tema = s.pasosCorrectos[0] || "secuencia";
@@ -936,6 +1038,7 @@ export function Tutor({
   function responderFlashcards(msgIdx: number) {
     // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
     reaccionarARespuesta(true);
+    marcarResuelto(msgIdx);
     const f = mensajes[msgIdx]?.flashcards;
     if (f && acuerdo) {
       const tema = f.enunciado.slice(0, 40);
@@ -1158,12 +1261,17 @@ export function Tutor({
       {/* conversación: solo texto centrado, sin burbujas */}
       <div className="flex flex-1 flex-col gap-7 overflow-y-auto py-4 text-center">
         {mensajes.map((m, i) => (
-          <Linea
+          <div
             key={i}
+            ref={i === mensajes.length - 1 ? ultimoRef : undefined}
+            // scroll-mt: al alinear arriba, deja aire bajo la esfera
+            className="scroll-mt-3"
+          >
+          <Linea
             m={m}
             // solo el último mensaje de Rai se "escribe"; el resto ya está completo
             animar={m.de === "rai" && i === mensajes.length - 1}
-            onTick={scrollAlFinal}
+            onTick={mostrarInicioDeRai}
             onResponderEjercicio={(seleccion) => responderEjercicio(i, seleccion)}
             onResponderIntruso={(acerto, elegido) =>
               responderIntruso(i, acerto, elegido)
@@ -1175,6 +1283,7 @@ export function Tutor({
             onResponderSecuencia={() => responderSecuencia(i)}
             onResponderFlashcards={() => responderFlashcards(i)}
           />
+          </div>
         ))}
 
         <div ref={finRef} />

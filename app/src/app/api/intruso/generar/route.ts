@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { elegirNoUsado, idsExcluidos } from "@/lib/contenido/variedad";
 import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -119,12 +120,14 @@ export async function GET(req: NextRequest) {
           eq(contenidoValidado.estado, "publicada")
         )
       );
-    if (existentes.length > 0) {
-      const elegido = existentes[Math.floor(Math.random() * existentes.length)];
+    // Descarta lo que el niño ya vio en esta sesión; si no queda nada nuevo,
+    // sigue de largo y genera contenido fresco.
+    const elegido = elegirNoUsado(existentes, idsExcluidos(req));
+    if (elegido) {
       const d = elegido.datos as DatosIntruso;
       return NextResponse.json({
         intruso: { ...d, opciones: revolver(d.opciones) },
-        fuente: "biblioteca_compartida",
+        fuente: "biblioteca_compartida", id: elegido.id,
       });
     }
 
@@ -143,10 +146,12 @@ export async function GET(req: NextRequest) {
       datos = lista[Math.floor(Math.random() * lista.length)];
     }
 
+    const nuevoId = `intruso-${crypto.randomUUID()}`;
+
     // 3. Guardar en la biblioteca para reutilizar gratis (best-effort).
     try {
       await db.insert(contenidoValidado).values({
-        id: `intruso-${crypto.randomUUID()}`,
+        id: nuevoId,
         materia,
         curso,
         oa,
@@ -164,7 +169,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       intruso: { ...datos, opciones: revolver(datos.opciones) },
-      fuente: "generada",
+      fuente: "generada", id: nuevoId,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";

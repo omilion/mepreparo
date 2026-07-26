@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { elegirNoUsado, idsExcluidos } from "@/lib/contenido/variedad";
 import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -130,9 +131,11 @@ export async function GET(req: NextRequest) {
           eq(contenidoValidado.estado, "publicada")
         )
       );
-    if (existentes.length > 0) {
-      const elegido = existentes[Math.floor(Math.random() * existentes.length)];
-      return NextResponse.json({ clasificador: elegido.datos, fuente: "biblioteca_compartida" });
+    // Descarta lo que el niño ya vio en esta sesión; si no queda nada nuevo,
+    // sigue de largo y genera contenido fresco.
+    const elegido = elegirNoUsado(existentes, idsExcluidos(req));
+    if (elegido) {
+      return NextResponse.json({ clasificador: elegido.datos, fuente: "biblioteca_compartida", id: elegido.id });
     }
 
     // 2. Conseguirlo: Gemini (con RAG) o semilla.
@@ -149,10 +152,12 @@ export async function GET(req: NextRequest) {
 
     const guardable = { tipoPlantilla: "clasificador", tema, ...datos };
 
+    const nuevoId = `clasif-${crypto.randomUUID()}`;
+
     // 3. Guardar en la biblioteca para reutilizar gratis (best-effort).
     try {
       await db.insert(contenidoValidado).values({
-        id: `clasif-${crypto.randomUUID()}`,
+        id: nuevoId,
         materia,
         curso,
         oa,
@@ -168,7 +173,7 @@ export async function GET(req: NextRequest) {
       console.error("No se pudo cachear el clasificador:", err);
     }
 
-    return NextResponse.json({ clasificador: guardable, fuente: "generada" });
+    return NextResponse.json({ clasificador: guardable, fuente: "generada", id: nuevoId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";
     console.error("Clasificador falló:", msg);

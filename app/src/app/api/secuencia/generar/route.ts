@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { elegirNoUsado, idsExcluidos } from "@/lib/contenido/variedad";
 import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -135,8 +136,10 @@ export async function GET(req: NextRequest) {
         )
       );
 
-    if (existentes.length > 0) {
-      const elegida = existentes[Math.floor(Math.random() * existentes.length)];
+    // Descarta lo que el niño ya vio en esta sesión; si no queda nada nuevo,
+    // sigue de largo y genera contenido fresco.
+    const elegida = elegirNoUsado(existentes, idsExcluidos(req));
+    if (elegida) {
       const d = elegida.datos as { enunciado: string; pasosCorrectos: string[] };
       return NextResponse.json({
         secuencia: {
@@ -144,7 +147,7 @@ export async function GET(req: NextRequest) {
           pasosCorrectos: d.pasosCorrectos,
           pasosBarajados: barajarSecuencia(d.pasosCorrectos),
         },
-        fuente: "biblioteca_compartida",
+        fuente: "biblioteca_compartida", id: elegida.id,
       });
     }
 
@@ -171,10 +174,12 @@ export async function GET(req: NextRequest) {
       pasosCorrectos: datosSecuencia.pasosCorrectos,
     };
 
+    const nuevoId = `secuencia-${crypto.randomUUID()}`;
+
     // 3. Cachear en biblioteca
     try {
       await db.insert(contenidoValidado).values({
-        id: `secuencia-${crypto.randomUUID()}`,
+        id: nuevoId,
         materia,
         curso,
         oa,
@@ -196,7 +201,7 @@ export async function GET(req: NextRequest) {
         pasosCorrectos: datosSecuencia.pasosCorrectos,
         pasosBarajados: barajarSecuencia(datosSecuencia.pasosCorrectos),
       },
-      fuente: "generada",
+      fuente: "generada", id: nuevoId,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";

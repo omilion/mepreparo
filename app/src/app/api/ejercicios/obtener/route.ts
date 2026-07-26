@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { elegirNoUsado, idsExcluidos } from "@/lib/contenido/variedad";
 import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -158,9 +159,11 @@ export async function GET(req: NextRequest) {
         const t = d?.tipoPlantilla || "opcion_multiple";
         return t === tipoPlantilla;
       });
-      if (coincidentes.length > 0) {
-        // Retornar un ejercicio aleatorio de los coincidentes (ahorro 100% de tokens)
-        const elegido = coincidentes[Math.floor(Math.random() * coincidentes.length)];
+      // Uno al azar entre los que el niño NO haya visto en esta sesión (ahorro
+      // 100% de tokens). Si ya los vio todos, sigue de largo y genera uno nuevo:
+      // repetirle el mismo ejercicio no le enseña nada.
+      const elegido = elegirNoUsado(coincidentes, idsExcluidos(req));
+      if (elegido) {
         return NextResponse.json({ ejercicio: elegido, fuente: "biblioteca_compartida" });
       }
     }
