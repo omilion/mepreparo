@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { chequearLimite } from "@/lib/rateLimit";
+import { registrarEventoAsync } from "@/lib/telemetria";
 import {
   TUTOR,
   sistemaPrimeraCharla,
@@ -19,9 +20,6 @@ import { normalizarIconosInline } from "@/lib/tutor/iconos";
 import { recuperar } from "@/lib/tutor/rag";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
-import { db } from "@/lib/db/db";
-import { cacheRespuestas as cacheRespuestasTable } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 
 export const runtime = "nodejs"; // necesitamos fs para leer los chunks
 
@@ -30,6 +28,8 @@ type Turno = { de: "rai" | "nino"; texto: string };
 interface Body {
   // "saludo" = Rai inicia (sin pregunta). "chat" = responde al niño. "cerrar" = resume la tutoría.
   accion: "saludo" | "chat" | "cerrar";
+  // solo para telemetría de fallos: a qué niño le pasó (nunca su nombre)
+  pupiloId?: string;
   // primera charla si no hay acuerdo; sesión recurrente si lo hay
   acuerdo?: AcuerdoTutoria | null;
   resumenPerfil: string;
@@ -45,14 +45,6 @@ interface Body {
   temaFoco?: string;
   // true cuando la sesión se acerca a su fin: Rai debe empezar a despedirse
   cerrandoSesion?: boolean;
-}
-
-function normalizarPregunta(texto: string): string {
-  return texto
-    .trim()
-    .toLowerCase()
-    .replace(/[¿?¡!.,:;_\-\(\)]/g, "")
-    .replace(/\s+/g, " ");
 }
 
 export async function POST(req: NextRequest) {
@@ -158,33 +150,25 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
     return NextResponse.json({ error: "Falta la pregunta" }, { status: 400 });
   }
 
-  // --- C2. CACHÉ DE RESPUESTAS DEL TUTOR ---
-  const preguntaNormalizada = normalizarPregunta(body.pregunta || "");
-  if (accion === "chat" && preguntaNormalizada.length > 5 && body.materia && body.curso) {
-    try {
-      const cacheRecords = await db
-        .select()
-        .from(cacheRespuestasTable)
-        .where(
-          and(
-            eq(cacheRespuestasTable.preguntaNormalizada, preguntaNormalizada),
-            eq(cacheRespuestasTable.materia, body.materia),
-            eq(cacheRespuestasTable.curso, body.curso)
-          )
-        )
-        .limit(1);
-
-      if (cacheRecords.length > 0) {
-        return NextResponse.json({
-          respuesta: cacheRecords[0].respuesta,
-          fuentes: [],
-          modo: "cache_respuestas",
-        });
-      }
-    } catch (err) {
-      console.error("Error al consultar caché de respuestas:", err);
-    }
-  }
+  // --- POR QUÉ AQUÍ NO HAY CACHÉ DE RESPUESTAS ---
+  //
+  // Hubo una: guardaba el texto de Rai con la llave
+  // (pregunta normalizada + materia + curso) y lo reutilizaba entre niños.
+  // Se quitó porque esa llave no incluye AL NIÑO, y el texto guardado sí lo
+  // incluye a él. En una prueba real, 20 de 30 turnos de una clase salieron de
+  // ahí, y la tabla tenía respuestas como "¡Qué entretenido, Emilia! A mí
+  // también me gusta la música" listas para servírsele a cualquier otro niño de
+  // 5º básico que escribiera algo parecido.
+  //
+  // Tres daños a la vez: filtraba el nombre y los gustos de una familia a otra;
+  // rompía la continuidad (un "no entiendo" del ciclo del agua respondido con
+  // lo que se le dijo a otro sobre las células); y saltaba el prompt, así que la
+  // respuesta no llevaba ni la memoria del niño ni la traza de la actividad.
+  //
+  // NO REVIVIR sobre la respuesta cruda. Lo caro y reutilizable de verdad son
+  // los interactivos, y para eso ya está `contenido_validado`, que sí es
+  // impersonal. Una conversación con un tutor que dice tu nombre y se acuerda
+  // de tu perro no es reutilizable por definición.
 
   // --- Prompt de sistema según el momento ---
   let sistema: string;
@@ -266,6 +250,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
 
   // --- CAPA IA (con fallback simulado) ---
   if (tieneClave()) {
+    const inicioIA = Date.now();
     try {
       // C3. Enrutado de modelos:
       // - Saludos o primera charla: modelo barato (lite)
@@ -283,6 +268,19 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         maxTokens: esPrimera ? 700 : 1000,
         model: modeloElegido,
       });
+
+      const msIA = Date.now() - inicioIA;
+      // Solo registramos las respuestas LENTAS: un niño esperando 10 segundos
+      // frente a una esfera es el fallo, no el promedio.
+      if (msIA > 8000) {
+        registrarEventoAsync({
+          tipo: "tutor_latencia",
+          origen: "servidor",
+          pupiloId: body.pupiloId,
+          materia: body.materia,
+          meta: { ms: msIA, accion },
+        });
+      }
 
       const { texto: sinHorario, horario } = separarHorario(cruda, body.materias || []);
       // extrae los marcadores <<EJERCICIO/SELECCION/SOPA/RUEDA/INTRUSO:tema>> de Rai
@@ -304,36 +302,6 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       // "[icono:pizza]" (si no, se ven como texto literal en el chat).
       const textoFinal = normalizarIconosInline(texto);
 
-      // C2. Guardar respuesta en la tabla caché si corresponde (sin marcadores).
-      // No cacheamos respuestas con actividad: la actividad es dinámica.
-      if (
-        accion === "chat" &&
-        !ejercicioTema &&
-        !sopaTema &&
-        !ruedaTema &&
-        !intrusoTema &&
-        !conectorTema &&
-        !clasificadorTema &&
-        !secuenciaTema &&
-        !flashcardsTema &&
-        preguntaNormalizada.length > 5 &&
-        body.materia &&
-        body.curso &&
-        texto
-      ) {
-        try {
-          await db.insert(cacheRespuestasTable).values({
-            id: crypto.randomUUID(),
-            preguntaNormalizada,
-            materia: body.materia,
-            curso: body.curso,
-            respuesta: textoFinal,
-          });
-        } catch (err) {
-          console.error("Error al registrar respuesta en cache_respuestas:", err);
-        }
-      }
-
       return NextResponse.json({
         respuesta: textoFinal,
         fuentes,
@@ -353,6 +321,15 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
     } catch (e) {
       const msg = e instanceof Error ? e.message : "error";
       console.error("Tutor Gemini falló:", msg);
+      // El niño ve una respuesta de demostración y sigue; nosotros necesitamos
+      // saber cuántas veces pasa y en qué materia.
+      registrarEventoAsync({
+        tipo: "tutor_ia_fallo",
+        origen: "servidor",
+        pupiloId: body.pupiloId,
+        materia: body.materia,
+        meta: { accion, ms: Date.now() - inicioIA, primera: esPrimera },
+      });
       return NextResponse.json({
         respuesta: simulada(accion, esPrimera, body.nombre, body.pregunta),
         fuentes,
@@ -361,6 +338,16 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       });
     }
   }
+
+  // Sin API key la app igual responde, pero NO está enseñando de verdad. Si
+  // esto aparece en producción es una alarma, no una curiosidad.
+  registrarEventoAsync({
+    tipo: "tutor_modo_simulado",
+    origen: "servidor",
+    pupiloId: body.pupiloId,
+    materia: body.materia,
+    meta: { accion },
+  });
 
   return NextResponse.json({
     respuesta: simulada(accion, esPrimera, body.nombre, body.pregunta),

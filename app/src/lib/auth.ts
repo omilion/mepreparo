@@ -25,6 +25,20 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  user: {
+    additionalFields: {
+      // El rol viaja en la sesión SOLO para decidir a qué pantalla mandar a
+      // quien entra. La autorización de verdad NO se apoya en esto: cada
+      // pantalla de admin lo vuelve a verificar contra la base (ver lib/admin).
+      // input:false es la parte importante: impide que alguien se registre
+      // mandando {"rol":"admin"} en el cuerpo del signup.
+      rol: {
+        type: "string",
+        defaultValue: "apoderado",
+        input: false,
+      },
+    },
+  },
   advanced: {
     // en http (staging por IP) las cookies no llevan Secure para poder probar
     // el login; con dominio+https esto es false y vuelven a ser seguras.

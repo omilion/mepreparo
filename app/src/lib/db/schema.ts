@@ -5,6 +5,10 @@ export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  // 'apoderado' (todos) | 'admin' (nosotros). NUNCA se puede fijar al
+  // registrarse: better-auth lo declara con input:false y se otorga a mano
+  // desde el servidor (ver scripts/promover-admin.ts).
+  rol: text("rol").notNull().default("apoderado"),
   emailVerified: boolean("emailVerified").notNull(),
   image: text("image"),
   createdAt: timestamp("createdAt").notNull(),
@@ -118,6 +122,30 @@ export const sesiones = pgTable("sesiones", {
   titulo: text("titulo").notNull(),
   resumen: text("resumen").notNull(),
   nMensajes: integer("n_mensajes").notNull(),
+});
+
+// TELEMETRÍA DE FALLOS Y USO (append-only)
+//
+// Existe porque los cuatro bugs de la prueba real los supimos porque las niñas
+// los contaron. Sin esto no hay forma de saber cuántas veces Rai se cayó, cuántas
+// prometió un juego que no llegó, ni cuánto tarda en responder.
+//
+// REGLA DURA DE PRIVACIDAD: aquí NO entra contenido. Ni lo que el niño escribe,
+// ni lo que Rai responde, ni resúmenes de clase. Solo qué pasó, cuándo y a quién
+// (por id). `meta` se sanitiza en el servidor y solo admite números, booleanos y
+// etiquetas cortas — nunca una frase. Ver lib/telemetria.
+//
+// Se borra en cascada con la cuenta: si el apoderado se va, no queda rastro.
+export const eventos = pgTable("eventos", {
+  id: text("id").primaryKey(),
+  // ambos opcionales: hay fallos de servidor sin sesión (ej. generar contenido)
+  cuentaId: text("cuenta_id").references(() => user.id, { onDelete: "cascade" }),
+  pupiloId: text("pupilo_id").references(() => pupilos.id, { onDelete: "cascade" }),
+  tipo: text("tipo").notNull(), // catálogo cerrado (lib/telemetria)
+  origen: text("origen").notNull(), // 'servidor' | 'cliente'
+  materia: text("materia"),
+  meta: jsonb("meta"), // solo números/booleanos/etiquetas cortas
+  creadoEn: timestamp("creado_en").defaultNow().notNull(),
 });
 
 export const contenidoValidado = pgTable("contenido_validado", {

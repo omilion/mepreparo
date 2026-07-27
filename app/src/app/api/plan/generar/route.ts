@@ -10,6 +10,7 @@ import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import { rutaDeTemas } from "@/lib/plan/etapas";
 import type { PlanMateria } from "@/lib/tutor/acuerdo";
 import { chequearLimite } from "@/lib/rateLimit";
+import { registrarEventoAsync } from "@/lib/telemetria";
 
 export const runtime = "nodejs";
 
@@ -98,6 +99,14 @@ export async function POST(req: NextRequest) {
         };
       } catch (e) {
         console.error(`Plan de ${materia} falló, uso orden del banco:`, e);
+        // El niño igual recibe un plan (el orden del banco), pero NO es el
+        // personalizado que le prometimos en "preparando tus mundos".
+        registrarEventoAsync({
+          tipo: "plan_materia_fallo",
+          origen: "servidor",
+          materia,
+          meta: { curso: body.curso },
+        });
         // plan ya tiene el fallback del banco
       }
     }

@@ -126,6 +126,57 @@ curl -s "$IP_PUERTO/api/tutor" -X POST -H "Content-Type: application/json" \
 
 ---
 
+## Actualizar el esquema cuando hay migraciones nuevas
+Las migraciones viven en `app/src/lib/db/migrations/` y se aplican EN ORDEN. La
+`0000_*` crea las tablas base (ya aplicada); las siguientes se aplican una vez
+cada una, después de un `git pull` y ANTES de levantar la app nueva:
+```bash
+set -a; . ./.env.vps; set +a
+
+# 0001 crea la tabla `eventos` (telemetría de fallos)
+# 0002 agrega la columna `rol` a `user` (admin de la empresa)
+for m in app/src/lib/db/migrations/0001_*.sql app/src/lib/db/migrations/0002_*.sql; do
+  docker compose -f docker-compose.vps.yml exec -T db \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < "$m"
+done
+
+docker compose -f docker-compose.vps.yml exec -T db \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt"   # debe aparecer `eventos`
+```
+
+### Vaciar la caché de respuestas del tutor (una vez, IMPORTANTE)
+Esa caché guardaba el texto de Rai con la llave (pregunta + materia + curso), sin
+el niño — así que servía respuestas con el NOMBRE y los gustos de un niño a otro
+distinto. Se quitó del código, pero las filas ya guardadas siguen ahí con datos
+personales. Hay que borrarlas:
+```bash
+docker compose -f docker-compose.vps.yml exec -T db \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "delete from cache_respuestas;"
+```
+> La tabla se deja creada a propósito (por si algún día se diseña una caché
+> despersonalizada), pero hoy ningún código la lee ni la escribe.
+
+### Crear el primer admin
+El rol NO se puede pedir al registrarse. Hay que registrarse por la app como
+cualquier apoderado y después promoverse a mano, con acceso al servidor:
+```bash
+docker compose -f docker-compose.vps.yml exec app \
+  npx tsx scripts/promover-admin.ts tu@correo.cl
+# quitar el rol:  ... scripts/promover-admin.ts tu@correo.cl --quitar
+```
+Hay que cerrar sesión y volver a entrar para que tome el cambio. Después de eso,
+al iniciar sesión esa cuenta entra directo a `/admin` en vez del panel de hijos.
+
+> ⚠️ **HTTPS ANTES QUE EL ADMIN.** Sobre `http://IP:PUERTO` la cookie de sesión
+> viaja sin cifrar (`useSecureCookies=false`). Para un apoderado en staging es un
+> riesgo asumido; para una cuenta admin —que ve datos de TODAS las familias— no
+> lo es. Mientras no haya dominio+HTTPS, mejor usar `/admin` por un túnel SSH
+> (`ssh -L 8090:localhost:8090 usuario@VPS` y abrir `http://localhost:8090/admin`)
+> en vez de exponer ese login por la IP pública.
+> ⚠️ Si no se aplica, la app NO se cae (registrar telemetría es best-effort y se
+> traga el error), pero la tabla queda vacía para siempre y uno cree que no hay
+> fallos cuando en realidad no se están guardando.
+
 ## Comandos útiles (operación)
 ```bash
 docker compose -f docker-compose.vps.yml logs -f app

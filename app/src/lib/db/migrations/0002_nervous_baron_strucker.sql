@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "rol" text DEFAULT 'apoderado' NOT NULL;

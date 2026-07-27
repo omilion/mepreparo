@@ -31,6 +31,7 @@ import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
 import { useApp } from "@/lib/app/AppProvider";
+import { avisarEvento } from "@/lib/telemetriaCliente";
 
 interface EjercicioChat {
   tema: string;
@@ -68,6 +69,23 @@ interface Mensaje {
   // el niño ya terminó la actividad de este turno (los ejercicios además guardan
   // si acertó en `ejercicio.respondido`)
   resuelto?: boolean;
+}
+
+// Qué tipo de actividad venía anunciada en la respuesta de Rai. Se usa solo
+// para la telemetría de fallos: una etiqueta corta, nunca el tema que escribió
+// el niño.
+function marcadorDeActividad(data: Record<string, unknown>): string | null {
+  const tipos: [string, unknown][] = [
+    ["ejercicio", data.ejercicioTema],
+    ["sopa", data.sopaTema],
+    ["rueda", data.ruedaTema],
+    ["intruso", data.intrusoTema],
+    ["conector", data.conectorTema],
+    ["clasificador", data.clasificadorTema],
+    ["secuencia", data.secuenciaTema],
+    ["flashcards", data.flashcardsTema],
+  ];
+  return tipos.find(([, tema]) => !!tema)?.[0] ?? null;
 }
 
 export function Tutor({
@@ -116,7 +134,12 @@ export function Tutor({
   // Control de ritmo de las actividades: no dos seguidas, y nunca una encima de
   // otra que el niño todavía no responde.
   const actividadPendiente = useRef(false);
-  const turnosDesdeActividad = useRef(99);
+  // Combinaciones tipo+tema ya entregadas y el tipo del último juego. Dos juegos
+  // seguidos están bien; lo que no puede pasar es que sean LA MISMA experiencia.
+  // Filas distintas no bastan: en una prueba real, dos "secuencia" del ciclo del
+  // agua salieron con ids distintos y los mismos cuatro pasos.
+  const combinacionesUsadas = useRef<Set<string>>(new Set());
+  const ultimoTipo = useRef<string | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
   const ultimoRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
@@ -185,6 +208,7 @@ export function Tutor({
     if (inicioPedido.current) return;
     inicioPedido.current = true;
     reaccionar(["saludo", 4200]);
+    avisarEvento("sesion_iniciada", { pupiloId: perfil.id, materia });
     void saludar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -198,6 +222,7 @@ export function Tutor({
       horasSemana: perfil.disponibilidad.horasSemana,
       curso: perfil.curso,
       nombre: perfil.nombre,
+      pupiloId: perfil.id, // solo para telemetría de fallos
       temaFoco, // si viene del mapa: la lección se centra en esta etapa
     };
   }
@@ -240,12 +265,40 @@ ${traza}` : m.texto };
     });
   }
 
-  // ¿Corresponde entregar una actividad ahora? Rai a veces insiste con el
-  // marcador varios turnos seguidos; esta es la garantía dura de que el niño no
-  // reciba el mismo juego una y otra vez.
-  function puedeLanzarActividad(): boolean {
-    if (actividadPendiente.current) return false; // la anterior sigue sin responder
-    return turnosDesdeActividad.current >= 2; // deja respirar la clase
+  // Orden en que se busca un reemplazo cuando el juego pedido repetiría la
+  // experiencia. Arriba los más versátiles (sirven para casi cualquier tema).
+  const ROTACION = [
+    "ejercicio",
+    "intruso",
+    "conector",
+    "clasificador",
+    "secuencia",
+    "flashcards",
+    "rueda",
+    "sopa",
+  ] as const;
+
+  // QUÉ JUEGO ENTREGAR. Rai propone; acá se decide si eso es repetirle algo.
+  // Reglas, en orden:
+  //   1. si la actividad anterior sigue sin responder, no se encima otra;
+  //   2. dos juegos seguidos SÍ se permiten, pero nunca del mismo tipo;
+  //   3. una combinación tipo+tema ya usada en la sesión no se repite;
+  //   4. si el pedido choca con 2 o 3, se busca OTRO TIPO para el mismo tema —
+  //      un clasificador del ciclo del agua no es lo mismo que una secuencia,
+  //      aunque el tema sea idéntico. Solo si no queda ninguno, se suprime.
+  function decidirActividad(
+    tipoPedido: string | null,
+    tema: string | undefined
+  ): { tipo: string; cambiado: boolean } | null {
+    if (!tipoPedido || !tema) return null;
+    if (actividadPendiente.current) return null;
+
+    const sirve = (t: string) =>
+      t !== ultimoTipo.current && !combinacionesUsadas.current.has(`${t}:${tema}`);
+
+    if (sirve(tipoPedido)) return { tipo: tipoPedido, cambiado: false };
+    const alternativa = ROTACION.find(sirve);
+    return alternativa ? { tipo: alternativa, cambiado: true } : null;
   }
 
   async function saludar() {
@@ -264,6 +317,11 @@ ${traza}` : m.texto };
       // poco. No niega — negar sería responderle algo al niño, y aquí no hay
       // nadie respondiendo.
       reaccionar(["ausente", 5000]);
+      avisarEvento("tutor_sin_conexion", {
+        pupiloId: perfil.id,
+        materia,
+        meta: { accion: "saludo" },
+      });
       setMensajes([
         {
           de: "rai",
@@ -279,7 +337,6 @@ ${traza}` : m.texto };
     if (!pregunta || cargando) return;
     const historial = [...historialPlano(), { de: "nino" as const, texto: pregunta }];
     setMensajes((m) => [...m, { de: "nino", texto: pregunta }]);
-    turnosDesdeActividad.current++;
     setCargando(true);
     setCompacta(true); // primera (y siguientes) respuestas: esfera a la esquina
 
@@ -320,6 +377,11 @@ ${traza}` : m.texto };
       }
     } catch {
       reaccionar(["ausente", 5000]); // se cortó: Rai se aleja y se apaga
+      avisarEvento("tutor_sin_conexion", {
+        pupiloId: perfil.id,
+        materia,
+        meta: { accion: "chat" },
+      });
       setMensajes((m) => [
         ...m,
         { de: "rai", texto: "No pude conectarme. Intenta de nuevo en un momento." },
@@ -353,39 +415,74 @@ ${traza}` : m.texto };
     // FRENO: si la actividad anterior sigue sin responder, o acaba de haber una,
     // se ignora el marcador y queda solo el texto. Es la garantía dura contra el
     // juego que aparecía una y otra vez mientras el niño ya lo tenía en pantalla.
-    const permitido = puedeLanzarActividad();
-    if (!permitido) {
-      data = {
-        ...data,
-        ejercicioTema: undefined,
-        sopaTema: undefined,
-        ruedaTema: undefined,
-        intrusoTema: undefined,
-        conectorTema: undefined,
-        clasificadorTema: undefined,
-        secuenciaTema: undefined,
-        flashcardsTema: undefined,
-      };
+    // Rai pidió un juego; acá se decide si ese juego repetiría la experiencia.
+    const tipoPedido = marcadorDeActividad(data);
+    const temaPedido = tipoPedido
+      ? (data as Record<string, string | undefined>)[`${tipoPedido}Tema`]
+      : undefined;
+    const decision = decidirActividad(tipoPedido, temaPedido);
+
+    if (tipoPedido && !decision) {
+      avisarEvento("actividad_suprimida", {
+        pupiloId: perfil.id,
+        materia: mat,
+        meta: { tipo: tipoPedido, pendiente: actividadPendiente.current },
+      });
+    }
+    if (tipoPedido && decision?.cambiado) {
+      // No es un fallo: es el sistema evitando que le llegue lo mismo otra vez.
+      avisarEvento("actividad_cambiada", {
+        pupiloId: perfil.id,
+        materia: mat,
+        meta: { de: tipoPedido, a: decision.tipo },
+      });
     }
 
-    const ejercicio = data.ejercicioTema
-      ? await obtenerEjercicio(data.ejercicioTema, data.ejercicioFormato, mat)
-      : null;
-    const sopa = data.sopaTema ? await obtenerSopa(data.sopaTema, mat) : null;
-    const rueda = data.ruedaTema ? await obtenerRueda(data.ruedaTema, mat) : null;
-    const intruso = data.intrusoTema ? await obtenerIntruso(data.intrusoTema, mat) : null;
-    const conector = data.conectorTema
-      ? await obtenerConector(data.conectorTema, mat)
-      : null;
-    const clasificador = data.clasificadorTema
-      ? await obtenerClasificador(data.clasificadorTema, mat)
-      : null;
-    const secuencia = data.secuenciaTema
-      ? await obtenerSecuencia(data.secuenciaTema, mat)
-      : null;
-    const flashcards = data.flashcardsTema
-      ? await obtenerFlashcards(data.flashcardsTema, mat)
-      : null;
+    // Un solo camino de descarga, según lo decidido (antes eran ocho ramas
+    // fijas atadas a lo que hubiera pedido Rai).
+    const tipoFinal = decision?.tipo ?? null;
+    const tema = temaPedido ?? "";
+    const traer = async (t: string) => {
+      switch (t) {
+        case "ejercicio":
+          return { ejercicio: await obtenerEjercicio(tema, data.ejercicioFormato, mat) };
+        case "sopa":
+          return { sopa: await obtenerSopa(tema, mat) };
+        case "rueda":
+          return { rueda: await obtenerRueda(tema, mat) };
+        case "intruso":
+          return { intruso: await obtenerIntruso(tema, mat) };
+        case "conector":
+          return { conector: await obtenerConector(tema, mat) };
+        case "clasificador":
+          return { clasificador: await obtenerClasificador(tema, mat) };
+        case "secuencia":
+          return { secuencia: await obtenerSecuencia(tema, mat) };
+        case "flashcards":
+          return { flashcards: await obtenerFlashcards(tema, mat) };
+        default:
+          return {};
+      }
+    };
+    const traida: {
+      ejercicio?: EjercicioChat | null;
+      sopa?: DatosSopa | null;
+      rueda?: DatosRueda | null;
+      intruso?: DatosIntruso | null;
+      conector?: DatosConector | null;
+      clasificador?: DatosClasificador | null;
+      secuencia?: DatosSecuencia | null;
+      flashcards?: DatosFlashcards | null;
+    } = tipoFinal ? await traer(tipoFinal) : {};
+
+    const ejercicio = traida.ejercicio ?? null;
+    const sopa = traida.sopa ?? null;
+    const rueda = traida.rueda ?? null;
+    const intruso = traida.intruso ?? null;
+    const conector = traida.conector ?? null;
+    const clasificador = traida.clasificador ?? null;
+    const secuencia = traida.secuencia ?? null;
+    const flashcards = traida.flashcards ?? null;
 
     setMensajes((m) => [
       ...m,
@@ -410,9 +507,10 @@ ${traza}` : m.texto };
     );
 
     // queda una actividad esperando respuesta: no se le encima otra
-    if (llegoActividad) {
+    if (llegoActividad && tipoFinal) {
       actividadPendiente.current = true;
-      turnosDesdeActividad.current = 0;
+      ultimoTipo.current = tipoFinal;
+      combinacionesUsadas.current.add(`${tipoFinal}:${tema}`);
     }
 
     // CÓMO ENTRA EL MENSAJE DE RAI:
@@ -447,6 +545,11 @@ ${traza}` : m.texto };
       data.flashcardsTema
     );
     if (prometioActividad && !llegoActividad) {
+      avisarEvento("actividad_prometida_sin_llegar", {
+        pupiloId: perfil.id,
+        materia: mat,
+        meta: { tipo: marcadorDeActividad(data) || "otro" },
+      });
       reaccionar(["ausente", 2200]); // se le perdió la actividad: se aleja un momento
       setMensajes((m) => [
         ...m,

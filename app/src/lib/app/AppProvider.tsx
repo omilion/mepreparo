@@ -18,7 +18,9 @@ import { usePathname, useRouter } from "next/navigation";
 
 // Herramientas internas que se abren escribiendo la URL a mano. El arranque no
 // debe rutearlas: si no, entras y te rebota al home antes de ver nada.
-const RUTAS_LIBRES = ["/rai"];
+// (/admin se protege solo, en el servidor, y no tiene nada que ver con el
+// flujo del niño: el arranque no debe moverlo de ahí.)
+const RUTAS_LIBRES = ["/rai", "/admin"];
 import { authClient } from "@/lib/auth-client";
 import {
   leerCuenta,
@@ -250,7 +252,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 3) apoderado con sesión → sincroniza y va a panel o registro
+    // 3) admin de la empresa → a su panel, no al flujo de apoderado (no tiene
+    // hijos que configurar, y mandarlo a /registro sería absurdo).
+    if ((session.user as { rol?: string }).rol === "admin") {
+      arranqueHecho.current = true;
+      setCargando(false);
+      router.replace("/admin");
+      return;
+    }
+
+    // 4) apoderado con sesión → sincroniza y va a panel o registro
     const user = session.user;
 
     // DISPOSITIVO COMPARTIDO: lo que hay en este navegador puede ser de OTRO

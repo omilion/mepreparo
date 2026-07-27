@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { MATERIAS, type Materia, type PerfilNino } from "@/lib/profile";
 import { AuraOrb } from "./AuraOrb";
 import type { PlanMateria } from "@/lib/tutor/acuerdo";
+import { avisarEvento } from "@/lib/telemetriaCliente";
 
 // Pantalla intermedia tras el onboarding: mientras la IA prepara el plan de
 // etapas de cada materia ("los mundos"), el niño ve una animación con lenguaje
@@ -106,6 +107,21 @@ export function PrepararMundos({
       }
 
       if (cancelado) return;
+
+      // La ceremonia prometió un camino hecho a su medida. Si alguna materia no
+      // alcanzó a generarse, el niño igual pasa al mapa — pero con la ruta
+      // genérica del banco, y eso nadie lo nota desde afuera.
+      if (plan.length < materias.length) {
+        avisarEvento("plan_incompleto", {
+          pupiloId: perfil.id,
+          meta: {
+            pedidas: materias.length,
+            logradas: plan.length,
+            ms: Date.now() - inicioTodo,
+          },
+        });
+      }
+
       setPaso(materias.length + 1); // "Trazando tus etapas…"
       await pausa(1100);
       if (cancelado) return;
