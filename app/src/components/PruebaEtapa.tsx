@@ -12,6 +12,12 @@ import { Fireworks } from "./Fireworks";
 
 const TOTAL = 5;
 const UMBRAL = 0.8;
+// Mínimo de preguntas para que la prueba sea EVALUABLE. Antes eran 4, y varios
+// temas del banco tienen solo 2: la niña respondía 2 de 2 correctas y el
+// resultado era "buen intento" — reprobada para siempre, por más veces que lo
+// intentara. Si el banco solo ofrece 2, esa es la mejor evidencia disponible y
+// no es culpa de ella. Bajo 2 no se evalúa: se avisa que faltan preguntas.
+const MINIMO_EVALUABLE = 2;
 
 interface PreguntaCliente {
   id: string;
@@ -115,24 +121,38 @@ export function PruebaEtapa({
   if (terminada) {
     // n = preguntas respondidas (puede ser <5 si el banco se agotó)
     const totalReal = Math.max(1, n);
-    const paso = correctos / totalReal >= UMBRAL && totalReal >= 4;
+    // Sin preguntas suficientes no hay prueba: no se aprueba NI se reprueba.
+    const evaluable = n >= MINIMO_EVALUABLE;
+    const paso = evaluable && correctos / totalReal >= UMBRAL;
+    const incompleta = evaluable && n < TOTAL;
     return (
       <div className="zen-page relative flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-6 text-center">
         {paso && <Fireworks />}
         <Reveal variant="lead" delay={80}>
           <h1 className="max-w-[16ch] text-[30px]">
-            {paso ? "¡Etapa superada!" : "Buen intento"}
+            {!evaluable
+              ? "Todavía no hay prueba"
+              : paso
+                ? "¡Etapa superada!"
+                : "Buen intento"}
           </h1>
         </Reveal>
         <Reveal delay={420}>
           <p className="max-w-[36ch] text-[15px] leading-[1.5] text-ink-soft">
-            {paso
-              ? `Respondiste bien ${correctos} de ${totalReal} en ${tituloDeTema(tema)}. Rai lo va a recordar.`
-              : `Lograste ${correctos} de ${totalReal} en ${tituloDeTema(tema)}. No pasa nada: Rai lo va a repasar contigo con otro enfoque y lo intentas de nuevo cuando quieras.`}
+            {!evaluable
+              ? `Aún no tenemos preguntas suficientes de ${tituloDeTema(tema)} para tomarte la prueba. No es culpa tuya: sigue estudiando este tema con Rai y volvemos pronto.`
+              : paso
+                ? `Respondiste bien ${correctos} de ${totalReal} en ${tituloDeTema(tema)}.${
+                    incompleta ? ` (De este tema había ${totalReal} preguntas.)` : ""
+                  } Rai lo va a recordar.`
+                : `Lograste ${correctos} de ${totalReal} en ${tituloDeTema(tema)}. No pasa nada: Rai lo va a repasar contigo con otro enfoque y lo intentas de nuevo cuando quieras.`}
           </p>
         </Reveal>
         <Reveal delay={560}>
-          <button onClick={() => onTerminar(correctos, totalReal)} className="cta px-9">
+          <button
+            onClick={() => (evaluable ? onTerminar(correctos, totalReal) : onSalir())}
+            className="cta px-9"
+          >
             Volver a mi camino
           </button>
         </Reveal>

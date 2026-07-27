@@ -10,6 +10,7 @@ import {
   aplicarCierre,
   sembrarTemasDesdeDiagnostico,
   registrarEjercicios,
+  recordarContenidos,
   type AcuerdoTutoria,
   type TemaTrabajado,
   type RecuerdoNino,
@@ -130,7 +131,18 @@ export function Tutor({
   // Contenidos que el niño YA vio en esta sesión. Se mandan a los generadores
   // para que no le devuelvan lo mismo: la biblioteca cachea un interactivo por
   // tema, así que sin esto el segundo juego del mismo tema salía idéntico.
-  const vistos = useRef<Set<string>>(new Set());
+  // Arranca con lo que este niño ya vio en clases ANTERIORES (viene en su
+  // perfil y viaja con el sync). Antes esto nacía vacío en cada clase y a la
+  // semana siguiente la biblioteca le devolvía el mismo juego.
+  const vistos = useRef<Set<string>>(new Set(acuerdo?.contenidosVistos ?? []));
+  // El acuerdo más reciente. `perfil` viene por props y se congela en cada
+  // render: dos guardados seguidos en la misma clase (responder un juego y
+  // recibir el siguiente) partían del mismo acuerdo viejo y el segundo pisaba
+  // al primero. Perder evidencia que la niña ya ganó es lo peor que puede pasar.
+  const acuerdoVivo = useRef<AcuerdoTutoria | null>(acuerdo);
+  useEffect(() => {
+    acuerdoVivo.current = perfil.tutoria ?? null;
+  }, [perfil.tutoria]);
   // Control de ritmo de las actividades: no dos seguidas, y nunca una encima de
   // otra que el niño todavía no responde.
   const actividadPendiente = useRef(false);
@@ -580,9 +592,23 @@ ${traza}` : m.texto };
     return p;
   }
 
-  // Anota el contenido entregado para no repetirlo más adelante en la sesión.
+  // ÚNICA puerta para guardar avance. Aplica el cambio sobre el acuerdo vivo y
+  // deja el resultado como nuevo punto de partida, así dos guardados seguidos
+  // se encadenan en vez de pisarse.
+  function guardarAvance(cambio: (a: AcuerdoTutoria) => AcuerdoTutoria) {
+    const base = acuerdoVivo.current;
+    if (!base) return;
+    const tutoria = cambio(base);
+    acuerdoVivo.current = tutoria;
+    onGuardarPerfil?.({ ...perfil, tutoria });
+  }
+
+  // Anota el contenido entregado para no repetírselo: primero en memoria (para
+  // el resto de esta clase) y luego en su perfil (para las próximas).
   function anotarVisto(id?: string) {
-    if (id) vistos.current.add(id);
+    if (!id || vistos.current.has(id)) return;
+    vistos.current.add(id);
+    guardarAvance((a) => recordarContenidos(a, [id]));
   }
 
   async function obtenerEjercicio(
@@ -1018,8 +1044,7 @@ ${traza}` : m.texto };
 
     if (acuerdo) {
       // evidencia dura de UN ejercicio en la charla (correctos/total)
-      const tutoria = registrarEjercicios(acuerdo, ej.tema, materia, ok ? 1 : 0, 1);
-      onGuardarPerfil?.({ ...perfil, tutoria });
+      guardarAvance((a) => registrarEjercicios(a, ej.tema, materia, ok ? 1 : 0, 1));
     }
 
     // Si falló, le pedimos a Rai que le explique cuáles eran y por qué, para que
@@ -1037,8 +1062,7 @@ ${traza}` : m.texto };
 
     if (acuerdo) {
       const tema = it.enunciado.slice(0, 40);
-      const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
-      onGuardarPerfil?.({ ...perfil, tutoria });
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
     }
     if (!acerto) void raiExplicaIntruso(it, elegido);
   }
@@ -1084,8 +1108,7 @@ ${traza}` : m.texto };
     marcarResuelto(msgIdx);
 
     const tema = c.enunciado.slice(0, 40);
-    const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
-    onGuardarPerfil?.({ ...perfil, tutoria });
+    guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
   }
 
   // El niño terminó "el clasificador": registra evidencia. La tarjeta ya muestra
@@ -1098,8 +1121,7 @@ ${traza}` : m.texto };
     marcarResuelto(msgIdx);
 
     const tema = c.enunciado.slice(0, 40);
-    const tutoria = registrarEjercicios(acuerdo, tema, materia, acerto ? 1 : 0, 1);
-    onGuardarPerfil?.({ ...perfil, tutoria });
+    guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
   }
 
   function responderSopa(msgIdx: number) {
@@ -1109,8 +1131,7 @@ ${traza}` : m.texto };
     const s = mensajes[msgIdx]?.sopa;
     if (s && acuerdo) {
       const tema = s.palabras[0]?.clean || "sopa de letras";
-      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
-      onGuardarPerfil?.({ ...perfil, tutoria });
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
     }
   }
 
@@ -1121,8 +1142,7 @@ ${traza}` : m.texto };
     const r = mensajes[msgIdx]?.rueda;
     if (r && acuerdo) {
       const tema = r.respuesta;
-      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
-      onGuardarPerfil?.({ ...perfil, tutoria });
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
     }
   }
 
@@ -1133,8 +1153,7 @@ ${traza}` : m.texto };
     const s = mensajes[msgIdx]?.secuencia;
     if (s && acuerdo) {
       const tema = s.pasosCorrectos[0] || "secuencia";
-      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
-      onGuardarPerfil?.({ ...perfil, tutoria });
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
     }
   }
 
@@ -1145,8 +1164,7 @@ ${traza}` : m.texto };
     const f = mensajes[msgIdx]?.flashcards;
     if (f && acuerdo) {
       const tema = f.enunciado.slice(0, 40);
-      const tutoria = registrarEjercicios(acuerdo, tema, materia, 1, 1);
-      onGuardarPerfil?.({ ...perfil, tutoria });
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
     }
   }
 

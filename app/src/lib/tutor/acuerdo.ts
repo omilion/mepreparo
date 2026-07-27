@@ -89,6 +89,29 @@ export interface AcuerdoTutoria {
   temas?: TemaDominio[];
   // Capa 3: recuerdos personales del niño.
   recuerdos?: RecuerdoNino[];
+  // Ids de interactivos que este niño YA vio, entre sesiones. Sin esto, la
+  // memoria de lo entregado moría con la clase y a la semana siguiente la
+  // biblioteca le devolvía exactamente el mismo juego. Se recorta a los
+  // últimos MAX_VISTOS para no engordar el perfil (que viaja en cada sync).
+  contenidosVistos?: string[];
+}
+
+// Cuántos interactivos recordamos por niño. ~120 cubre varias semanas de
+// clases; más allá, repetir algo de hace meses es aceptable (y deseable, como
+// repaso espaciado).
+export const MAX_VISTOS = 120;
+
+// Registra contenidos entregados sin duplicar y conservando los más recientes.
+export function recordarContenidos(
+  acuerdo: AcuerdoTutoria,
+  ids: string[]
+): AcuerdoTutoria {
+  const limpios = ids.filter(Boolean);
+  if (limpios.length === 0) return acuerdo;
+  const previos = acuerdo.contenidosVistos ?? [];
+  // los nuevos al final: si hay que recortar, se pierde lo más antiguo
+  const juntos = [...previos.filter((id) => !limpios.includes(id)), ...limpios];
+  return { ...acuerdo, contenidosVistos: juntos.slice(-MAX_VISTOS) };
 }
 
 // Día de hoy como Dia (lun..dom), a partir de getDay() (0=domingo).

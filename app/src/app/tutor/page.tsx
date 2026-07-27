@@ -15,6 +15,19 @@ export default function TutorRuta() {
     }
   }, [pupilo, router]);
 
+  // El botón ATRÁS del navegador no puede sacar al niño de la clase. Salir por
+  // ahí se saltaba `manejarVolver`, que es quien cierra la sesión: no se
+  // guardaba el resumen del día ni los temas trabajados, así que una clase
+  // entera de esfuerzo desaparecía. Se sale por el botón de inicio, que sí
+  // guarda. (Mismo bloqueo que ya tenían /mapa y /panel.)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.history.pushState(null, "", window.location.href);
+    const bloquear = () => window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", bloquear);
+    return () => window.removeEventListener("popstate", bloquear);
+  }, []);
+
   if (!pupilo) return null;
 
   return (
