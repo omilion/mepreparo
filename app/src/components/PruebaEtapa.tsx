@@ -10,7 +10,7 @@ import { Fireworks } from "./Fireworks";
 // ≥80% (4 de 5) supera la etapa; menos = refuerzo con Rai, sin castigo.
 // Las respuestas se validan en el servidor (HMAC), igual que el diagnóstico.
 
-const TOTAL = 5;
+const TOTAL = 8;
 const UMBRAL = 0.8;
 // Mínimo de preguntas para que la prueba sea EVALUABLE. Antes eran 4, y varios
 // temas del banco tienen solo 2: la niña respondía 2 de 2 correctas y el

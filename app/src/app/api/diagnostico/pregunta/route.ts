@@ -3,6 +3,8 @@ import crypto from "crypto";
 import BANCO_PREGUNTAS from "@/lib/diagnostico/banco.json";
 import type { BancoPreguntas, Pregunta, Dificultad } from "@/lib/diagnostico/tipos";
 import type { Materia, Curso } from "@/lib/profile";
+import { obtenerPreguntaGenerada } from "@/lib/diagnostico/generarPrueba";
+
 
 const banco = BANCO_PREGUNTAS as BancoPreguntas;
 const SECRET = process.env.DIAG_HMAC_SECRET || "mepreparo_dev_secret_key_12345";
@@ -34,6 +36,35 @@ export async function GET(req: NextRequest) {
 
   const candidatas = pool.filter((p) => !excluidas.has(p.id));
   if (candidatas.length === 0) {
+    if (tema) {
+      const gen = await obtenerPreguntaGenerada(materia, curso, tema, dificultad, excluidas);
+      if (gen) {
+        const indices = gen.opciones.map((_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        const correctaShuffled = indices.indexOf(gen.correctaIndex);
+        const hmac = crypto
+          .createHmac("sha256", SECRET)
+          .update(`${gen.id}:${correctaShuffled}`)
+          .digest("hex");
+
+        return NextResponse.json({
+          pregunta: {
+            id: gen.id,
+            materia,
+            curso,
+            dificultad,
+            tema,
+            enunciado: gen.enunciado,
+            opciones: indices.map((i) => gen.opciones[i]),
+            oa: tema,
+          },
+          token: hmac,
+        });
+      }
+    }
     return NextResponse.json({ pregunta: null });
   }
 
