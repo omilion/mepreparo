@@ -11,6 +11,7 @@ import {
 import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 import { calcularPlan } from "@/lib/plan/motor";
+import { indicadorExamen } from "@/lib/plan/indicador";
 
 // Panel del apoderado (admin): ve a sus hijos ya configurados y elige a cuál
 // entrar, o agrega otro. El onboarding solo ocurre la primera vez.
@@ -264,6 +265,36 @@ function TarjetaPupilo({
               </div>
             </div>
           )}
+          {/* Listo para el examen: destacado, por materia */}
+          {diagnosticado && (
+            <div className="border-t border-hair pt-3">
+              <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
+                Listo para el examen
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {p.examen.materias.map((m) => {
+                  const ind = indicadorExamen(m, p.curso, p.tutoria, p.examen.fecha);
+                  const materiaLabel = MATERIAS.find((x) => x.id === m)?.label ?? m;
+                  const color = ind.porcentaje >= 60 ? "var(--sage-deep)" : "var(--clay)";
+                  return (
+                    <div key={m} className="rounded-lg border border-hair/60 p-3">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[13px] font-medium text-ink">{materiaLabel}</span>
+                        <span className="font-serif text-[17px] font-bold" style={{ color }}>
+                          {ind.porcentaje}%
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-[5px] w-full overflow-hidden rounded-full bg-mist">
+                        <div className="h-full rounded-full" style={{ width: `${ind.porcentaje}%`, background: color }} />
+                      </div>
+                      <p className="mt-1.5 text-[12px] leading-[1.4] text-ink-soft">{ind.texto}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Plan de estudio sugerido (Apoderado) */}
           {diagnosticado && (
             <div className="border-t border-hair pt-3 flex flex-col gap-3">

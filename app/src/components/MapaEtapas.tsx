@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MATERIAS, diasHastaExamen, type Materia, type PerfilNino } from "@/lib/profile";
 import { etapasDeMateria, progresoDeMateria, type Etapa } from "@/lib/plan/etapas";
+import { indicadorExamen } from "@/lib/plan/indicador";
 import { materiasDeHoy } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 
@@ -66,6 +67,7 @@ export function MapaEtapas({
   const progreso = progresoDeMateria(etapas);
   const dias = diasHastaExamen(perfil.examen.fecha);
   const nombre = perfil.nombre.trim() || "tú";
+  const indicador = indicadorExamen(materia, perfil.curso, perfil.tutoria, perfil.examen.fecha);
 
   const theme = TEMAS_MATERIAS[materia] || TEMAS_MATERIAS.matematica;
 
@@ -94,6 +96,25 @@ export function MapaEtapas({
           </p>
         </header>
       </Reveal>
+
+      {/* indicador "listo para tu examen": sutil para el niño (solo la barra
+          y el %, sin el texto largo — eso queda para el apoderado) */}
+      {progreso.total > 0 && (
+        <Reveal delay={160}>
+          <div className="mx-auto w-full max-w-[280px]">
+            <div className="mb-1 flex items-center justify-between text-[10.5px] uppercase tracking-wider text-ink-soft/70">
+              <span>Listo para tu examen</span>
+              <span>{indicador.porcentaje}%</span>
+            </div>
+            <div className="h-[3px] w-full overflow-hidden rounded-full bg-mist">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${indicador.porcentaje}%`, backgroundColor: "var(--materia-primary)" }}
+              />
+            </div>
+          </div>
+        </Reveal>
+      )}
 
       {/* el simulacro solo tiene sentido con ALGO de camino recorrido: si el
           niño recién empieza, tirarle 20+ preguntas cronometradas desanima */}
