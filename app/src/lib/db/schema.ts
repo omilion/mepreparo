@@ -74,6 +74,11 @@ export const apoderadoPerfil = pgTable("apoderado_perfil", {
   consentimientoAt: timestamp("consentimiento_at"),
   consentimientoVersion: text("consentimiento_version"),
   perfilCompleto: boolean("perfil_completo").notNull().default(false),
+  // Preferencias de alertas por correo (obligatorio poder apagarlas si mandamos
+  // email). Por defecto todas activas: son las que enganchan al apoderado.
+  alertaSemanal: boolean("alerta_semanal").notNull().default(true),
+  alertaInactividad: boolean("alerta_inactividad").notNull().default(true),
+  alertaLogro: boolean("alerta_logro").notNull().default(true),
   actualizadoEn: timestamp("actualizado_en").defaultNow().notNull(),
 });
 
@@ -103,6 +108,11 @@ export const pupilos = pgTable("pupilos", {
   contexto: jsonb("contexto").notNull(), // intereses, estilos de aprendizaje, etc.
   diagnostico: jsonb("diagnostico"), // Resultados de diagnósticos
   tutoria: jsonb("tutoria"), // Configuración de horarios y memoria
+  // Marcas de la última vez que se mandó cada alerta por email, para no
+  // repetirla todos los días (inactividad) ni más de una vez por semana
+  // (resumen). null = nunca se ha mandado.
+  ultimaAlertaInactividadEn: timestamp("ultima_alerta_inactividad_en"),
+  ultimoResumenSemanalEn: timestamp("ultimo_resumen_semanal_en"),
   creadoEn: timestamp("creado_en").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

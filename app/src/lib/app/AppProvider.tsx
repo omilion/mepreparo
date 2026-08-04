@@ -52,8 +52,10 @@ import {
   registrarEjercicios,
   registrarSimulacro,
   sembrarTemasDesdeDiagnostico,
+  temasSuperadosNuevos,
   type AcuerdoTutoria,
 } from "@/lib/tutor/acuerdo";
+import { notificarLogros } from "@/lib/logros";
 import { cuentaDePrueba } from "@/lib/dev/seed";
 
 export type Foco = { materia: Materia; tema: string } | null;
@@ -389,6 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           p.diagnostico
         );
       const tutoria = registrarEjercicios(base, foco.tema, foco.materia, correctos, total);
+      notificarLogros(p.id, temasSuperadosNuevos(base.temas, tutoria.temas));
       setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
       setFoco(null);
       router.push("/mapa");
@@ -414,6 +417,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           p.diagnostico
         );
       const tutoria = registrarSimulacro(base, materia, desglose);
+      notificarLogros(p.id, temasSuperadosNuevos(base.temas, tutoria.temas));
       setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
       router.push("/mapa");
     },

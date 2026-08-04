@@ -11,10 +11,12 @@ import {
   sembrarTemasDesdeDiagnostico,
   registrarEjercicios,
   recordarContenidos,
+  temasSuperadosNuevos,
   type AcuerdoTutoria,
   type TemaTrabajado,
   type RecuerdoNino,
 } from "@/lib/tutor/acuerdo";
+import { notificarLogros } from "@/lib/logros";
 import { AuraOrb } from "./AuraOrb";
 import { useExpresionRai } from "@/lib/tutor/useExpresionRai";
 import { TextoRevelado } from "./TextoRevelado";
@@ -1300,6 +1302,7 @@ ${traza}` : m.texto };
         temasTrabajados: (data.temasTrabajados ?? []) as TemaTrabajado[],
         recuerdos: (data.recuerdos ?? []) as Omit<RecuerdoNino, "fecha">[],
       });
+      notificarLogros(perfil.id, temasSuperadosNuevos(acuerdo.temas, conMemoria.temas));
 
       const tutoriaActualizada: AcuerdoTutoria = {
         ...conMemoria,

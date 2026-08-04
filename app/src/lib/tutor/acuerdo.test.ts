@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { diaDeHoy, materiasDeHoy, registrarSimulacro, ultimaSesion, type AcuerdoTutoria } from "./acuerdo";
+import {
+  diaDeHoy,
+  materiasDeHoy,
+  registrarSimulacro,
+  temasSuperadosNuevos,
+  ultimaSesion,
+  type AcuerdoTutoria,
+  type TemaDominio,
+} from "./acuerdo";
 
 const mockAcuerdo: AcuerdoTutoria = {
   creadoEn: "2026-07-09T00:00:00Z",
@@ -128,5 +136,44 @@ describe("registrarSimulacro", () => {
     // 1 de 2 correctas: no llega al mínimo de 4 preguntas para bajar de estado
     const r = registrarSimulacro(previo, "matematica", [{ tema: "division", correctos: 1, total: 2 }]);
     expect(r.temas?.find((x) => x.tema === "division")?.estado).toBe("superado");
+  });
+});
+
+describe("temasSuperadosNuevos", () => {
+  const tema = (t: string, estado: TemaDominio["estado"]): TemaDominio => ({
+    tema: t,
+    materia: "matematica",
+    estado,
+    evidencias: [],
+    actualizadoEn: "2026-07-20",
+  });
+
+  it("detecta un tema que pasó de le_cuesta a superado", () => {
+    const antes = [tema("fracciones", "le_cuesta")];
+    const despues = [tema("fracciones", "superado")];
+    expect(temasSuperadosNuevos(antes, despues)).toEqual([{ tema: "fracciones", materia: "matematica" }]);
+  });
+
+  it("un tema que ya estaba superado no se reporta de nuevo", () => {
+    const antes = [tema("fracciones", "superado")];
+    const despues = [tema("fracciones", "superado")];
+    expect(temasSuperadosNuevos(antes, despues)).toEqual([]);
+  });
+
+  it("un tema nuevo que nace directo superado sí se reporta", () => {
+    expect(temasSuperadosNuevos(undefined, [tema("fracciones", "superado")])).toEqual([
+      { tema: "fracciones", materia: "matematica" },
+    ]);
+  });
+
+  it("temas que no llegan a superado no se reportan", () => {
+    const despues = [tema("fracciones", "en_proceso"), tema("algebra", "le_cuesta")];
+    expect(temasSuperadosNuevos([], despues)).toEqual([]);
+  });
+
+  it("varios temas superados a la vez (ej. tras un simulacro) se reportan todos", () => {
+    const antes = [tema("fracciones", "le_cuesta"), tema("algebra", "en_proceso")];
+    const despues = [tema("fracciones", "superado"), tema("algebra", "superado")];
+    expect(temasSuperadosNuevos(antes, despues)).toHaveLength(2);
   });
 });

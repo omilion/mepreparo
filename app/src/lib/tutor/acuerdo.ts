@@ -263,6 +263,27 @@ export function registrarEjercicios(
   return { ...acuerdo, temas };
 }
 
+// Detecta qué temas pasaron a "superado" recién ahora (no lo estaban antes).
+// Puro: compara dos listas de TemaDominio, no toca red ni estado. Se usa en
+// los tres lugares donde un tema puede superarse (prueba de etapa, simulacro,
+// cierre de sesión con Rai) para disparar el correo de logro sin duplicar la
+// lógica de detección en cada uno.
+export function temasSuperadosNuevos(
+  antes: TemaDominio[] | undefined,
+  despues: TemaDominio[] | undefined
+): { tema: string; materia: Materia }[] {
+  const previos = antes ?? [];
+  const nuevos: { tema: string; materia: Materia }[] = [];
+  for (const t of despues ?? []) {
+    if (t.estado !== "superado") continue;
+    const antesDeEste = previos.find((p) => p.tema === t.tema && p.materia === t.materia);
+    if (antesDeEste?.estado !== "superado") {
+      nuevos.push({ tema: t.tema, materia: t.materia });
+    }
+  }
+  return nuevos;
+}
+
 // Evidencia dura: resultado por tema de un SIMULACRO de examen completo (varios
 // temas de una materia, cronometrado, sin ayuda de Rai). Misma regla dura que
 // registrarEjercicios, pero recorre el desglose tema a tema en un solo llamado.

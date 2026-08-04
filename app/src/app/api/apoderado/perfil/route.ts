@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
     comuna?: string;
     region?: string;
     consentimientoVersion?: string;
+    alertaSemanal?: boolean;
+    alertaInactividad?: boolean;
+    alertaLogro?: boolean;
   };
   try {
     body = await req.json();
@@ -34,18 +37,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "RUT inválido" }, { status: 400 });
   }
 
-  const datos = {
-    telefono: body.telefono?.trim() || null,
-    rut: body.rut ? formatearRut(body.rut) : null,
-    relacion: body.relacion || null,
-    comuna: body.comuna?.trim() || null,
-    region: body.region?.trim() || null,
-    // el consentimiento se sella con la fecha del servidor (no confiamos en el cliente)
-    consentimientoAt: body.consentimientoVersion ? new Date() : null,
-    consentimientoVersion: body.consentimientoVersion || null,
-    perfilCompleto: !!(body.telefono && body.rut && body.comuna),
+  // Este endpoint también sirve para el switch de preferencias de alertas en
+  // Mi Cuenta (llamada parcial, solo con esos 3 campos): por eso los booleanos
+  // solo se tocan si vienen explícitos, sin pisar el resto del perfil.
+  const datos: Record<string, unknown> = {
     actualizadoEn: new Date(),
   };
+  if (body.telefono !== undefined) datos.telefono = body.telefono.trim() || null;
+  if (body.rut !== undefined) datos.rut = body.rut ? formatearRut(body.rut) : null;
+  if (body.relacion !== undefined) datos.relacion = body.relacion || null;
+  if (body.comuna !== undefined) datos.comuna = body.comuna.trim() || null;
+  if (body.region !== undefined) datos.region = body.region.trim() || null;
+  if (body.consentimientoVersion !== undefined) {
+    // el consentimiento se sella con la fecha del servidor (no confiamos en el cliente)
+    datos.consentimientoAt = body.consentimientoVersion ? new Date() : null;
+    datos.consentimientoVersion = body.consentimientoVersion || null;
+  }
+  if (body.alertaSemanal !== undefined) datos.alertaSemanal = !!body.alertaSemanal;
+  if (body.alertaInactividad !== undefined) datos.alertaInactividad = !!body.alertaInactividad;
+  if (body.alertaLogro !== undefined) datos.alertaLogro = !!body.alertaLogro;
+  if (body.telefono !== undefined || body.rut !== undefined || body.comuna !== undefined) {
+    datos.perfilCompleto = !!(body.telefono && body.rut && body.comuna);
+  }
 
   try {
     await db

@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { type Cuenta, MATERIAS } from "@/lib/profile";
 import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
+
+type PreferenciasAlertas = {
+  alertaSemanal: boolean;
+  alertaInactividad: boolean;
+  alertaLogro: boolean;
+};
 
 export function MiCuenta({
   cuenta,
@@ -22,6 +28,47 @@ export function MiCuenta({
   const [confirmacion, setConfirmacion] = useState("");
   const [borrando, setBorrando] = useState(false);
   const [errorBorrado, setErrorBorrado] = useState("");
+  const [alertas, setAlertas] = useState<PreferenciasAlertas>({
+    alertaSemanal: true,
+    alertaInactividad: true,
+    alertaLogro: true,
+  });
+  const [guardandoAlerta, setGuardandoAlerta] = useState<keyof PreferenciasAlertas | null>(null);
+
+  // precarga las preferencias reales (por defecto asumimos todas activas,
+  // que es lo que la base también asume si el apoderado nunca las tocó)
+  useEffect(() => {
+    fetch("/api/apoderado/perfil")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.perfil) {
+          setAlertas({
+            alertaSemanal: data.perfil.alertaSemanal ?? true,
+            alertaInactividad: data.perfil.alertaInactividad ?? true,
+            alertaLogro: data.perfil.alertaLogro ?? true,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function alternarAlerta(clave: keyof PreferenciasAlertas) {
+    const nuevoValor = !alertas[clave];
+    setAlertas((a) => ({ ...a, [clave]: nuevoValor }));
+    setGuardandoAlerta(clave);
+    try {
+      await fetch("/api/apoderado/perfil", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [clave]: nuevoValor }),
+      });
+    } catch (err) {
+      console.error("No se pudo guardar la preferencia de alerta:", err);
+      setAlertas((a) => ({ ...a, [clave]: !nuevoValor })); // revierte si falló
+    } finally {
+      setGuardandoAlerta(null);
+    }
+  }
 
   async function handleSignOut() {
     setCargando(true);
@@ -300,6 +347,84 @@ export function MiCuenta({
           )}
         </div>
       </Reveal>
+
+      {/* Preferencias de alertas por email */}
+      <Reveal delay={700}>
+        <div className="rounded-zen border border-hair p-6 flex flex-col gap-4 mt-2">
+          <h2 className="font-serif text-[20px] text-ink border-b border-hair pb-2">
+            Alertas por Email
+          </h2>
+          <p className="text-[13px] text-ink-soft leading-[1.4]">
+            Te avisamos por correo sobre el avance de tus hijos. Puedes apagar
+            cualquiera de estas cuando quieras.
+          </p>
+          <div className="flex flex-col divide-y divide-hair/60">
+            <ToggleAlerta
+              titulo="Resumen semanal"
+              descripcion="Minutos de estudio, temas superados y qué reforzar."
+              activo={alertas.alertaSemanal}
+              guardando={guardandoAlerta === "alertaSemanal"}
+              onToggle={() => alternarAlerta("alertaSemanal")}
+            />
+            <ToggleAlerta
+              titulo="Inactividad"
+              descripcion="Si tu hijo/a lleva varios días sin estudiar."
+              activo={alertas.alertaInactividad}
+              guardando={guardandoAlerta === "alertaInactividad"}
+              onToggle={() => alternarAlerta("alertaInactividad")}
+            />
+            <ToggleAlerta
+              titulo="Logros"
+              descripcion="Cuando tu hijo/a supera un tema nuevo."
+              activo={alertas.alertaLogro}
+              guardando={guardandoAlerta === "alertaLogro"}
+              onToggle={() => alternarAlerta("alertaLogro")}
+            />
+          </div>
+        </div>
+      </Reveal>
+    </div>
+  );
+}
+
+function ToggleAlerta({
+  titulo,
+  descripcion,
+  activo,
+  guardando,
+  onToggle,
+}: {
+  titulo: string;
+  descripcion: string;
+  activo: boolean;
+  guardando: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[14px] font-medium text-ink">{titulo}</span>
+        <span className="text-[12px] text-ink-soft">{descripcion}</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activo}
+        aria-label={titulo}
+        onClick={onToggle}
+        disabled={guardando}
+        className={
+          "relative h-6 w-11 flex-none rounded-full transition-colors disabled:opacity-60 " +
+          (activo ? "bg-sage-deep" : "bg-hair")
+        }
+      >
+        <span
+          className={
+            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform " +
+            (activo ? "translate-x-[22px]" : "translate-x-0.5")
+          }
+        />
+      </button>
     </div>
   );
 }
