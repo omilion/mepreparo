@@ -40,7 +40,8 @@ export interface EvidenciaTema {
   fecha: string; // ISO date
   // ejercicios = conteo determinista | juicio_rai = del cierre de sesión
   // dijo = frase del niño | diagnostico = brecha detectada al inicio
-  tipo: "ejercicios" | "juicio_rai" | "dijo" | "diagnostico";
+  // simulacro = bloque del simulacro de examen (evidencia dura, cronometrada)
+  tipo: "ejercicios" | "juicio_rai" | "dijo" | "diagnostico" | "simulacro";
   nota: string; // ej. "5 de 6 correctos" | "dijo 'no las entiendo'"
 }
 
@@ -260,6 +261,48 @@ export function registrarEjercicios(
   if (idx >= 0) temas[idx] = actualizado;
   else temas.push(actualizado);
   return { ...acuerdo, temas };
+}
+
+// Evidencia dura: resultado por tema de un SIMULACRO de examen completo (varios
+// temas de una materia, cronometrado, sin ayuda de Rai). Misma regla dura que
+// registrarEjercicios, pero recorre el desglose tema a tema en un solo llamado.
+export function registrarSimulacro(
+  acuerdo: AcuerdoTutoria,
+  materia: Materia,
+  desglose: { tema: string; correctos: number; total: number }[],
+  fecha = hoyIso()
+): AcuerdoTutoria {
+  let siguiente = acuerdo;
+  for (const d of desglose) {
+    if (d.total <= 0) continue;
+    const clave = d.tema.trim().toLowerCase();
+    const temas = [...(siguiente.temas ?? [])];
+    const idx = temas.findIndex((x) => x.tema === clave && x.materia === materia);
+    const previo = idx >= 0 ? temas[idx] : undefined;
+
+    const evidencias = [...(previo?.evidencias ?? [])];
+    evidencias.push({
+      fecha,
+      tipo: "simulacro",
+      nota: `${d.correctos} de ${d.total} correctos en simulacro`,
+    });
+
+    const ratio = d.correctos / d.total;
+    const estado: EstadoTema =
+      d.total >= 4 && ratio >= 0.8 ? "superado" : ratio <= 0.4 ? "le_cuesta" : (previo?.estado ?? "en_proceso");
+
+    const actualizado: TemaDominio = {
+      tema: clave,
+      materia,
+      estado,
+      evidencias: evidencias.slice(-8),
+      actualizadoEn: fecha,
+    };
+    if (idx >= 0) temas[idx] = actualizado;
+    else temas.push(actualizado);
+    siguiente = { ...siguiente, temas };
+  }
+  return siguiente;
 }
 
 // Recuperación selectiva: los recuerdos y temas que valen para la sesión de HOY.

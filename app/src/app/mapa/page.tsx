@@ -47,6 +47,9 @@ export default function MapaRuta() {
             setFoco(null);
             router.push("/tutor");
           }}
+          onSimulacro={(materia) => {
+            router.push(`/simulacro?materia=${materia}`);
+          }}
         />
       </StepFade>
     </main>

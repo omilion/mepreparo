@@ -35,6 +35,7 @@ export const TIPOS_EVENTO = [
   "tutor_latencia", // cuánto tardó una respuesta, en ms
   // --- uso, para leer los fallos como tasa y no como número suelto ---
   "sesion_iniciada",
+  "simulacro_completado", // el niño rindió un simulacro de examen completo
 ] as const;
 
 export type TipoEvento = (typeof TIPOS_EVENTO)[number];

@@ -50,11 +50,13 @@ export function MapaEtapas({
   onEstudiar,
   onPrueba,
   onTutorLibre,
+  onSimulacro,
 }: {
   perfil: PerfilNino;
   onEstudiar: (materia: Materia, tema: string) => void;
   onPrueba: (materia: Materia, tema: string) => void;
   onTutorLibre: () => void;
+  onSimulacro: (materia: Materia) => void;
 }) {
   // materia inicial: la que toca hoy según el horario; si no, la primera del examen
   const deHoy = perfil.tutoria ? materiasDeHoy(perfil.tutoria) : [];
@@ -92,6 +94,22 @@ export function MapaEtapas({
           </p>
         </header>
       </Reveal>
+
+      {/* el simulacro solo tiene sentido con ALGO de camino recorrido: si el
+          niño recién empieza, tirarle 20+ preguntas cronometradas desanima */}
+      {progreso.superadas > 0 && (
+        <Reveal delay={220}>
+          <div className="text-center">
+            <button
+              onClick={() => onSimulacro(materia)}
+              className="rounded-full border px-4 py-2 text-[13px] font-[560] transition-colors"
+              style={{ borderColor: "var(--materia-primary-deep)", color: "var(--materia-primary-deep)" }}
+            >
+              Rendir simulacro de {MATERIAS.find((m) => m.id === materia)?.label}
+            </button>
+          </div>
+        </Reveal>
+      )}
 
       {/* selector de materia (solo las del examen) */}
       {perfil.examen.materias.length > 1 && (

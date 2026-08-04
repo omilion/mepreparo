@@ -50,6 +50,7 @@ import {
 import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 import {
   registrarEjercicios,
+  registrarSimulacro,
   sembrarTemasDesdeDiagnostico,
   type AcuerdoTutoria,
 } from "@/lib/tutor/acuerdo";
@@ -119,6 +120,10 @@ interface AppState {
   agregarHijo: () => void;
   alTerminarDiagnostico: (resultados: ResultadoMateria[]) => void;
   alTerminarPrueba: (correctos: number, total: number) => void;
+  alTerminarSimulacro: (
+    materia: Materia,
+    desglose: { tema: string; correctos: number; total: number }[]
+  ) => void;
   alCerrarSesionAuth: () => void;
   alSalirModoAlumno: () => void;
   guardarPupiloEnfocado: (p: PerfilNino) => void;
@@ -391,6 +396,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [cuenta, pupilo, foco, router]
   );
 
+  // Igual que alTerminarPrueba pero para un simulacro (varios temas a la vez):
+  // guarda el desglose completo como evidencia dura y vuelve al mapa. `foco`
+  // no aplica aquí (el simulacro no es de un solo tema), por eso la materia
+  // llega como argumento explícito.
+  const alTerminarSimulacro = useCallback(
+    (materia: Materia, desglose: { tema: string; correctos: number; total: number }[]) => {
+      const p = pupilo;
+      if (!cuenta || !p) {
+        router.push("/mapa");
+        return;
+      }
+      const base: AcuerdoTutoria =
+        p.tutoria ??
+        sembrarTemasDesdeDiagnostico(
+          { creadoEn: new Date().toISOString(), horario: {}, notasNino: "", sesiones: [] },
+          p.diagnostico
+        );
+      const tutoria = registrarSimulacro(base, materia, desglose);
+      setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
+      router.push("/mapa");
+    },
+    [cuenta, pupilo, router]
+  );
+
   // Al cerrar sesión no queda NADA de este apoderado en el dispositivo: ni la
   // cuenta ni un onboarding a medias (si no, el siguiente que entre se
   // encontraría configurando hijos que no son suyos).
@@ -473,6 +502,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     agregarHijo,
     alTerminarDiagnostico,
     alTerminarPrueba,
+    alTerminarSimulacro,
     alCerrarSesionAuth,
     alSalirModoAlumno,
     guardarPupiloEnfocado,
