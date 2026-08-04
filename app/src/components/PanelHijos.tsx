@@ -12,6 +12,7 @@ import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 import { calcularPlan } from "@/lib/plan/motor";
 import { indicadorExamen } from "@/lib/plan/indicador";
+import { EnQueVa } from "./EnQueVa";
 
 // Panel del apoderado (admin): ve a sus hijos ya configurados y elige a cuál
 // entrar, o agrega otro. El onboarding solo ocurre la primera vez.
@@ -294,6 +295,8 @@ function TarjetaPupilo({
               </div>
             </div>
           )}
+
+          <EnQueVa perfil={p} />
 
           {/* Plan de estudio sugerido (Apoderado) */}
           {diagnosticado && (
