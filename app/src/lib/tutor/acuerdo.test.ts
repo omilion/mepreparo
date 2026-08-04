@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diaDeHoy, materiasDeHoy, ultimaSesion, type AcuerdoTutoria } from "./acuerdo";
+import { diaDeHoy, materiasDeHoy, registrarSimulacro, ultimaSesion, type AcuerdoTutoria } from "./acuerdo";
 
 const mockAcuerdo: AcuerdoTutoria = {
   creadoEn: "2026-07-09T00:00:00Z",
@@ -70,5 +70,63 @@ describe("Manejador de Acuerdo de Tutoría", () => {
     // 2026-07-12 es Domingo (getDay = 0)
     const fechaDom = new Date("2026-07-12T12:00:00");
     expect(diaDeHoy(fechaDom)).toBe("dom");
+  });
+});
+
+describe("registrarSimulacro", () => {
+  const acuerdoBase: AcuerdoTutoria = {
+    creadoEn: "2026-07-01T00:00:00Z",
+    horario: {},
+    notasNino: "",
+    sesiones: [],
+  };
+
+  it("marca superado un tema con ≥4 preguntas y ≥80% de aciertos", () => {
+    const r = registrarSimulacro(
+      acuerdoBase,
+      "matematica",
+      [{ tema: "fracciones", correctos: 4, total: 5 }],
+      "2026-07-20"
+    );
+    const t = r.temas?.find((x) => x.tema === "fracciones");
+    expect(t?.estado).toBe("superado");
+    expect(t?.evidencias.at(-1)).toMatchObject({ tipo: "simulacro", nota: "4 de 5 correctos en simulacro" });
+  });
+
+  it("marca le_cuesta un tema con ≤40% de aciertos", () => {
+    const r = registrarSimulacro(
+      acuerdoBase,
+      "matematica",
+      [{ tema: "algebra", correctos: 1, total: 5 }],
+      "2026-07-20"
+    );
+    expect(r.temas?.find((x) => x.tema === "algebra")?.estado).toBe("le_cuesta");
+  });
+
+  it("ignora temas con total 0 (no se tocaron en el simulacro)", () => {
+    const r = registrarSimulacro(acuerdoBase, "matematica", [{ tema: "geometria", correctos: 0, total: 0 }]);
+    expect(r.temas?.find((x) => x.tema === "geometria")).toBeUndefined();
+  });
+
+  it("recorre varios temas del desglose en un solo llamado", () => {
+    const r = registrarSimulacro(acuerdoBase, "matematica", [
+      { tema: "fracciones", correctos: 5, total: 5 },
+      { tema: "algebra", correctos: 0, total: 3 },
+      { tema: "numeros", correctos: 2, total: 3 },
+    ]);
+    expect(r.temas).toHaveLength(3);
+    expect(r.temas?.find((x) => x.tema === "numeros")?.estado).toBe("en_proceso");
+  });
+
+  it("nunca degrada un tema ya superado si el simulacro solo trae 1-3 preguntas de él", () => {
+    const previo: AcuerdoTutoria = {
+      ...acuerdoBase,
+      temas: [
+        { tema: "division", materia: "matematica", estado: "superado", evidencias: [], actualizadoEn: "2026-07-01" },
+      ],
+    };
+    // 1 de 2 correctas: no llega al mínimo de 4 preguntas para bajar de estado
+    const r = registrarSimulacro(previo, "matematica", [{ tema: "division", correctos: 1, total: 2 }]);
+    expect(r.temas?.find((x) => x.tema === "division")?.estado).toBe("superado");
   });
 });
