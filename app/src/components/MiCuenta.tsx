@@ -17,6 +17,11 @@ export function MiCuenta({
 }) {
   const apoderado = cuenta.apoderado || { nombre: "Apoderado", email: "" };
   const [cargando, setCargando] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [mostrarBorrado, setMostrarBorrado] = useState(false);
+  const [confirmacion, setConfirmacion] = useState("");
+  const [borrando, setBorrando] = useState(false);
+  const [errorBorrado, setErrorBorrado] = useState("");
 
   async function handleSignOut() {
     setCargando(true);
@@ -27,6 +32,59 @@ export function MiCuenta({
       console.error("Error al cerrar sesión:", err);
     } finally {
       setCargando(false);
+    }
+  }
+
+  // Derecho de acceso: descarga un JSON con todo lo guardado del apoderado y
+  // sus hijos (ver /api/apoderado/exportar).
+  async function handleExportar() {
+    setExportando(true);
+    try {
+      const res = await fetch("/api/apoderado/exportar");
+      if (!res.ok) throw new Error("fallo export");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "mepreparo-mis-datos.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error al exportar datos:", err);
+      alert("No se pudo exportar. Intenta de nuevo en un momento.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  // Derecho de cancelación: borra la cuenta y TODO lo asociado (cascade en el
+  // servidor). Exige escribir "ELIMINAR" para evitar un borrado accidental.
+  async function handleEliminarCuenta() {
+    if (confirmacion !== "ELIMINAR") {
+      setErrorBorrado('Escribe "ELIMINAR" en mayúsculas para confirmar.');
+      return;
+    }
+    setBorrando(true);
+    setErrorBorrado("");
+    try {
+      const res = await fetch("/api/apoderado/cuenta", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmacion: "ELIMINAR" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "No se pudo eliminar la cuenta");
+      }
+      await authClient.signOut();
+      onCerrarSesion();
+    } catch (err) {
+      console.error("Error al eliminar cuenta:", err);
+      setErrorBorrado(
+        err instanceof Error ? err.message : "No se pudo eliminar la cuenta."
+      );
+    } finally {
+      setBorrando(false);
     }
   }
 
@@ -146,6 +204,100 @@ export function MiCuenta({
               })
             )}
           </div>
+        </div>
+      </Reveal>
+
+      {/* Privacidad y datos: derechos de acceso y cancelación (Ley 21.719) */}
+      <Reveal delay={620}>
+        <div className="rounded-zen border border-hair p-6 flex flex-col gap-4 mt-2">
+          <h2 className="font-serif text-[20px] text-ink border-b border-hair pb-2">
+            Privacidad y Datos
+          </h2>
+          <p className="text-[13px] text-ink-soft leading-[1.4]">
+            Puedes revisar qué guardamos y por qué en nuestra{" "}
+            <a
+              href="/privacidad"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sage-deep underline underline-offset-2"
+            >
+              Política de Privacidad
+            </a>{" "}
+            y{" "}
+            <a
+              href="/terminos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sage-deep underline underline-offset-2"
+            >
+              Términos de Uso
+            </a>
+            .
+          </p>
+
+          <div className="flex flex-col gap-2.5 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleExportar}
+              disabled={exportando}
+              className="flex-1 rounded-xl border border-hair py-2.5 text-[14px] text-ink hover:border-sage transition-colors disabled:opacity-40"
+            >
+              {exportando ? "Preparando…" : "Exportar mis datos"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMostrarBorrado((v) => !v)}
+              className="flex-1 rounded-xl border border-clay/30 py-2.5 text-[14px] text-clay hover:bg-clay/5 transition-colors"
+            >
+              Eliminar mi cuenta
+            </button>
+          </div>
+
+          {mostrarBorrado && (
+            <div className="mt-1 flex flex-col gap-3 rounded-xl border border-clay/30 bg-clay/5 p-4">
+              <p className="text-[13.5px] leading-[1.5] text-ink">
+                Esto borra tu cuenta, la de todos tus hijos, su historial de
+                estudio y todo lo asociado. <strong>No se puede deshacer.</strong>{" "}
+                Escribe <strong>ELIMINAR</strong> para confirmar.
+              </p>
+              <input
+                type="text"
+                value={confirmacion}
+                onChange={(e) => {
+                  setConfirmacion(e.target.value);
+                  setErrorBorrado("");
+                }}
+                placeholder="ELIMINAR"
+                disabled={borrando}
+                className="input w-full"
+              />
+              {errorBorrado && (
+                <p className="text-[12.5px] text-clay">{errorBorrado}</p>
+              )}
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleEliminarCuenta}
+                  disabled={borrando || confirmacion !== "ELIMINAR"}
+                  className="flex-1 rounded-xl bg-clay py-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  {borrando ? "Eliminando…" : "Sí, eliminar todo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarBorrado(false);
+                    setConfirmacion("");
+                    setErrorBorrado("");
+                  }}
+                  disabled={borrando}
+                  className="rounded-xl border border-hair px-4 py-2.5 text-[14px] text-ink-soft hover:text-ink transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </Reveal>
     </div>

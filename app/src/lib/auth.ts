@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db/db";
 import * as schema from "./db/schema";
+import { enviarEmail, plantillaZen } from "./email";
 
 // URL pública de la app (en producción: https://tu-dominio). En dev cae a :3008.
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3008";
@@ -24,6 +25,24 @@ export const auth = betterAuth({
   trustedOrigins: [APP_URL],
   emailAndPassword: {
     enabled: true,
+    // El enlace vence en 1 hora; better-auth ya invalida el token al usarlo.
+    resetPasswordTokenExpiresIn: 3600,
+    sendResetPassword: async ({ user, url }) => {
+      // better-auth arma `url` apuntando a su propio endpoint de verificación,
+      // que redirige a /auth/nueva-clave?token=... si el token es válido.
+      const html = plantillaZen({
+        titulo: `Hola, ${user.name || "apoderado"}`,
+        cuerpoHtml:
+          "<p>Pediste restablecer tu contraseña de mepreparo.</p>" +
+          "<p>Este enlace es válido por 1 hora. Si no fuiste tú, ignora este correo: tu contraseña actual sigue funcionando.</p>",
+        cta: { texto: "Elegir nueva contraseña", url },
+      });
+      await enviarEmail({
+        para: user.email,
+        asunto: "Restablece tu contraseña — mepreparo",
+        html,
+      });
+    },
   },
   user: {
     additionalFields: {

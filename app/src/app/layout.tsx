@@ -7,7 +7,15 @@ export const metadata: Metadata = {
   description:
     "Estudia con calma y prepara tu examen libre con un tutor que te conoce.",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "mepreparo",
+  },
 };
 
 export const viewport: Viewport = {
@@ -38,6 +46,9 @@ export default function RootLayout({
     // suppressHydrationWarning le dice a React que es esperado en este nodo.
     <html lang="es" suppressHydrationWarning>
       <head>
+        {/* iOS < 17.4 solo respeta el meta con prefijo "apple-"; Next.js ya
+            emite el estándar "mobile-web-app-capable" via appleWebApp. */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>

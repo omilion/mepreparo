@@ -192,6 +192,14 @@ export function AuthForm({
               disabled={cargando}
               className="input w-full"
             />
+            {esLogin && (
+              <a
+                href="/auth/recuperar"
+                className="mt-0.5 self-end text-[12.5px] text-sage-deep underline underline-offset-2 hover:opacity-85"
+              >
+                ¿Olvidaste tu contraseña?
+              </a>
+            )}
           </div>
 
           {!esLogin && (
@@ -274,11 +282,21 @@ export function AuthForm({
                 <span>
                   Soy mayor de edad y responsable del/los menor(es) que voy a
                   registrar. Acepto los{" "}
-                  <a href="#" className="text-sage-deep underline underline-offset-2">
+                  <a
+                    href="/terminos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sage-deep underline underline-offset-2"
+                  >
                     términos
                   </a>{" "}
                   y la{" "}
-                  <a href="#" className="text-sage-deep underline underline-offset-2">
+                  <a
+                    href="/privacidad"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sage-deep underline underline-offset-2"
+                  >
                     política de privacidad
                   </a>
                   , y autorizo el tratamiento de los datos de estudio del menor.
