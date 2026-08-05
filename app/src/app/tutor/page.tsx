@@ -38,7 +38,7 @@ export default function TutorRuta() {
       key={pupilo.id}
       perfil={pupilo}
       temaFoco={foco?.tema}
-      onVolver={() => router.push(pupilo.tutoria ? "/mapa" : "/plan")}
+      onVolver={() => router.push(pupilo.tutoria ? "/hoy" : "/plan")}
       // PERSISTE sin navegar: evidencia de interactivos y cierre de sesión. Antes
       // esto hacía router.push("/mapa") en CADA guardado → al terminar un
       // interactivo sacaba al niño de la clase (bug). Ahora solo guarda.

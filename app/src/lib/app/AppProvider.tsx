@@ -70,7 +70,7 @@ function rutaSegunEstado(p: PerfilNino): string {
   if (!configuracionCompleta(p)) return "/wizard";
   if (!tieneDiagnostico(p)) return "/diagnostico";
   if (!p.tutoria) return "/tutor";
-  return "/mapa";
+  return "/hoy";
 }
 
 // Acciones dev que el Tutor "publica" al panel dev global mientras está montado.
