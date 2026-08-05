@@ -36,6 +36,17 @@ import { devToolsActivas } from "@/lib/devTools";
 import { useApp } from "@/lib/app/AppProvider";
 import { avisarEvento } from "@/lib/telemetriaCliente";
 
+// Rai necesita la API en vivo: sin internet no hay forma honesta de
+// "conversar offline" (Fase 5.1). Un mensaje genérico de error confunde —
+// mejor decir la verdad y dirigir a lo que SÍ funciona sin conexión (los
+// juegos ya cargados).
+function mensajeConexion(generico: string): string {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Ahora no tienes internet, así que no puedo conversar contigo. Mientras vuelve la conexión, puedes repasar los juegos que ya cargaste.";
+  }
+  return generico;
+}
+
 interface EjercicioChat {
   tema: string;
   enunciado: string;
@@ -339,7 +350,9 @@ ${traza}` : m.texto };
       setMensajes([
         {
           de: "rai",
-          texto: `Hola ${nombre}, soy ${TUTOR.nombre}. Ahora no pude conectarme, intenta volver en un momento.`,
+          texto: mensajeConexion(
+            `Hola ${nombre}, soy ${TUTOR.nombre}. Ahora no pude conectarme, intenta volver en un momento.`
+          ),
         },
       ]);
     } finally {
@@ -398,7 +411,7 @@ ${traza}` : m.texto };
       });
       setMensajes((m) => [
         ...m,
-        { de: "rai", texto: "No pude conectarme. Intenta de nuevo en un momento." },
+        { de: "rai", texto: mensajeConexion("No pude conectarme. Intenta de nuevo en un momento.") },
       ]);
     } finally {
       setCargando(false);
