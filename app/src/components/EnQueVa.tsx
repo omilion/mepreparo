@@ -49,7 +49,7 @@ export function EnQueVa({ perfil }: { perfil: PerfilNino }) {
   }
 
   return (
-    <div className="border-t border-hair pt-3 flex flex-col gap-4">
+    <div className="border-t border-hair pt-3 flex flex-col gap-4 md:col-span-2">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
         En qué va
       </div>

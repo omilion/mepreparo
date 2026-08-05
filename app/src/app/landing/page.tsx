@@ -12,7 +12,7 @@ export default function LandingRuta() {
     <main className="min-h-screen">
       {/* barra mínima de la landing: marca + acceso a login */}
       <div className="zen-page flex h-[58px] items-center justify-between">
-        <span className="font-serif text-[19px]">mepreparo</span>
+        <span className="font-serif text-[19px]">RAI</span>
         <button
           type="button"
           onClick={() => {

@@ -126,6 +126,71 @@ export function guardarDiagnosticoEnCurso(
   );
 }
 
+// --- Clase en curso (la conversación con Rai) ---
+//
+// La conversación vivía SOLO en el estado del componente: si el niño tocaba
+// inicio sin querer, o la tablet se bloqueaba, la clase entera se perdía y al
+// volver Rai saludaba de cero como si no hubiera pasado nada. Ahora sobrevive
+// mientras sea la MISMA clase (mismo niño, misma materia, mismo tema) y sea
+// reciente; si no, se descarta y se empieza limpia.
+
+const CLASE_KEY = "mp-clase-en-curso";
+// Pasadas 3 horas ya no es "la clase de recién": mejor empezar de nuevo que
+// retomar algo que el niño ya no recuerda.
+const VIGENCIA_CLASE_MS = 3 * 60 * 60 * 1000;
+// Tope de mensajes guardados: una clase larga con varios interactivos podría
+// pasarse de la cuota de localStorage y hacer fallar el guardado entero.
+const MAX_MENSAJES_GUARDADOS = 60;
+
+export interface ClaseEnCurso<M = unknown> {
+  pupiloId: string;
+  materia: string;
+  temaFoco?: string;
+  mensajes: M[];
+  inicioSesion: number; // epoch ms, para no reiniciar el reloj de la sesión
+  guardadoEn: number;
+}
+
+export function leerClaseEnCurso<M>(
+  pupiloId: string,
+  materia: string,
+  temaFoco?: string
+): ClaseEnCurso<M> | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(CLASE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as ClaseEnCurso<M>;
+    if (!data || data.pupiloId !== pupiloId || data.materia !== materia) return null;
+    // retomar una clase de otro tema confundiría más de lo que ayuda
+    if ((data.temaFoco ?? "") !== (temaFoco ?? "")) return null;
+    if (!Array.isArray(data.mensajes) || data.mensajes.length === 0) return null;
+    if (Date.now() - data.guardadoEn > VIGENCIA_CLASE_MS) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarClaseEnCurso<M>(datos: Omit<ClaseEnCurso<M>, "guardadoEn">): void {
+  if (!disponible()) return;
+  try {
+    const recortado: ClaseEnCurso<M> = {
+      ...datos,
+      mensajes: datos.mensajes.slice(-MAX_MENSAJES_GUARDADOS),
+      guardadoEn: Date.now(),
+    };
+    window.localStorage.setItem(CLASE_KEY, JSON.stringify(recortado));
+  } catch {
+    // cuota llena o modo privado: la clase sigue en pantalla, solo no sobrevive
+  }
+}
+
+export function borrarClaseEnCurso(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(CLASE_KEY);
+}
+
 export function borrarDiagnosticoEnCurso(): void {
   if (!disponible()) return;
   window.localStorage.removeItem(DIAGNOSTICO_KEY);

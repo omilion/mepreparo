@@ -119,7 +119,13 @@ function TarjetaPupilo({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-zen border border-hair px-5 py-[18px] text-left transition-all duration-300 hover:border-sage/50"
+      className={
+        "flex flex-col gap-3 rounded-zen border border-hair px-5 py-[18px] text-left transition-all duration-300 hover:border-sage/50" +
+        // Al desplegarse, la tarjeta toma las dos columnas: el detalle (gráficos,
+        // plan, "en qué va") no cabe cómodo en media pantalla y quedaba todo
+        // apilado con mucho espacio muerto a los lados en tablet y escritorio.
+        (expandido ? " md:col-span-2" : "")
+      }
     >
       <div
         onClick={() => setExpandido(!expandido)}
@@ -147,7 +153,10 @@ function TarjetaPupilo({
       )}
 
       {expandido && (
-        <div className="mt-2 border-t border-hair pt-4 flex flex-col gap-4">
+        // En pantallas anchas el detalle va en dos columnas; los bloques
+        // densos (plan, "en qué va") se marcan md:col-span-2 para conservar
+        // su ancho completo.
+        <div className="mt-2 grid gap-4 border-t border-hair pt-4 md:grid-cols-2 md:items-start">
           {/* Horario */}
           {filasHorario.length > 0 && (
             <div>
@@ -300,7 +309,7 @@ function TarjetaPupilo({
 
           {/* Plan de estudio sugerido (Apoderado) */}
           {diagnosticado && (
-            <div className="border-t border-hair pt-3 flex flex-col gap-3">
+            <div className="border-t border-hair pt-3 flex flex-col gap-3 md:col-span-2">
               <div className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
                 Plan de estudio sugerido (Apoderado)
               </div>
@@ -388,7 +397,7 @@ function TarjetaPupilo({
           )}
 
           {/* Botón de acción */}
-          <div className="flex flex-col sm:flex-row gap-2 mt-2">
+          <div className="flex flex-col sm:flex-row gap-2 mt-2 md:col-span-2">
             <button
               type="button"
               onClick={onEntrar}

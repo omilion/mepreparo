@@ -35,6 +35,11 @@ import { Fireworks } from "./Fireworks";
 import { tocarLira } from "@/lib/audio/liraUI";
 import { devToolsActivas } from "@/lib/devTools";
 import { useApp } from "@/lib/app/AppProvider";
+import {
+  leerClaseEnCurso,
+  guardarClaseEnCurso,
+  borrarClaseEnCurso,
+} from "@/lib/storage";
 import { avisarEvento } from "@/lib/telemetriaCliente";
 
 // Rai necesita la API en vivo: sin internet no hay forma honesta de
@@ -242,14 +247,41 @@ export function Tutor({
 
   // Rai INICIA la conversación al entrar (una sola vez): la esfera saluda —
   // se abre, se entibia y lanza un anillo — mientras pide su primer mensaje.
+  //
+  // …salvo que haya una clase EN CURSO de este mismo niño/materia/tema: si el
+  // niño tocó inicio sin querer o se bloqueó la tablet, volver no puede
+  // significar empezar de cero. En ese caso se retoma donde iba y no se saluda
+  // de nuevo (saludar borraría la conversación que acabamos de recuperar).
   useEffect(() => {
     if (inicioPedido.current) return;
     inicioPedido.current = true;
+
+    const enCurso = leerClaseEnCurso<Mensaje>(perfil.id, materia, temaFoco);
+    if (enCurso) {
+      setMensajes(enCurso.mensajes);
+      inicioSesion.current = enCurso.inicioSesion; // el reloj de la sesión sigue corriendo
+      setCompacta(enCurso.mensajes.some((m) => m.de === "nino"));
+      return;
+    }
+
     reaccionar(["saludo", 4200]);
     avisarEvento("sesion_iniciada", { pupiloId: perfil.id, materia });
     void saludar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Guarda la clase ante cualquier cambio, para que sobreviva a un cierre
+  // accidental. Se limpia sola al cerrar la sesión de verdad (manejarVolver).
+  useEffect(() => {
+    if (mensajes.length === 0 || sesionTerminada) return;
+    guardarClaseEnCurso<Mensaje>({
+      pupiloId: perfil.id,
+      materia,
+      temaFoco,
+      mensajes,
+      inicioSesion: inicioSesion.current,
+    });
+  }, [mensajes, perfil.id, materia, temaFoco, sesionTerminada]);
 
   function cuerpoBase() {
     return {
@@ -1064,6 +1096,53 @@ ${traza}` : m.texto };
     else reaccionar(["no", 1300], ["animo", 2800]);
   }
 
+  // CALLEJÓN SIN SALIDA TRAS UNA ACTIVIDAD. Rai felicitaba ("¡correcto!") y se
+  // quedaba esperando que el niño escribiera algo para seguir. Para un niño de
+  // básica eso es un muro: no sabe que le toca a él ni qué escribir. Estos dos
+  // botones le devuelven el turno a Rai sin obligarlo a teclear.
+  //
+  // El pedido de "otra actividad" NO se arma acá: se le pide a Rai que la lance
+  // con su marcador, así pasa por el mismo freno de variedad de siempre
+  // (decidirActividad) y nunca le llega dos veces el mismo tipo.
+  async function seguirDespuesDeActividad(pedirOtra: boolean) {
+    if (cargando) return;
+    setCargando(true);
+    try {
+      const res = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...cuerpoBase(),
+          accion: "chat",
+          materia,
+          pregunta: pedirOtra
+            ? "[Sistema] El niño quiere OTRA actividad del mismo tema. Preséntasela en " +
+              "UNA frase corta y lánzala con su marcador. No uses el mismo tipo de " +
+              "actividad que acabas de darle."
+            : "[Sistema] El niño terminó la actividad y quiere seguir con la clase. " +
+              "Comenta en una frase cómo le fue y CONTINÚA enseñando el tema desde " +
+              "donde ibas, con el siguiente pedacito. NO lances otra actividad ahora.",
+          historial: historialPlano(),
+        }),
+      });
+      const data = await res.json();
+      void agregarRai(data);
+    } catch {
+      reaccionar(["ausente", 5000]);
+      avisarEvento("tutor_sin_conexion", {
+        pupiloId: perfil.id,
+        materia,
+        meta: { accion: "chat" },
+      });
+      setMensajes((m) => [
+        ...m,
+        { de: "rai", texto: mensajeConexion("No pude conectarme. Intenta de nuevo en un momento.") },
+      ]);
+    } finally {
+      setCargando(false);
+    }
+  }
+
   // El niño responde el ejercicio embebido: marca acierto y registra evidencia.
   // `seleccion` = opciones elegidas. En opción múltiple es 1; en selección
   // múltiple pueden ser varias (se valida el conjunto EXACTO: todo o nada).
@@ -1285,6 +1364,16 @@ ${traza}` : m.texto };
   const turnosNinoActual = mensajes.filter((m) => m.de === "nino").length;
   const mostrarEscapeHorario = esPrimera && !perfil.tutoria && turnosNinoActual >= 4;
 
+  // ¿La conversación quedó parada en una actividad ya resuelta? Entonces le
+  // toca a Rai y hay que ofrecerle al niño cómo devolverle el turno.
+  const ultimo = mensajes[mensajes.length - 1];
+  const mostrarSeguirActividad =
+    !cargando &&
+    !sesionTerminada &&
+    !!ultimo &&
+    ultimo.de === "rai" &&
+    !!ultimo.resuelto;
+
   // Al salir de la tutoría, cerramos sesión de forma estructurada si hubo interacción
   async function manejarVolver() {
     // La despedida usa el mismo gesto que la llegada: la esfera se abre, se
@@ -1293,10 +1382,14 @@ ${traza}` : m.texto };
     const turnosNino = mensajes.filter((m) => m.de === "nino").length;
     // Si no hay acuerdo o el niño conversó menos de 2 turnos, no guardamos sesión
     if (turnosNino < 2 || !acuerdo) {
+      // clase demasiado corta para guardarla como sesión, pero SÍ vale la pena
+      // poder retomarla: no se borra la clase en curso.
       onVolver();
       return;
     }
 
+    // esta salida sí cierra la clase: ya no hay nada que retomar
+    borrarClaseEnCurso();
     setCargando(true);
     const duracionMin = Math.max(1, Math.round((Date.now() - inicioSesion.current) / 60000));
     const nMensajes = mensajes.length;
@@ -1437,6 +1530,30 @@ ${traza}` : m.texto };
           </div>
         ))}
 
+        {/* Tras terminar una actividad, el turno vuelve a Rai con un toque:
+            sin esto el niño quedaba mirando un "¡correcto!" sin saber que le
+            tocaba a él escribir para que la clase siguiera. */}
+        {mostrarSeguirActividad && (
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pb-2">
+            <button
+              type="button"
+              onClick={() => seguirDespuesDeActividad(false)}
+              disabled={cargando}
+              className="cta px-7 disabled:opacity-40"
+            >
+              Seguir con la clase
+            </button>
+            <button
+              type="button"
+              onClick={() => seguirDespuesDeActividad(true)}
+              disabled={cargando}
+              className="rounded-full border border-hair px-5 py-2 text-[13.5px] text-ink-soft transition-colors hover:border-sage hover:text-ink disabled:opacity-40"
+            >
+              Hacer otro
+            </button>
+          </div>
+        )}
+
         <div ref={finRef} />
       </div>
 
@@ -1560,7 +1677,9 @@ function CajaTexto({
     // input DESTACADO: caja con borde completo, fondo sutil, ~90% del ancho y
     // tipografía más grande — pensado para que el niño lo vea claro en tablet.
     <div className="flex flex-none justify-center py-3">
-      <div className="flex w-[90%] items-center gap-2 rounded-2xl border border-hair bg-surface/60 px-3 py-1.5 transition-colors focus-within:border-sage">
+      {/* py-2.5 (antes 1.5): la caja quedaba muy baja para tocarla con el dedo
+          en tablet — ~20% más alta sin cambiar la tipografía */}
+      <div className="flex w-[90%] items-center gap-2 rounded-2xl border border-hair bg-surface/60 px-3 py-2.5 transition-colors focus-within:border-sage">
         {soportaVoz && (
           <button
             type="button"
@@ -1657,8 +1776,10 @@ const Linea = memo(function Linea({
       </p>
     );
   }
+  // En tablet el texto de Rai quedaba angosto y con mucho aire a los lados: se
+  // le da más ancho (58ch) sin pasarse del largo de línea cómodo para leer.
   return (
-    <div className="mx-auto flex w-[90%] max-w-[40ch] flex-col items-center gap-2 md:max-w-[46ch]">
+    <div className="mx-auto flex w-[90%] max-w-[40ch] flex-col items-center gap-2 md:max-w-[58ch]">
       <p className="whitespace-pre-line text-[26px] font-serif leading-[1.35] text-ink md:text-[29px]">
         {animar ? (
           <TextoRevelado texto={m.texto} onTick={onTick} />

@@ -25,42 +25,59 @@ export const TextoRevelado = memo(function TextoRevelado({
     onTick?.();
   }, [texto, onTick]);
 
-  // Dividimos el texto por espacios y marcadores de icono
-  const tokens = useMemo(() => texto.split(/(\s+|\[icono:\w+\])/), [texto]);
+  // Primero se parte por los tramos en **negrita** y recién dentro de cada
+  // tramo por palabras. Al revés no funcionaría: "**la célula**" abarca dos
+  // palabras y el marcador quedaría partido a la mitad.
+  //
+  // Sin esto el niño veía los asteriscos literales ("**celula**"), porque el
+  // texto se pinta palabra por palabra y nadie interpretaba el markdown que
+  // Gemini escribe por su cuenta.
+  const tramos = useMemo(() => {
+    return texto.split(/(\*\*[^*\n]+\*\*)/).map((parte) => {
+      const negrita = /^\*\*[^*\n]+\*\*$/.test(parte);
+      return { negrita, texto: negrita ? parte.slice(2, -2) : parte };
+    });
+  }, [texto]);
 
   // Contador para asignar retrasos solo a las palabras visibles, no a los espacios
   let wordIndex = 0;
+
+  // Pinta un tramo palabra por palabra, respetando iconos y el escalonado.
+  function palabrasDe(contenido: string, claveTramo: number, negrita: boolean) {
+    return contenido.split(/(\s+|\[icono:\w+\])/).map((token, idx) => {
+      if (token === "") return null;
+      if (/^\s+$/.test(token)) {
+        return <span key={`${claveTramo}-${idx}`}>{token}</span>;
+      }
+
+      const matchIcono = token.match(/^\[icono:(\w+)\]$/);
+      const currentDelayIndex = wordIndex;
+      wordIndex++;
+
+      return (
+        <span
+          key={`${claveTramo}-${idx}`}
+          className={"palabra-zen-fade" + (negrita ? " palabra-destacada" : "")}
+          style={{
+            animationDelay: `${currentDelayIndex * stagger}s`,
+          }}
+        >
+          {matchIcono ? (
+            <IconoZen nombre={matchIcono[1]} className="mx-1 align-middle" size={20} />
+          ) : (
+            token
+          )}
+        </span>
+      );
+    });
+  }
 
   return (
     // <span> (no <div>): este componente se renderiza DENTRO del <p> de cada
     // línea de Rai, y un <div> dentro de <p> es HTML inválido (hydration error).
     // Como el contenedor ya es display:inline-block, el <span> se ve idéntico.
     <span className="texto-contenedor-zen">
-      {tokens.map((token, idx) => {
-        if (/^\s+$/.test(token)) {
-          return <span key={idx}>{token}</span>;
-        }
-
-        const matchIcono = token.match(/^\[icono:(\w+)\]$/);
-        const currentDelayIndex = wordIndex;
-        wordIndex++;
-
-        return (
-          <span
-            key={idx}
-            className="palabra-zen-fade"
-            style={{
-              animationDelay: `${currentDelayIndex * stagger}s`,
-            }}
-          >
-            {matchIcono ? (
-              <IconoZen nombre={matchIcono[1]} className="mx-1 align-middle" size={20} />
-            ) : (
-              token
-            )}
-          </span>
-        );
-      })}
+      {tramos.map((tramo, i) => palabrasDe(tramo.texto, i, tramo.negrita))}
 
       <style jsx>{`
         .texto-contenedor-zen {
@@ -74,6 +91,13 @@ export const TextoRevelado = memo(function TextoRevelado({
           transform: translateY(3px);
           animation: palabraZenFadeIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           will-change: opacity, transform;
+        }
+        /* El dorado de la paleta: distinto del salvia del resto del texto, así
+           se lee de inmediato que Rai quiso subrayar ESA palabra. Se acompaña
+           con peso, no con fondo de resaltador. */
+        .palabra-destacada {
+          font-weight: 620;
+          color: var(--gold);
         }
         @keyframes palabraZenFadeIn {
           to {

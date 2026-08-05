@@ -8,6 +8,13 @@ import { useEffect, useState, useRef } from "react";
 // `variant="soft"` = fade simple, suave.
 // Respeta prefers-reduced-motion (aparece de inmediato).
 
+// El efecto estaba bien pero duraba demasiado: había retardos de hasta 2.6s
+// SUMADOS a 2.4s de animación, o sea 5 segundos hasta que un bloque terminaba
+// de aparecer. En vez de tocar los ~40 lugares que pasan `delay`, se escala
+// acá: la coreografía (qué entra antes que qué) se mantiene intacta y el
+// tiempo total se reduce a la mitad.
+const FACTOR_RITMO = 0.5;
+
 export function Reveal({
   delay = 0,
   variant = "soft",
@@ -22,6 +29,7 @@ export function Reveal({
   const [on, setOn] = useState(false);
   const [reduce, setReduce] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const espera = Math.round(delay * FACTOR_RITMO);
 
   useEffect(() => {
     if (
@@ -47,7 +55,7 @@ export function Reveal({
             timeoutId = setTimeout(() => {
               setOn(true);
               onVisible?.();
-            }, delay);
+            }, espera);
             observer.unobserve(element);
             window.removeEventListener("scroll", handleScroll);
           }
@@ -66,7 +74,7 @@ export function Reveal({
         timeoutId = setTimeout(() => {
           setOn(true);
           onVisible?.();
-        }, delay);
+        }, espera);
         observer.disconnect();
         window.removeEventListener("scroll", handleScroll);
       }
@@ -83,10 +91,12 @@ export function Reveal({
       window.removeEventListener("scroll", handleScroll);
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [delay, onVisible]);
+  }, [espera, onVisible]);
 
   const lead = variant === "lead";
-  const dur = lead ? "2.4s" : "1.7s"; // Animaciones lentas y Zen (tiempos duplicados)
+  // Antes 2.4s/1.7s: sumadas al retardo, un bloque tardaba hasta 5s en llegar.
+  // A la mitad el gesto sigue siendo sereno, pero deja de hacerse esperar.
+  const dur = lead ? "1.2s" : "0.85s";
   const shift = lead ? "28px" : "14px"; // Desplazamiento sutil hacia arriba
 
   return (

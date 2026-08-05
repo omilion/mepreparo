@@ -247,10 +247,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setPinBloqueado(!!alumno.tienePin);
         arranqueHecho.current = true;
         setCargando(false);
-        // Bloqueo suave (Fase 4.3): se decide UNA vez, al arrancar — nunca a
-        // mitad de una sesión de estudio ya en curso.
+        // Se navega YA. Antes se esperaba la respuesta del gate de pago para
+        // recién ahí navegar, y ese hueco —sin "cargando" y sin ruta— se veía
+        // como una pantalla en negro al entrar con el QR, que solo se arreglaba
+        // recargando. El bloqueo suave (Fase 4.3) se resuelve después: si la
+        // familia está al día no se nota, y si no, redirige en cuanto responde.
+        router.replace(rutaSegunEstado(p));
         void accesoBloqueado(alumno.token).then((bloqueado) => {
-          router.replace(bloqueado ? "/suscripcion" : rutaSegunEstado(p));
+          if (bloqueado) router.replace("/suscripcion");
         });
         return;
       }
@@ -311,15 +315,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCuenta(sinc);
         setCargando(false);
         const irA = destino(sinc);
-        // El bloqueo solo aplica DESPUÉS del onboarding (irA === "/panel"):
-        // interrumpir el registro o el wizard a medias sería peor que dejar
-        // pasar un par de minutos de más antes de mostrar el paywall.
-        if (irA !== "/panel") {
-          router.replace(irA);
-          return;
-        }
+        // Navegar primero, consultar el gate después (ver el caso del QR más
+        // arriba: esperar la red antes de navegar deja la pantalla en blanco).
+        router.replace(irA);
+        // El bloqueo solo aplica DESPUÉS del onboarding: interrumpir el
+        // registro o el wizard a medias sería peor que dejar pasar un par de
+        // minutos antes de mostrar el paywall.
+        if (irA !== "/panel") return;
         void accesoBloqueado().then((bloqueado) => {
-          router.replace(bloqueado ? "/suscripcion" : irA);
+          if (bloqueado) router.replace("/suscripcion");
         });
       })
       .catch(() => {

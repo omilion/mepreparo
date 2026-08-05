@@ -39,7 +39,7 @@ export function TopBar({
           />
           <path d="M12 4v15" stroke="var(--paper)" strokeWidth="1.3" />
         </svg>
-        <span>mepreparo</span>
+        <span>RAI</span>
         {nombreAlumno && (
           <span className="ml-2 hidden sm:inline-block rounded-full bg-sage-deep/10 px-2.5 py-0.5 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-sage-deep">
             Estudiante: {nombreAlumno}

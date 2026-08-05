@@ -9,6 +9,9 @@ import {
   leerFoco,
   guardarFoco,
   borrarFoco,
+  leerClaseEnCurso,
+  guardarClaseEnCurso,
+  borrarClaseEnCurso,
 } from "./storage";
 import { nuevoPerfil } from "./profile";
 import type { ResultadoMateria } from "./diagnostico/tipos";
@@ -114,5 +117,78 @@ describe("etapa enfocada", () => {
     guardarFoco("nina-1", { materia: "ciencias", tema: "ciclo_del_agua" });
     borrarFoco();
     expect(leerFoco("nina-1")).toBeNull();
+  });
+});
+
+// La clase con Rai vivía SOLO en el estado del componente: si el niño tocaba
+// inicio sin querer o se bloqueaba la tablet, la conversación entera se perdía
+// y al volver Rai saludaba de cero. Estas pruebas cubren que se retome, y —más
+// importante— que NO se retome cuando sería confuso o de otro niño.
+describe("clase en curso (la conversación con Rai)", () => {
+  const mensajes = [
+    { de: "rai", texto: "Hola, veamos fracciones" },
+    { de: "nino", texto: "ya" },
+  ];
+
+  it("se recupera si es el mismo niño, materia y tema", () => {
+    guardarClaseEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      temaFoco: "fracciones",
+      mensajes,
+      inicioSesion: Date.now(),
+    });
+    const r = leerClaseEnCurso<(typeof mensajes)[number]>("nina-1", "matematica", "fracciones");
+    expect(r?.mensajes).toHaveLength(2);
+  });
+
+  it("NO se filtra a otro niño de la misma tablet", () => {
+    guardarClaseEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      temaFoco: "fracciones",
+      mensajes,
+      inicioSesion: Date.now(),
+    });
+    expect(leerClaseEnCurso("nina-2", "matematica", "fracciones")).toBeNull();
+  });
+
+  it("no se retoma una clase de otra materia ni de otro tema", () => {
+    guardarClaseEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      temaFoco: "fracciones",
+      mensajes,
+      inicioSesion: Date.now(),
+    });
+    expect(leerClaseEnCurso("nina-1", "lenguaje", "fracciones")).toBeNull();
+    expect(leerClaseEnCurso("nina-1", "matematica", "geometria")).toBeNull();
+  });
+
+  it("una clase de hace más de 3 horas se descarta", () => {
+    guardarClaseEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      temaFoco: "fracciones",
+      mensajes,
+      inicioSesion: Date.now(),
+    });
+    // envejecemos el guardado a mano
+    const crudo = JSON.parse(window.localStorage.getItem("mp-clase-en-curso")!);
+    crudo.guardadoEn = Date.now() - 4 * 60 * 60 * 1000;
+    window.localStorage.setItem("mp-clase-en-curso", JSON.stringify(crudo));
+    expect(leerClaseEnCurso("nina-1", "matematica", "fracciones")).toBeNull();
+  });
+
+  it("al cerrar la sesión de verdad, no queda nada que retomar", () => {
+    guardarClaseEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      temaFoco: "fracciones",
+      mensajes,
+      inicioSesion: Date.now(),
+    });
+    borrarClaseEnCurso();
+    expect(leerClaseEnCurso("nina-1", "matematica", "fracciones")).toBeNull();
   });
 });
