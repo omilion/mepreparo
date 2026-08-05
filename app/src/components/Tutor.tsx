@@ -1468,7 +1468,7 @@ ${traza}` : m.texto };
     // Ancho responsive: en móvil la columna zen (560px, buena legibilidad); en
     // tablet+ ocupa ~80% del ancho con un tope, para no dejar márgenes enormes.
     <div
-      className="zen-page flex flex-col"
+      className="zen-page-tutor flex flex-col"
       style={{ height: "100dvh", minHeight: "100dvh" }}
     >
       {/* Barra superior de herramientas idéntica a otras vistas */}
@@ -1776,10 +1776,13 @@ const Linea = memo(function Linea({
       </p>
     );
   }
-  // En tablet el texto de Rai quedaba angosto y con mucho aire a los lados: se
-  // le da más ancho (58ch) sin pasarse del largo de línea cómodo para leer.
+  // En tablet el texto de Rai quedaba angosto con mucho aire a los lados. El
+  // culpable era este `w-[90%]` (y el tope de la página), no el max-w: en un
+  // iPad de 768px daba ~590px y el max-w en `ch` ni siquiera llegaba a aplicar.
+  // Desde md se usa todo el ancho disponible y el largo de línea lo limita el
+  // max-w en `ch`, que es lo que corresponde para leer cómodo.
   return (
-    <div className="mx-auto flex w-[90%] max-w-[40ch] flex-col items-center gap-2 md:max-w-[58ch]">
+    <div className="mx-auto flex w-[90%] max-w-[40ch] flex-col items-center gap-2 md:w-full md:max-w-[62ch]">
       <p className="whitespace-pre-line text-[26px] font-serif leading-[1.35] text-ink md:text-[29px]">
         {animar ? (
           <TextoRevelado texto={m.texto} onTick={onTick} />

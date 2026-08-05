@@ -12,6 +12,13 @@
   .zen-page {
     @apply mx-auto w-full max-w-zen px-[22px] md:max-w-[700px] lg:max-w-[880px];
   }
+  /* La clase con Rai es una pantalla de INMERSIÓN, no un documento: en tablet
+     el tope de 700px de .zen-page dejaba el texto en ~590px con márgenes
+     enormes a los lados. Acá el largo de línea cómodo lo pone el propio texto
+     con su max-w en `ch`, no la página. */
+  .zen-page-tutor {
+    @apply mx-auto w-full max-w-zen px-[22px] md:max-w-[900px] lg:max-w-[1100px];
+  }
   .input {
     @apply w-full border-0 border-b border-hair bg-transparent px-0.5 py-2 text-[16px] text-ink transition-colors;
   }
