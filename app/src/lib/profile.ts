@@ -84,6 +84,9 @@ export interface PerfilNino {
     // ¿el acceso del alumno está protegido por PIN? El PIN nunca se guarda en
     // el perfil (solo su hash en la BD del servidor). Ver auth-student.ts.
     tienePin?: boolean;
+    // Logros ya celebrados (ids de lib/plan/logros.ts): para no repetir la
+    // fiesta de partículas cada vez que el niño vuelve a entrar.
+    logrosVistos?: string[];
   };
   // Se llena en Fase 2 (diagnóstico). Vacío al crear el perfil.
   diagnostico?: Partial<Record<Materia, DiagnosticoMateria>>;

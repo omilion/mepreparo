@@ -6,6 +6,7 @@
 
 import { MATERIAS, type Curso, type Materia, type PerfilNino } from "@/lib/profile";
 import { queHacerHoy, yaEstudioHoy } from "@/lib/plan/hoy";
+import { calcularRacha } from "@/lib/plan/racha";
 import { Reveal } from "./Reveal";
 
 export function QueHacerHoy({
@@ -22,6 +23,7 @@ export function QueHacerHoy({
   const plan = queHacerHoy(perfil, curso);
   const yaEstudio = yaEstudioHoy(perfil);
   const nombre = perfil.nombre.trim() || "tú";
+  const racha = calcularRacha(perfil.tutoria?.sesiones ?? []);
 
   if (!plan) {
     // sin camino armado todavía (raro llegando aquí, pero no debe romperse)
@@ -54,6 +56,15 @@ export function QueHacerHoy({
           Hola, {nombre}
         </div>
       </Reveal>
+
+      {racha >= 1 && (
+        <Reveal delay={140}>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-hair px-3.5 py-1.5 text-[12.5px] text-ink-soft">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-clay" />
+            {racha} {racha === 1 ? "día seguido" : "días seguidos"}
+          </div>
+        </Reveal>
+      )}
 
       {yaEstudio ? (
         <>

@@ -4,10 +4,11 @@ import { useEffect } from "react";
 import { useApp } from "@/lib/app/AppProvider";
 import { useRouter } from "next/navigation";
 import { QueHacerHoy } from "@/components/QueHacerHoy";
+import { LogrosCelebracion } from "@/components/LogrosCelebracion";
 import { TopBar } from "@/components/TopBar";
 
 export default function HoyRuta() {
-  const { pupilo, setFoco } = useApp();
+  const { pupilo, setFoco, guardarPupiloEnfocado } = useApp();
   const router = useRouter();
 
   // Guard: sin pupilo, al inicio
@@ -31,6 +32,7 @@ export default function HoyRuta() {
   return (
     <main className="min-h-screen">
       <TopBar />
+      <LogrosCelebracion key={pupilo.id} perfil={pupilo} curso={pupilo.curso} onGuardar={guardarPupiloEnfocado} />
       <QueHacerHoy
         perfil={pupilo}
         curso={pupilo.curso}

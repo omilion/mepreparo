@@ -60,7 +60,13 @@ describe("indicadorExamen", () => {
     const hoy = new Date();
     const enUnaSemana = new Date(hoy);
     enUnaSemana.setDate(hoy.getDate() + 7);
-    const iso = enUnaSemana.toISOString().slice(0, 10);
+    // OJO: toISOString() da la fecha en UTC, que puede caer en otro día
+    // calendario que el local (diasHastaExamen compara en hora LOCAL). Se arma
+    // el ISO a mano con los componentes locales para no desfasar el test.
+    const y = enUnaSemana.getFullYear();
+    const m = String(enUnaSemana.getMonth() + 1).padStart(2, "0");
+    const d = String(enUnaSemana.getDate()).padStart(2, "0");
+    const iso = `${y}-${m}-${d}`;
     const r = indicadorExamen("matematica", "5basico", null, iso);
     expect(r.dias).toBe(7);
   });
