@@ -4,6 +4,7 @@ import { db } from "@/lib/db/db";
 import { contenidoValidado } from "@/lib/db/schema";
 import { generar, tieneClave } from "@/lib/tutor/gemini";
 import { validarEjercicio } from "@/lib/tutor/checker";
+import { esMuyParecida } from "./similitud";
 
 // Pregunta de opción múltiple para la PRUEBA DE ETAPA, generada por Gemini cuando
 // el banco estático es delgado (muchos temas tienen solo 1-2 preguntas). Se valida
@@ -27,8 +28,21 @@ export async function obtenerPreguntaGenerada(
   curso: string,
   tema: string,
   dificultad: number,
-  excluidas: Set<string>
+  excluidas: Set<string>,
+  // Enunciados que el niño YA vio en esta prueba (del banco o generados). Sin
+  // esto la IA no tenía forma de saber qué se preguntó y devolvía siempre lo
+  // más obvio del tema con otra redacción: una niña recibió 3 de 8 preguntas
+  // que eran la misma.
+  enunciadosUsados: string[] = []
 ): Promise<PreguntaGen | null> {
+  // Todos los enunciados ya cacheados del tema: sirven para dos cosas distintas
+  // —elegir uno sin usar, y evitar que la IA vuelva a inventar ese mismo.
+  let enunciadosCacheados: string[] = [];
+  // Lo que el niño ya vio en ESTA prueba. Empieza con lo que llega del banco y
+  // se completa abajo con las generadas que ya se le sirvieron (esas no están
+  // en el banco, así que quien llama no puede conocer su enunciado).
+  const yaVistos = [...enunciadosUsados];
+
   // 1. ¿Ya hay alguna cacheada de este tema sin usar? (costo cero)
   try {
     const cacheadas = await db
@@ -43,7 +57,16 @@ export async function obtenerPreguntaGenerada(
           eq(contenidoValidado.estado, "publicada")
         )
       );
-    const disponibles = cacheadas.filter((r) => !excluidas.has(r.id));
+    enunciadosCacheados = cacheadas.map((r) => r.enunciado);
+    // las generadas que ya se le sirvieron en esta misma prueba
+    for (const r of cacheadas) if (excluidas.has(r.id)) yaVistos.push(r.enunciado);
+
+    // No basta con descartar por id: la biblioteca quedó con variantes de la
+    // misma pregunta, así que también se descarta lo que se PAREZCA a algo ya
+    // preguntado en esta prueba.
+    const disponibles = cacheadas.filter(
+      (r) => !excluidas.has(r.id) && !esMuyParecida(r.enunciado, yaVistos)
+    );
     if (disponibles.length > 0) {
       const r = disponibles[Math.floor(Math.random() * disponibles.length)];
       const opciones: string[] = (r.datos as { opciones?: string[] })?.opciones ?? [];
@@ -63,10 +86,20 @@ export async function obtenerPreguntaGenerada(
 Genera UNA pregunta clara con EXACTAMENTE 4 opciones plausibles y UNA sola correcta. Las opciones incorrectas deben ser errores creíbles, no absurdos.
 Responde SOLO un JSON con este formato exacto:
 { "enunciado": "la pregunta", "opciones": ["a","b","c","d"], "respuestaFinal": "la opción correcta, idéntica a una de opciones" }`;
+    // Se le muestra TODO lo que ya existe del tema (lo preguntado en esta
+    // prueba y lo que hay en la biblioteca) para que apunte a otro aspecto.
+    const yaExisten = [...new Set([...yaVistos, ...enunciadosCacheados])].slice(0, 20);
+    const evitar = yaExisten.length
+      ? `\n\nEstas preguntas YA EXISTEN sobre este tema. Genera una CLARAMENTE DISTINTA, ` +
+        `que evalúe otro aspecto o habilidad del mismo tema — no vale la misma pregunta ` +
+        `con otros números, otros nombres o el orden cambiado:\n` +
+        yaExisten.map((e) => `- ${e}`).join("\n")
+      : "";
+
     const usuario = `Materia: ${materia}
 Curso: ${curso}
 Tema: ${tema}
-Dificultad: ${dificultad} (escala 1 a 3)`;
+Dificultad: ${dificultad} (escala 1 a 3)${evitar}`;
     const cruda = await generar({ sistema, usuario, maxTokens: 600, json: true });
     const obj = JSON.parse(cruda) as {
       enunciado?: string;
@@ -79,6 +112,13 @@ Dificultad: ${dificultad} (escala 1 a 3)`;
       obj.opciones.length !== N_OPCIONES ||
       !obj.respuestaFinal
     ) {
+      return null;
+    }
+
+    // Aunque se le pidió algo distinto, la IA insiste a veces con la misma
+    // pregunta. Si salió parecida a algo ya preguntado en ESTA prueba, se
+    // descarta: es preferible una pregunta menos a repetirle una al niño.
+    if (esMuyParecida(obj.enunciado, yaVistos)) {
       return null;
     }
 
@@ -97,20 +137,26 @@ Dificultad: ${dificultad} (escala 1 a 3)`;
     if (idx < 0) return null;
 
     const id = `pruebagen-${crypto.randomUUID()}`;
+    // Solo se guarda si aporta algo NUEVO a la biblioteca. Cachear variantes
+    // de lo mismo era lo que hacía que el problema creciera solo: cada prueba
+    // dejaba más duplicados para las pruebas siguientes, de todos los niños.
+    const aportaALaBiblioteca = !esMuyParecida(obj.enunciado, enunciadosCacheados);
     try {
-      await db.insert(contenidoValidado).values({
-        id,
-        materia,
-        curso,
-        oa: tema,
-        dificultad,
-        tipo: "prueba_gen",
-        enunciado: obj.enunciado,
-        datos: { opciones: obj.opciones },
-        solucionPasoAPaso: [],
-        respuestaFinal: obj.respuestaFinal,
-        estado: "publicada",
-      });
+      if (aportaALaBiblioteca) {
+        await db.insert(contenidoValidado).values({
+          id,
+          materia,
+          curso,
+          oa: tema,
+          dificultad,
+          tipo: "prueba_gen",
+          enunciado: obj.enunciado,
+          datos: { opciones: obj.opciones },
+          solucionPasoAPaso: [],
+          respuestaFinal: obj.respuestaFinal,
+          estado: "publicada",
+        });
+      }
     } catch (err) {
       console.error("No se pudo cachear la pregunta generada:", err);
     }

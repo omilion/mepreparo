@@ -34,10 +34,24 @@ export async function GET(req: NextRequest) {
   // la prueba de etapa evalúa SOLO su tema (si no hay preguntas, devuelve null)
   if (tema) pool = pool.filter((p) => p.tema === tema);
 
+  // Los enunciados que el niño YA vio en esta prueba (las excluidas que salen
+  // del banco). Se le pasan al generador para que no invente la misma pregunta
+  // con otra redacción, que era lo que hacía que 3 de 8 fueran la misma.
+  const enunciadosUsados = banco
+    .filter((p) => excluidas.has(p.id))
+    .map((p) => p.enunciado);
+
   const candidatas = pool.filter((p) => !excluidas.has(p.id));
   if (candidatas.length === 0) {
     if (tema) {
-      const gen = await obtenerPreguntaGenerada(materia, curso, tema, dificultad, excluidas);
+      const gen = await obtenerPreguntaGenerada(
+        materia,
+        curso,
+        tema,
+        dificultad,
+        excluidas,
+        enunciadosUsados
+      );
       if (gen) {
         const indices = gen.opciones.map((_, i) => i);
         for (let i = indices.length - 1; i > 0; i--) {
