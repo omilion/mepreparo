@@ -101,7 +101,13 @@ export function sistemaSesion(
   resumen: string,
   acuerdo: AcuerdoTutoria,
   materiasHoy: Materia[],
-  fechaHora: string
+  fechaHora: string,
+  // La materia que se está enseñando de verdad (puede no ser la agendada: el
+  // niño eligió otra etapa en el mapa). Sin esto Rai afirmaba "hoy toca
+  // Lenguaje" mientras enseñaba Matemática.
+  materiaClase?: Materia,
+  // El tema de la etapa en curso, para que su memoria entre siempre.
+  temaFoco?: string
 ): string {
   const horarioTexto = DIAS.map((d) => {
     const ms = acuerdo.horario[d.id];
@@ -112,13 +118,22 @@ export function sistemaSesion(
     .join(" | ");
 
   const ultima = acuerdo.sesiones.at(-1);
-  const hoyTexto =
-    materiasHoy.length > 0
+  // El niño puede haber elegido en el mapa una etapa de OTRA materia. Se dice
+  // tal cual, sin reproche: elegir qué estudiar es suyo.
+  const salioDelHorario =
+    !!materiaClase && materiasHoy.length > 0 && !materiasHoy.includes(materiaClase);
+  const hoyTexto = salioDelHorario
+    ? `Según el horario hoy tocaba ${materiasHoy.map(nombreMateria).join(" y ")}, ` +
+      `pero el niño eligió estudiar ${nombreMateria(materiaClase!)}. Acompáñalo en lo que eligió ` +
+      "sin retarlo ni insistir con lo agendado."
+    : materiasHoy.length > 0
       ? `Hoy toca: ${materiasHoy.map(nombreMateria).join(" y ")}.`
       : "Hoy no hay ramo asignado en el horario; puedes proponerle repasar algo pendiente o descansar.";
 
-  // memoria selectiva: temas y recuerdos relevantes para la materia de hoy
-  const memoria = textoMemoria(memoriaParaHoy(acuerdo, materiasHoy));
+  // memoria selectiva: la de la materia que se está enseñando de verdad, con
+  // el tema de la etapa en curso siempre incluido
+  const materiasMemoria = materiaClase ? [materiaClase] : materiasHoy;
+  const memoria = textoMemoria(memoriaParaHoy(acuerdo, materiasMemoria, 3, 3, temaFoco));
 
   return (
     TUTOR.sistema +

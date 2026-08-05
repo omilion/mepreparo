@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, memo } from "react";
-import { type PerfilNino } from "@/lib/profile";
+import { type Materia, type PerfilNino } from "@/lib/profile";
 import { TUTOR } from "@/lib/tutor/personaje";
 import { resumenPerfil } from "@/lib/tutor/resumenPerfil";
 import {
@@ -17,6 +17,7 @@ import {
   type RecuerdoNino,
 } from "@/lib/tutor/acuerdo";
 import { notificarLogros } from "@/lib/logros";
+import { materiaDeClase } from "@/lib/tutor/clase";
 import { AuraOrb } from "./AuraOrb";
 import { useExpresionRai } from "@/lib/tutor/useExpresionRai";
 import { TextoRevelado } from "./TextoRevelado";
@@ -83,6 +84,13 @@ interface Mensaje {
   // el niño ya terminó la actividad de este turno (los ejercicios además guardan
   // si acertó en `ejercicio.respondido`)
   resuelto?: boolean;
+  // TEMA con el que se pidió la actividad (el del marcador de Rai). Es la clave
+  // con la que se guarda la evidencia. Antes no se guardaba y cada interactivo
+  // improvisaba una: el enunciado cortado a 40 caracteres, una palabra de la
+  // sopa, la respuesta de la rueda… Resultado: temas fantasma como "une cada
+  // órgano con su función" que el mapa no puede leer. Si falta, NO se registra
+  // evidencia: mejor ninguna que una que ensucia el camino.
+  temaActividad?: string;
 }
 
 // Qué tipo de actividad venía anunciada en la respuesta de Rai. Se usa solo
@@ -108,6 +116,7 @@ export function Tutor({
   onGuardarPerfil,
   onHorarioCreado,
   temaFoco,
+  materiaFoco,
 }: {
   perfil: PerfilNino;
   onVolver: () => void;
@@ -116,18 +125,22 @@ export function Tutor({
   onGuardarPerfil?: (p: PerfilNino) => void;
   // Solo la PRIMERA vez, cuando se acuerda el horario: persiste y pasa a "mundos".
   onHorarioCreado?: (p: PerfilNino) => void;
-  // si viene del mapa de etapas: la lección se centra en este tema
+  // si viene del mapa de etapas: la lección se centra en este tema…
   temaFoco?: string;
+  // …y en ESTA materia. Sin esto la clase se guiaba solo por el horario del
+  // día, y la evidencia terminaba archivada en la materia equivocada.
+  materiaFoco?: Materia;
 }) {
   const { setAccionesDevTutor } = useApp();
   const nombre = perfil.nombre.trim() || "tú";
   const acuerdo = perfil.tutoria ?? null;
   const esPrimera = !acuerdo;
 
-  // materia activa (para el color de la esfera y el RAG): la que toca hoy según
-  // el horario; si hoy no hay, la primera del examen. Rai la maneja, no el niño.
+  // materia activa (color de la esfera, RAG, evidencia y resumen de la sesión):
+  // manda la etapa que el niño eligió en el mapa; si no eligió, el horario del
+  // día; y si hoy no toca nada, la primera del examen. Ver lib/tutor/clase.ts.
   const materiasHoy = acuerdo ? materiasDeHoy(acuerdo) : [];
-  const materia = materiasHoy[0] ?? perfil.examen.materias[0];
+  const materia = materiaDeClase(materiaFoco, materiasHoy, perfil.examen.materias);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [cargando, setCargando] = useState(false);
   // la esfera empieza grande y centrada; tras la 1ª respuesta del niño sube a
@@ -526,6 +539,9 @@ ${traza}` : m.texto };
         clasificador: clasificador ?? undefined,
         secuencia: secuencia ?? undefined,
         flashcards: flashcards ?? undefined,
+        // el tema del marcador, para que la evidencia se guarde con la clave
+        // real del camino y no con un pedazo del enunciado
+        temaActividad: tipoFinal && tema ? tema : undefined,
       },
     ]);
 
@@ -594,11 +610,21 @@ ${traza}` : m.texto };
   // hay uno válido). `formato` = "opcion_multiple" | "seleccion_multiple".
   // NO toca el estado: quien llama decide dónde lo adjunta.
   // Params comunes de los generadores, con lo ya visto excluido.
+  // Dificultad según cómo le va al niño EN ESE TEMA (escala 1-3 del endpoint de
+  // ejercicios, distinta de la 1-5 del diagnóstico). Antes estaba fija en "2":
+  // al que le costaba y al que ya lo había superado les llegaba lo mismo.
+  function dificultadDelTema(tema: string, mat: string): string {
+    const dominio = acuerdo?.temas?.find((t) => t.tema === tema && t.materia === mat);
+    if (dominio?.estado === "le_cuesta") return "1";
+    if (dominio?.estado === "superado") return "3";
+    return "2";
+  }
+
   function paramsActividad(tema: string, mat: string): URLSearchParams {
     const p = new URLSearchParams({
       materia: mat,
       curso: perfil.curso,
-      dificultad: "2",
+      dificultad: dificultadDelTema(tema, mat),
       tema,
     });
     if (vistos.current.size > 0) {
@@ -1075,8 +1101,8 @@ ${traza}` : m.texto };
     reaccionarARespuesta(acerto);
     marcarResuelto(msgIdx);
 
-    if (acuerdo) {
-      const tema = it.enunciado.slice(0, 40);
+    const tema = mensajes[msgIdx]?.temaActividad;
+    if (acuerdo && tema) {
       guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
     }
     if (!acerto) void raiExplicaIntruso(it, elegido);
@@ -1122,8 +1148,10 @@ ${traza}` : m.texto };
     reaccionarARespuesta(acerto);
     marcarResuelto(msgIdx);
 
-    const tema = c.enunciado.slice(0, 40);
-    guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+    const tema = mensajes[msgIdx]?.temaActividad;
+    if (tema) {
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+    }
   }
 
   // El niño terminó "el clasificador": registra evidencia. La tarjeta ya muestra
@@ -1135,52 +1163,38 @@ ${traza}` : m.texto };
     reaccionarARespuesta(acerto);
     marcarResuelto(msgIdx);
 
-    const tema = c.enunciado.slice(0, 40);
-    guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+    const tema = mensajes[msgIdx]?.temaActividad;
+    if (tema) {
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+    }
+  }
+
+  // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto.
+  // Las cuatro comparten el mismo registro de evidencia, con el tema del
+  // marcador (nunca una palabra del juego).
+  function registrarActividadCompletada(msgIdx: number) {
+    reaccionarARespuesta(true);
+    marcarResuelto(msgIdx);
+    const tema = mensajes[msgIdx]?.temaActividad;
+    if (acuerdo && tema) {
+      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
+    }
   }
 
   function responderSopa(msgIdx: number) {
-    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
-    reaccionarARespuesta(true);
-    marcarResuelto(msgIdx);
-    const s = mensajes[msgIdx]?.sopa;
-    if (s && acuerdo) {
-      const tema = s.palabras[0]?.clean || "sopa de letras";
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
-    }
+    registrarActividadCompletada(msgIdx);
   }
 
   function responderRueda(msgIdx: number) {
-    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
-    reaccionarARespuesta(true);
-    marcarResuelto(msgIdx);
-    const r = mensajes[msgIdx]?.rueda;
-    if (r && acuerdo) {
-      const tema = r.respuesta;
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
-    }
+    registrarActividadCompletada(msgIdx);
   }
 
   function responderSecuencia(msgIdx: number) {
-    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
-    reaccionarARespuesta(true);
-    marcarResuelto(msgIdx);
-    const s = mensajes[msgIdx]?.secuencia;
-    if (s && acuerdo) {
-      const tema = s.pasosCorrectos[0] || "secuencia";
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
-    }
+    registrarActividadCompletada(msgIdx);
   }
 
   function responderFlashcards(msgIdx: number) {
-    // sopa, rueda, secuencia y flashcards solo se completan bien: siempre acierto
-    reaccionarARespuesta(true);
-    marcarResuelto(msgIdx);
-    const f = mensajes[msgIdx]?.flashcards;
-    if (f && acuerdo) {
-      const tema = f.enunciado.slice(0, 40);
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
-    }
+    registrarActividadCompletada(msgIdx);
   }
 
   // ¿La selección del niño es correcta? Todo o nada.

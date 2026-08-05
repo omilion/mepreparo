@@ -38,6 +38,9 @@ export default function TutorRuta() {
       key={pupilo.id}
       perfil={pupilo}
       temaFoco={foco?.tema}
+      // la materia de la etapa elegida manda sobre el horario del día: sin
+      // esto la evidencia de la clase quedaba archivada en otra materia
+      materiaFoco={foco?.materia}
       onVolver={() => router.push(pupilo.tutoria ? "/hoy" : "/plan")}
       // PERSISTE sin navegar: evidencia de interactivos y cierre de sesión. Antes
       // esto hacía router.push("/mapa") en CADA guardado → al terminar un

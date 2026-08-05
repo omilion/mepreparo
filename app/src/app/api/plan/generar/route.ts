@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
           `Materia: ${nombreMateria}. Curso: ${body.curso}. ` +
           `Temas disponibles (usa EXACTAMENTE estas claves, no inventes otras): ${JSON.stringify(temasBanco)}. ` +
           (brechas.length ? `Temas donde el niño tiene dificultad (priorizar): ${JSON.stringify(brechas)}. ` : "") +
-          'Responde: {"objetivo":"una frase motivadora de la meta de esta materia para el examen","temas":["clave1","clave2",...]}. ' +
+          'Responde: {"temas":["clave1","clave2",...]}. ' +
           "El arreglo temas debe contener TODAS las claves disponibles, ordenadas pedagógicamente.";
 
         const cruda = await generar({
@@ -90,10 +90,11 @@ export async function POST(req: NextRequest) {
 
         plan = {
           materia,
-          objetivo:
-            typeof parsed.objetivo === "string" && parsed.objetivo.trim()
-              ? parsed.objetivo.trim().slice(0, 160)
-              : plan.objetivo,
+          // El objetivo por materia se generaba con IA y no lo leía nadie: lo
+          // reemplazó un mensaje fijo por cantidad de materias en la ceremonia
+          // (lib/plan/mensajeMundos). Se conserva el campo por compatibilidad
+          // con los perfiles ya guardados.
+          objetivo: plan.objetivo,
           temas: orden,
           generadoEn: new Date().toISOString(),
         };

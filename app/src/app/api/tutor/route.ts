@@ -18,6 +18,8 @@ import {
 import { generarConUso, tieneClave, MODELO_CHAT, MODELO_LITE } from "@/lib/tutor/gemini";
 import { normalizarIconosInline } from "@/lib/tutor/iconos";
 import { recuperar } from "@/lib/tutor/rag";
+import { rutaDeTemas, tituloDeTema } from "@/lib/plan/etapas";
+import { emparejarConRuta, pareceEnunciado } from "@/lib/plan/claveTema";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
 
@@ -68,6 +70,16 @@ export async function POST(req: NextRequest) {
       .join("\n");
 
     const materiaSesion = body.materia || "matematica";
+    // Las claves REALES del camino de este niño. Se le dan a la IA para que
+    // elija de ahí (el lever más fuerte) y además se usan para emparejar lo
+    // que devuelva: sin esto se guardaban temas fantasma que el mapa no lee.
+    const rutaDelNino = body.curso
+      ? rutaDeTemas(materiaSesion as Materia, body.curso, body.acuerdo ?? null)
+      : [];
+    const listaTemas = rutaDelNino.length
+      ? `\nCLAVES DE TEMA VÁLIDAS (usa EXACTAMENTE una de estas si el tema trabajado corresponde a alguna; si de verdad fue otro tema, escríbelo en minúsculas y con guion bajo): ${JSON.stringify(rutaDelNino)}`
+      : "";
+
     const sistemaPrompt = `Eres un asistente del currículum escolar. Se te proporciona una conversación entre el tutor de estudio "Rai" y un niño.
 Debes generar un resumen de la sesión y extraer la MEMORIA pedagógica del niño.
 REGLA DE PRIVACIDAD ESTRICTA: las frases del niño que registres deben ser SOLO sobre el estudio (qué le cuesta, qué le gusta aprender, cómo se sintió estudiando). NUNCA registres datos de familia, salud, ubicación ni vida personal.
@@ -76,12 +88,13 @@ Retorna un objeto JSON con el siguiente formato exacto:
   "titulo": "Título corto del tema principal (ej: Suma de fracciones)",
   "resumen": "1 a 3 frases en tercera persona: qué se trabajó, dónde se quedó, qué reforzar.",
   "temasTrabajados": [
-    { "tema": "nombre corto del tema en minúsculas (ej: fracciones)", "materia": "${materiaSesion}", "resultado": "avanzo | le_costo | supero", "fraseDelNino": "frase TEXTUAL del niño sobre ese tema si dijo algo revelador, si no omítela" }
+    { "tema": "clave del tema en minúsculas (ej: fracciones)", "materia": "${materiaSesion}", "resultado": "avanzo | le_costo | supero", "fraseDelNino": "frase TEXTUAL del niño sobre ese tema si dijo algo revelador, si no omítela" }
   ],
   "recuerdos": [
     { "tipo": "gusto | dificultad | logro | emocional", "texto": "observación breve con las palabras del niño si las hay (ej: dijo 'las fracciones se me hacen difíciles')", "tema": "tema relacionado o omitir" }
   ]
 }
+El "tema" es el CONCEPTO estudiado, NUNCA el enunciado de una actividad: "fracciones", no "une cada fracción con su dibujo".${listaTemas}
 Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (solo si hubo algo memorable).`;
 
     const defaultResp = {
@@ -112,18 +125,23 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
 
         const parsed = JSON.parse(cruda);
 
-        // saneo: solo resultados válidos y materia conocida
+        // saneo: resultado válido, materia conocida, y la clave del tema
+        // emparejada con el camino real del niño. Se descartan los enunciados
+        // de actividad, que es lo que venía ensuciando la memoria.
         const temasTrabajados = (Array.isArray(parsed.temasTrabajados) ? parsed.temasTrabajados : [])
           .filter(
             (t: { tema?: string; resultado?: string }) =>
-              t?.tema && ["avanzo", "le_costo", "supero"].includes(t.resultado || "")
+              t?.tema &&
+              ["avanzo", "le_costo", "supero"].includes(t.resultado || "") &&
+              !pareceEnunciado(String(t.tema))
           )
           .map((t: { tema: string; materia?: string; resultado: string; fraseDelNino?: string }) => ({
-            tema: String(t.tema).toLowerCase().trim(),
+            tema: emparejarConRuta(String(t.tema), rutaDelNino),
             materia: MATERIAS.some((m) => m.id === t.materia) ? t.materia : materiaSesion,
             resultado: t.resultado,
             fraseDelNino: t.fraseDelNino ? String(t.fraseDelNino).slice(0, 140) : undefined,
-          }));
+          }))
+          .filter((t: { tema: string }) => !!t.tema);
 
         const recuerdos = (Array.isArray(parsed.recuerdos) ? parsed.recuerdos : [])
           .filter(
@@ -133,7 +151,9 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
           .map((r: { tipo: string; texto: string; tema?: string }) => ({
             tipo: r.tipo,
             texto: String(r.texto).slice(0, 180),
-            tema: r.tema ? String(r.tema).toLowerCase().trim() : undefined,
+            // el recuerdo se ata al mismo tema canónico, si no se pierde el
+            // vínculo con la etapa (memoriaParaHoy filtra por esta clave)
+            tema: r.tema ? emparejarConRuta(String(r.tema), rutaDelNino) || undefined : undefined,
           }));
 
         return NextResponse.json({
@@ -193,7 +213,9 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       body.resumenPerfil || "",
       body.acuerdo!,
       body.materiasHoy || [],
-      fechaHoraLegible()
+      fechaHoraLegible(),
+      body.materia,
+      body.temaFoco?.trim()
     );
   }
 
@@ -227,14 +249,37 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       "a cerrar. Mantén el tono cálido y sereno.";
   }
 
-  // --- RAG solo cuando hay una pregunta concreta ---
+  // --- RAG: el currículum a la vista mientras Rai enseña ---
+  //
+  // La consulta se arma del TEMA, no del texto literal del niño. En una clase
+  // real la mayoría de los turnos son "sí", "ya", "no sé": esos vaciaban la
+  // consulta (terminos() descarta palabras cortas y vacías) y el RAG devolvía
+  // nada, así que Rai enseñaba sin currículum casi todo el tiempo. El tema del
+  // foco es lo estable de la conversación; la pregunta del niño solo matiza.
+  //
+  // También corre en el SALUDO cuando hay tema: es el mensaje que abre la
+  // lección con la introducción macro, justo el que más necesita apoyo.
   let fuentes: string[] = [];
   let contexto = "";
-  if (accion === "chat" && body.materia) {
-    const fragmentos = await recuperar(body.pregunta!.trim(), {
+  const temaRag = body.temaFoco?.trim();
+  const haceFaltaRag =
+    !!body.materia && (accion === "chat" || (accion === "saludo" && !!temaRag));
+
+  if (haceFaltaRag) {
+    const consulta = [
+      temaRag ? tituloDeTema(temaRag) : "",
+      MATERIAS.find((m) => m.id === body.materia)?.label ?? body.materia,
+      body.curso ?? "",
+      accion === "chat" ? (body.pregunta ?? "").trim() : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const fragmentos = await recuperar(consulta, {
       materia: body.materia,
       curso: body.curso,
-      k: 3,
+      // el saludo es breve por diseño: menos contexto para no volverlo denso
+      k: accion === "saludo" ? 2 : 3,
     });
     contexto = fragmentos.map((f, i) => `[${i + 1}] ${f.texto}`).join("\n\n");
     fuentes = fragmentos.map((f) => f.fuente);

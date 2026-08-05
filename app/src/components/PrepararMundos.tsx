@@ -5,6 +5,7 @@ import { MATERIAS, type Materia, type PerfilNino } from "@/lib/profile";
 import { AuraOrb } from "./AuraOrb";
 import type { PlanMateria } from "@/lib/tutor/acuerdo";
 import { avisarEvento } from "@/lib/telemetriaCliente";
+import { mensajeDeMundos } from "@/lib/plan/mensajeMundos";
 
 // Pantalla intermedia tras el onboarding: mientras la IA prepara el plan de
 // etapas de cada materia ("los mundos"), el niño ve una animación con lenguaje
@@ -40,14 +41,16 @@ export function PrepararMundos({
   const [paso, setPaso] = useState(0);
   const arrancado = useRef(false);
 
-  // guion: intro + una línea por materia + trazado + cierre
+  // guion: intro + una línea por materia + trazado + cierre.
+  // El cierre dice algo real sobre la carga que tiene por delante (ver
+  // mensajeDeMundos) en vez de un "¡todo listo!" genérico.
   const mensajes = [
     `Muy bien, ${nombre}. Estoy preparando tu aventura…`,
     ...materias.map(
       (m) => `Creando el mundo de ${MATERIAS.find((x) => x.id === m)?.label ?? m}…`
     ),
     "Trazando tus etapas y desafíos…",
-    "¡Todo listo! Este es tu camino ✨",
+    mensajeDeMundos(materias.length),
   ];
 
   useEffect(() => {

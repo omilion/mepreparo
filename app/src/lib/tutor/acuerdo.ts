@@ -145,13 +145,41 @@ export interface TemaTrabajado {
 
 const hoyIso = () => new Date().toISOString().slice(0, 10);
 
+// ¿Hay evidencia DURA a favor de este tema? (ejercicios resueltos, prueba de
+// etapa o simulacro). El juicio de Rai y las frases del niño no cuentan acá.
+function tieneEvidenciaDura(evidencias: EvidenciaTema[]): boolean {
+  return evidencias.some((e) => e.tipo === "ejercicios" || e.tipo === "simulacro");
+}
+
+// ¿Rai ya lo había dado por superado en una sesión ANTERIOR (otro día)?
+function juicioSuperoPrevio(evidencias: EvidenciaTema[], hoy: string): boolean {
+  return evidencias.some(
+    (e) => e.tipo === "juicio_rai" && e.nota === "lo logró en la sesión" && e.fecha !== hoy
+  );
+}
+
 // Transición de estado determinista (el LLM reporta, el CÓDIGO decide):
-// le_costo → le_cuesta | supero → superado | avanzo → en_proceso (pero nunca
-// degrada un tema ya superado: si vuelve a costar, sí baja — eso es señal real).
-function transicion(previo: EstadoTema | undefined, r: TemaTrabajado["resultado"]): EstadoTema {
+// le_costo → le_cuesta | avanzo → en_proceso (nunca degrada un superado; si
+// vuelve a costar sí baja, eso es señal real).
+//
+// "supero" NO basta por sí solo para dar un tema por superado. registrarEjercicios
+// exige ≥4 ejercicios y ≥80%; aceptar la impresión de Rai sin umbral inflaba el
+// indicador "listo para tu examen" y el logro "materia completa" con pura
+// conversación. Ahora sube a superado solo si hay evidencia dura, o si Rai lo
+// sostiene en DOS sesiones distintas; si no, reconoce el avance con "en_proceso".
+function transicion(
+  previo: TemaDominio | undefined,
+  r: TemaTrabajado["resultado"],
+  evidencias: EvidenciaTema[],
+  hoy: string
+): EstadoTema {
   if (r === "le_costo") return "le_cuesta";
-  if (r === "supero") return "superado";
-  return previo === "superado" ? "superado" : "en_proceso";
+  if (r === "supero") {
+    const respaldado =
+      tieneEvidenciaDura(evidencias) || juicioSuperoPrevio(previo?.evidencias ?? [], hoy);
+    return respaldado ? "superado" : "en_proceso";
+  }
+  return previo?.estado === "superado" ? "superado" : "en_proceso";
 }
 
 // Aplica el reporte del cierre de sesión al acuerdo. Devuelve un acuerdo NUEVO.
@@ -186,7 +214,7 @@ export function aplicarCierre(
     const actualizado: TemaDominio = {
       tema: clave,
       materia: t.materia,
-      estado: transicion(previo?.estado, t.resultado),
+      estado: transicion(previo, t.resultado, evidencias, fecha),
       evidencias: evidencias.slice(-8), // cap: las 8 evidencias más recientes
       actualizadoEn: fecha,
     };
@@ -333,14 +361,22 @@ export function memoriaParaHoy(
   acuerdo: AcuerdoTutoria,
   materiasHoy: Materia[],
   maxTemas = 3,
-  maxRecuerdos = 3
+  maxRecuerdos = 3,
+  // El tema de la etapa que el niño está estudiando AHORA. Va primero sí o sí:
+  // ordenando solo por fecha, la memoria del tema en curso podía quedar fuera
+  // del corte — justo la que Rai necesita para decir "¿te acuerdas que te
+  // costaban y las lograste?", que es lo que justifica tener memoria.
+  temaFoco?: string
 ): { temas: TemaDominio[]; recuerdos: RecuerdoNino[] } {
   const enMateria = (m: Materia) => materiasHoy.length === 0 || materiasHoy.includes(m);
 
-  const temas = (acuerdo.temas ?? [])
+  const candidatos = (acuerdo.temas ?? [])
     .filter((t) => enMateria(t.materia))
-    .sort((a, b) => b.actualizadoEn.localeCompare(a.actualizadoEn))
-    .slice(0, maxTemas);
+    .sort((a, b) => b.actualizadoEn.localeCompare(a.actualizadoEn));
+
+  const delFoco = temaFoco ? candidatos.filter((t) => t.tema === temaFoco) : [];
+  const resto = candidatos.filter((t) => !delFoco.includes(t));
+  const temas = [...delFoco, ...resto].slice(0, maxTemas);
 
   const temasElegidos = new Set(temas.map((t) => t.tema));
   const recuerdos = (acuerdo.recuerdos ?? [])

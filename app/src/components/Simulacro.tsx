@@ -16,7 +16,12 @@ import { Fireworks } from "./Fireworks";
 // etapa (10 respondidas en total, no 2).
 
 const MIN_PREGUNTAS = 20;
-const MAX_PREGUNTAS = 30;
+// 4 preguntas por tema es lo que exige registrarEjercicios para dar un tema por
+// superado. Con 3 el simulacro solo podía BAJAR un tema a "le_cuesta", nunca
+// subirlo: un niño que rendía perfecto no avanzaba ninguna etapa. El tope sale
+// de la materia con más temas del banco (matemática de 3°, 4° y 6°: 9 temas).
+const PREGUNTAS_POR_TEMA = 4;
+const MAX_PREGUNTAS = 36;
 const SEGUNDOS_POR_PREGUNTA = 40;
 const MINIMO_EVALUABLE = 10;
 
@@ -70,7 +75,9 @@ export function Simulacro({
 }) {
   const temas = useRef(rutaDeTemas(materia, curso, acuerdo)).current;
   const totalPreguntas = useRef(
-    temas.length === 0 ? 0 : Math.min(MAX_PREGUNTAS, Math.max(MIN_PREGUNTAS, temas.length * 3))
+    temas.length === 0
+      ? 0
+      : Math.min(MAX_PREGUNTAS, Math.max(MIN_PREGUNTAS, temas.length * PREGUNTAS_POR_TEMA))
   ).current;
   const cola = useRef(
     Array.from({ length: totalPreguntas }, (_, i) => temas[i % Math.max(1, temas.length)])

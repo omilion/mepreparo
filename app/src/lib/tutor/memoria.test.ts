@@ -28,12 +28,45 @@ describe("aplicarCierre (capa 2 + 3)", () => {
     expect(a.temas![0].evidencias[0].tipo).toBe("juicio_rai");
   });
 
-  it("supero → superado, y 'avanzo' posterior NO degrada el superado", () => {
+  // El juicio de Rai por sí solo NO da un tema por superado: registrarEjercicios
+  // exige ≥4 ejercicios y ≥80%, y aceptar la impresión del tutor sin umbral
+  // inflaba el indicador "listo para tu examen" y el logro "materia completa".
+  it("un solo 'supero' sin respaldo reconoce el avance, pero no da el tema por superado", () => {
+    const a = aplicarCierre(
+      base(),
+      { temasTrabajados: [{ tema: "fracciones", materia: "matematica", resultado: "supero" }] },
+      "2026-07-02"
+    );
+    expect(a.temas![0].estado).toBe("en_proceso");
+  });
+
+  it("'supero' sostenido en DOS sesiones distintas sí llega a superado", () => {
     let a = aplicarCierre(
       base(),
       { temasTrabajados: [{ tema: "fracciones", materia: "matematica", resultado: "supero" }] },
       "2026-07-02"
     );
+    a = aplicarCierre(
+      a,
+      { temasTrabajados: [{ tema: "fracciones", materia: "matematica", resultado: "supero" }] },
+      "2026-07-04"
+    );
+    expect(a.temas![0].estado).toBe("superado");
+  });
+
+  it("'supero' respaldado por evidencia dura previa llega a superado de una", () => {
+    let a = registrarEjercicios(base(), "fracciones", "matematica", 5, 6, "2026-07-02");
+    a = aplicarCierre(
+      a,
+      { temasTrabajados: [{ tema: "fracciones", materia: "matematica", resultado: "supero" }] },
+      "2026-07-03"
+    );
+    expect(a.temas![0].estado).toBe("superado");
+  });
+
+  it("'avanzo' posterior NO degrada un tema ya superado", () => {
+    let a = registrarEjercicios(base(), "fracciones", "matematica", 5, 6, "2026-07-02");
+    expect(a.temas![0].estado).toBe("superado");
     a = aplicarCierre(
       a,
       { temasTrabajados: [{ tema: "fracciones", materia: "matematica", resultado: "avanzo" }] },
@@ -104,8 +137,10 @@ describe("registrarEjercicios (evidencia dura)", () => {
 
 describe("memoriaParaHoy + textoMemoria", () => {
   it("filtra por la materia de hoy y produce texto compacto", () => {
-    let a = aplicarCierre(
-      base(),
+    // la evidencia dura primero, para que el 'supero' de Rai sí consolide
+    let a = registrarEjercicios(base(), "fracciones", "matematica", 5, 6, "2026-07-04");
+    a = aplicarCierre(
+      a,
       {
         temasTrabajados: [
           { tema: "fracciones", materia: "matematica", resultado: "supero", fraseDelNino: "ya las entiendo" },
@@ -121,6 +156,32 @@ describe("memoriaParaHoy + textoMemoria", () => {
     const texto = textoMemoria(m);
     expect(texto).toContain("fracciones (superado)");
     expect(texto).toContain("ya las entiendo");
+  });
+
+  it("el tema de la etapa en curso entra aunque no sea el más reciente", () => {
+    // fracciones se trabajó ANTES que otros dos temas, así que por fecha
+    // quedaría fuera del corte de 2 — pero es la etapa que el niño abrió
+    let a = aplicarCierre(
+      base(),
+      { temasTrabajados: [{ tema: "fracciones", materia: "matematica", resultado: "le_costo" }] },
+      "2026-07-01"
+    );
+    a = aplicarCierre(
+      a,
+      { temasTrabajados: [{ tema: "geometria", materia: "matematica", resultado: "avanzo" }] },
+      "2026-07-08"
+    );
+    a = aplicarCierre(
+      a,
+      { temasTrabajados: [{ tema: "decimales", materia: "matematica", resultado: "avanzo" }] },
+      "2026-07-09"
+    );
+
+    const sinFoco = memoriaParaHoy(a, ["matematica"], 2);
+    expect(sinFoco.temas.map((t) => t.tema)).not.toContain("fracciones");
+
+    const conFoco = memoriaParaHoy(a, ["matematica"], 2, 3, "fracciones");
+    expect(conFoco.temas[0].tema).toBe("fracciones");
   });
 
   it("sin materia de hoy devuelve lo más reciente de todo", () => {
