@@ -13,6 +13,8 @@ import { sql } from "drizzle-orm";
 import { adminActual } from "@/lib/admin";
 import { db } from "@/lib/db/db";
 import { eventos, pupilos, sesiones, user } from "@/lib/db/schema";
+import { retencionSemanal, embudoOnboarding, costoOperacion } from "@/lib/admin/metricas";
+import { clp } from "@/lib/precios";
 import { SalirAdmin } from "./SalirAdmin";
 
 export const dynamic = "force-dynamic"; // nunca cachear datos de la operación
@@ -29,7 +31,7 @@ export default async function AdminRuta() {
   const admin = await adminActual();
   if (!admin) notFound();
 
-  const [cuentas, ninos, clases7d, minutos7d, fallos7d, fallosPorTipo] =
+  const [cuentas, ninos, clases7d, minutos7d, fallos7d, fallosPorTipo, retencion, embudo, costo] =
     await Promise.all([
       contar(
         db
@@ -55,16 +57,19 @@ export default async function AdminRuta() {
           .select({ n: sql<number>`count(*)` })
           .from(eventos)
           .where(
-            sql`${eventos.creadoEn} > now() - interval '7 days' and ${eventos.tipo} <> 'sesion_iniciada'`
+            sql`${eventos.creadoEn} > now() - interval '7 days' and ${eventos.tipo} not in ('sesion_iniciada', 'sesion_costo')`
           )
       ),
       db
         .select({ tipo: eventos.tipo, n: sql<number>`count(*)` })
         .from(eventos)
-        .where(sql`${eventos.creadoEn} > now() - interval '7 days'`)
+        .where(sql`${eventos.creadoEn} > now() - interval '7 days' and ${eventos.tipo} <> 'sesion_costo'`)
         .groupBy(eventos.tipo)
         .orderBy(sql`count(*) desc`)
         .catch(() => [] as { tipo: string; n: number }[]),
+      retencionSemanal(),
+      embudoOnboarding(),
+      costoOperacion(),
     ]);
 
   return (
@@ -87,6 +92,77 @@ export default async function AdminRuta() {
         <Tarjeta valor={ninos} etiqueta="niños" />
         <Tarjeta valor={clases7d} etiqueta="clases (7 días)" />
         <Tarjeta valor={minutos7d} etiqueta="minutos estudiados" />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-[18px]">Retención semanal</h2>
+        <div className="rounded-zen border border-hair px-5 py-4">
+          {retencion.cohorteN === 0 ? (
+            <p className="text-[14px] text-ink-soft">
+              Todavía no hay una cohorte completa (se registró hace 7-14 días).
+              Vuelve en unos días.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="font-serif text-[30px] tabular-nums text-ink">
+                  {retencion.porcentaje}%
+                </span>
+                <span className="text-[13px] text-ink-soft">
+                  volvió a estudiar en su segunda semana
+                </span>
+              </div>
+              <p className="mt-1 text-[12.5px] text-ink-soft">
+                {retencion.retenidosN} de {retencion.cohorteN} apoderados que se
+                registraron hace 7-14 días.
+              </p>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-[18px]">Embudo de onboarding</h2>
+        <ul className="flex flex-col gap-2">
+          <PasoEmbudo etiqueta="Registro" n={embudo.registro} base={embudo.registro} />
+          <PasoEmbudo etiqueta="Configuró un hijo (wizard)" n={embudo.wizard} base={embudo.registro} />
+          <PasoEmbudo etiqueta="Hizo el diagnóstico" n={embudo.diagnostico} base={embudo.registro} />
+          <PasoEmbudo etiqueta="Primera sesión de estudio" n={embudo.primeraSesion} base={embudo.registro} />
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-[18px]">Costo de operación (Gemini, estimado)</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-zen border border-hair px-5 py-4">
+            <div className="font-serif text-[24px] tabular-nums text-ink">
+              {clp(costo.costoPorSesionClp)}
+            </div>
+            <div className="mt-1 text-[12.5px] text-ink-soft">
+              por sesión · meta &lt; $20
+            </div>
+          </div>
+          <div className="rounded-zen border border-hair px-5 py-4">
+            <div className="font-serif text-[24px] tabular-nums text-ink">
+              {clp(costo.costoPorFamiliaMesClp)}
+            </div>
+            <div className="mt-1 text-[12.5px] text-ink-soft">
+              proyectado por familia / mes
+            </div>
+          </div>
+          <div className="rounded-zen border border-hair px-5 py-4">
+            <div className="font-serif text-[24px] tabular-nums text-ink">
+              {clp(costo.totalClp7d)}
+            </div>
+            <div className="mt-1 text-[12.5px] text-ink-soft">
+              total últimos 7 días ({costo.sesiones7d} sesiones · {costo.familiasActivas7d} niños activos)
+            </div>
+          </div>
+        </div>
+        <p className="text-[12px] leading-[1.5] text-ink-soft">
+          Estimado con precios de referencia por token (ver lib/costoGemini.ts),
+          no la boleta exacta de Google Cloud.
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -132,5 +208,18 @@ function Tarjeta({ valor, etiqueta }: { valor: number; etiqueta: string }) {
       <div className="font-serif text-[30px] tabular-nums text-ink">{valor}</div>
       <div className="mt-1 text-[12.5px] text-ink-soft">{etiqueta}</div>
     </div>
+  );
+}
+
+function PasoEmbudo({ etiqueta, n, base }: { etiqueta: string; n: number; base: number }) {
+  const pct = base > 0 ? Math.round((n / base) * 100) : 0;
+  return (
+    <li className="flex items-center justify-between gap-4 rounded-zen border border-hair px-5 py-3">
+      <span className="text-[14px] text-ink">{etiqueta}</span>
+      <span className="flex items-baseline gap-2">
+        <span className="font-mono text-[15px] tabular-nums text-ink-soft">{n}</span>
+        <span className="w-11 text-right text-[12px] tabular-nums text-sage-deep">{pct}%</span>
+      </span>
+    </li>
   );
 }
