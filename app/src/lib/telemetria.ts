@@ -36,6 +36,10 @@ export const TIPOS_EVENTO = [
   // --- uso, para leer los fallos como tasa y no como número suelto ---
   "sesion_iniciada",
   "simulacro_completado", // el niño rindió un simulacro de examen completo
+  // costo real de una llamada a Gemini: {tokensIn, tokensOut, modelo} en meta
+  // (modelo va como etiqueta corta, ej. "flash"/"flash_lite" — no el nombre
+  // completo con puntos, que ETIQUETA no aceptaría)
+  "sesion_costo",
 ] as const;
 
 export type TipoEvento = (typeof TIPOS_EVENTO)[number];

@@ -16,19 +16,21 @@ function modelo(): string {
   return process.env.GEMINI_MODEL || MODELO_CHAT;
 }
 
-// Genera una respuesta con Gemini. Lanza si no hay clave o si la API falla,
-// para que el llamador decida el fallback.
-export async function generar(opts: {
+interface OpcionesGenerar {
   sistema: string;
   usuario: string;
   maxTokens?: number;
   json?: boolean;
   model?: string;
-}): Promise<string> {
+}
+
+// Núcleo compartido: llama a la API, reintenta ante saturación y devuelve el
+// JSON crudo (con `usageMetadata`, que es lo que necesita generarConUso). Lo
+// usan tanto generar() como generarConUso() para no duplicar el fetch/retry.
+async function llamarGeminiCrudo(opts: OpcionesGenerar, chosenModel: string): Promise<any> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("SIN_CLAVE");
 
-  const chosenModel = opts.model || modelo();
   const url = `${BASE}/${chosenModel}:generateContent?key=${key}`;
   const body = {
     system_instruction: { parts: [{ text: opts.sistema }] },
@@ -67,19 +69,48 @@ export async function generar(opts: {
     throw new Error(`GEMINI_${res?.status ?? "NA"}: ${detalle.slice(0, 200)}`);
   }
 
-  const data = await res.json();
-  // Los modelos "thinking" devuelven partes de RAZONAMIENTO (thought:true) además
-  // de la respuesta. Hay que EXCLUIRLAS: si no, el razonamiento se filtra al texto
-  // visible (ej: "Let's use [icono:torta]. Ends with one clear question? Yes.").
+  return res.json();
+}
+
+// Los modelos "thinking" devuelven partes de RAZONAMIENTO (thought:true) además
+// de la respuesta. Hay que EXCLUIRLAS: si no, el razonamiento se filtra al texto
+// visible (ej: "Let's use [icono:torta]. Ends with one clear question? Yes.").
+function extraerTexto(data: any): string {
   const parts: { text?: string; thought?: boolean }[] =
     data?.candidates?.[0]?.content?.parts ?? [];
-  const texto = parts
+  return parts
     .filter((p) => !p.thought && typeof p.text === "string")
     .map((p) => p.text)
     .join("")
     .trim();
+}
+
+// Genera una respuesta con Gemini. Lanza si no hay clave o si la API falla,
+// para que el llamador decida el fallback.
+export async function generar(opts: OpcionesGenerar): Promise<string> {
+  const data = await llamarGeminiCrudo(opts, opts.model || modelo());
+  const texto = extraerTexto(data);
   if (!texto) throw new Error("GEMINI_RESPUESTA_VACIA");
   return texto;
+}
+
+export interface ResultadoConUso {
+  texto: string;
+  tokensIn: number;
+  tokensOut: number;
+}
+
+// Igual que generar(), pero además devuelve el uso de tokens (usageMetadata
+// de la API) para poder registrar el costo real de la sesión (Fase 4.1).
+export async function generarConUso(opts: OpcionesGenerar): Promise<ResultadoConUso> {
+  const data = await llamarGeminiCrudo(opts, opts.model || modelo());
+  const texto = extraerTexto(data);
+  if (!texto) throw new Error("GEMINI_RESPUESTA_VACIA");
+  return {
+    texto,
+    tokensIn: data?.usageMetadata?.promptTokenCount ?? 0,
+    tokensOut: data?.usageMetadata?.candidatesTokenCount ?? 0,
+  };
 }
 
 // Modelo de embeddings vigente (text-embedding-004 fue retirado de la API).

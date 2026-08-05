@@ -15,7 +15,7 @@ import {
   instruccionExtraerHorario,
   fechaHoraLegible,
 } from "@/lib/tutor/personaje";
-import { generar, tieneClave, MODELO_CHAT, MODELO_LITE } from "@/lib/tutor/gemini";
+import { generarConUso, tieneClave, MODELO_CHAT, MODELO_LITE } from "@/lib/tutor/gemini";
 import { normalizarIconosInline } from "@/lib/tutor/iconos";
 import { recuperar } from "@/lib/tutor/rag";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
@@ -95,12 +95,19 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
     if (tieneClave()) {
       try {
         // C3. Enrutado de modelos: modelo barato (lite) para resúmenes
-        const cruda = await generar({
+        const { texto: cruda, tokensIn, tokensOut } = await generarConUso({
           sistema: sistemaPrompt,
           usuario: `Conversación de estudio:\n${historialText}`,
           maxTokens: 520,
           json: true,
           model: MODELO_LITE,
+        });
+        registrarEventoAsync({
+          tipo: "sesion_costo",
+          origen: "servidor",
+          pupiloId: body.pupiloId,
+          materia: materiaSesion,
+          meta: { tokensIn, tokensOut, modelo: MODELO_LITE },
         });
 
         const parsed = JSON.parse(cruda);
@@ -259,7 +266,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         ? MODELO_LITE
         : MODELO_CHAT;
 
-      const cruda = await generar({
+      const { texto: cruda, tokensIn, tokensOut } = await generarConUso({
         sistema,
         usuario,
         // Enseñar necesita más espacio que saludar: antes era al revés (560 en
@@ -267,6 +274,13 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         // charla es breve por diseño, así que le basta menos.
         maxTokens: esPrimera ? 700 : 1000,
         model: modeloElegido,
+      });
+      registrarEventoAsync({
+        tipo: "sesion_costo",
+        origen: "servidor",
+        pupiloId: body.pupiloId,
+        materia: body.materia,
+        meta: { tokensIn, tokensOut, modelo: modeloElegido },
       });
 
       const msIA = Date.now() - inicioIA;
