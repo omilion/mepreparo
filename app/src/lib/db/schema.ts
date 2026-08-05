@@ -181,3 +181,22 @@ export const cacheRespuestas = pgTable("cache_respuestas", {
   respuesta: text("respuesta").notNull(),
   creadoEn: timestamp("creado_en").defaultNow().notNull(),
 });
+
+// Suscripción por FAMILIA (una fila por cuenta de apoderado, no por niño).
+// Estados: prueba → activa → vencida | cancelada. "cancelada" NO corta el
+// acceso de inmediato: periodoHasta sigue siendo la fecha real hasta la que
+// pagó, y el gate solo bloquea cuando esa fecha ya pasó (bloqueo suave).
+export const suscripciones = pgTable("suscripciones", {
+  cuentaId: text("cuenta_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  estado: text("estado").notNull().default("prueba"), // 'prueba'|'activa'|'vencida'|'cancelada'
+  pruebaHasta: timestamp("prueba_hasta"), // fin de la prueba gratis
+  periodoHasta: timestamp("periodo_hasta"), // hasta cuándo hay acceso pagado
+  flowOrdenComercio: text("flow_orden_comercio"), // nuestro commerceOrder de la última orden
+  flowToken: text("flow_token"), // token que devuelve Flow al crear el pago
+  ultimoPagoEn: timestamp("ultimo_pago_en"),
+  canceladaEn: timestamp("cancelada_en"), // cuándo pidió cancelar (no cuándo pierde acceso)
+  creadoEn: timestamp("creado_en").defaultNow().notNull(),
+  actualizadoEn: timestamp("actualizado_en").defaultNow().notNull(),
+});

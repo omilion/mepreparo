@@ -19,9 +19,12 @@ import { usePathname, useRouter } from "next/navigation";
 // Herramientas internas que se abren escribiendo la URL a mano. El arranque no
 // debe rutearlas: si no, entras y te rebota al home antes de ver nada.
 // (/admin se protege solo, en el servidor, y no tiene nada que ver con el
-// flujo del niño: el arranque no debe moverlo de ahí.)
-const RUTAS_LIBRES = ["/rai", "/admin"];
+// flujo del niño: el arranque no debe moverlo de ahí.) /suscripcion tampoco:
+// es a donde el arranque manda si el acceso está bloqueado, y volver a
+// rutearla desde ahí formaría un loop.
+const RUTAS_LIBRES = ["/rai", "/admin", "/suscripcion"];
 import { authClient } from "@/lib/auth-client";
+import { accesoBloqueado } from "@/lib/pagos/cliente";
 import {
   leerCuenta,
   guardarCuenta,
@@ -244,7 +247,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setPinBloqueado(!!alumno.tienePin);
         arranqueHecho.current = true;
         setCargando(false);
-        router.replace(rutaSegunEstado(p));
+        // Bloqueo suave (Fase 4.3): se decide UNA vez, al arrancar — nunca a
+        // mitad de una sesión de estudio ya en curso.
+        void accesoBloqueado(alumno.token).then((bloqueado) => {
+          router.replace(bloqueado ? "/suscripcion" : rutaSegunEstado(p));
+        });
         return;
       }
       borrarSesionAlumno();
@@ -303,7 +310,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .then((sinc) => {
         setCuenta(sinc);
         setCargando(false);
-        router.replace(destino(sinc));
+        const irA = destino(sinc);
+        // El bloqueo solo aplica DESPUÉS del onboarding (irA === "/panel"):
+        // interrumpir el registro o el wizard a medias sería peor que dejar
+        // pasar un par de minutos de más antes de mostrar el paywall.
+        if (irA !== "/panel") {
+          router.replace(irA);
+          return;
+        }
+        void accesoBloqueado().then((bloqueado) => {
+          router.replace(bloqueado ? "/suscripcion" : irA);
+        });
       })
       .catch(() => {
         setCargando(false);

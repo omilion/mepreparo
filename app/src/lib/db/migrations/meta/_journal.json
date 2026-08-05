@@ -29,6 +29,13 @@
       "when": 1785887221709,
       "tag": "0003_free_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785889116492,
+      "tag": "0004_dazzling_toro",
+      "breakpoints": true
     }
   ]
 }

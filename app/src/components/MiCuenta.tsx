@@ -5,6 +5,7 @@ import { authClient } from "@/lib/auth-client";
 import { type Cuenta, MATERIAS } from "@/lib/profile";
 import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
+import { Suscripcion } from "./Suscripcion";
 
 type PreferenciasAlertas = {
   alertaSemanal: boolean;
@@ -191,26 +192,7 @@ export function MiCuenta({
 
         {/* Planes y Suscripción */}
         <Reveal delay={350}>
-          <div className="rounded-zen border border-hair p-6 flex flex-col gap-4 bg-sage/5">
-            <h2 className="font-serif text-[20px] text-ink border-b border-hair pb-2">
-              Suscripción y Pagos
-            </h2>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
-                Plan Actual
-              </span>
-              <span className="text-[16px] font-semibold text-sage-deep">
-                Beta Gratuita 🎁
-              </span>
-            </div>
-            <p className="text-[13px] text-ink-soft leading-[1.4] mt-2">
-              Actualmente tienes acceso ilimitado a todas las herramientas pedagógicas de Rai. 
-              En la fase de producto final podrás suscribirte a un plan familiar mensual.
-            </p>
-            <div className="mt-2 rounded-lg border border-dashed border-hair p-3 text-center text-[12px] text-ink-soft bg-white/40">
-              Métodos de pago deshabilitados temporalmente
-            </div>
-          </div>
+          <Suscripcion />
         </Reveal>
       </div>
 
