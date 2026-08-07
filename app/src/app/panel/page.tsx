@@ -7,7 +7,7 @@ import { PanelHijos } from "@/components/PanelHijos";
 import { TopBar } from "@/components/TopBar";
 
 export default function PanelRuta() {
-  const { cuenta, irAPupilo, agregarHijo, guardarPupiloEnfocado } = useApp();
+  const { cuenta, agregarHijo } = useApp();
   const router = useRouter();
 
   // Guard: sin cuenta, al inicio
@@ -33,9 +33,9 @@ export default function PanelRuta() {
       <TopBar />
       <PanelHijos
         cuenta={cuenta}
-        onEntrar={irAPupilo}
+        // tocar una tarjeta abre la hoja del alumno, no despliega un acordeón
+        onAbrirAlumno={(id) => router.push(`/estudiante/${id}`)}
         onAgregar={agregarHijo}
-        onActualizarPupilo={guardarPupiloEnfocado}
       />
     </main>
   );
