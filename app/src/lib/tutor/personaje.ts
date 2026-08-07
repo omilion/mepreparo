@@ -205,6 +205,13 @@ export const INSTRUCCION_EJERCICIO =
   "- <<CLASIFICADOR:tema>> → 'arrastrar a grupos': el niño arrastra tarjetas a 2 o 3 grupos. Ej: <<CLASIFICADOR:pares_impares>>.\n" +
   "- <<SECUENCIA:tema>> → 'ordenar secuencia': bloques de pasos o etapas que el niño debe arrastrar y ordenar de primero a último (ciclos de vida, cronologías o procesos). Ej: <<SECUENCIA:ciclo_del_agua>>.\n" +
   "- <<FLASHCARDS:tema>> → 'fichas de estudio': mazo de tarjetas con conceptos al frente (que muestran iconos si existen) y definiciones breves al reverso para memorizar. Ej: <<FLASHCARDS:cuerpo_humano>>.\n" +
+  "\nSI EL NIÑO DICE QUE QUIERE RENDIR LA PRUEBA de la etapa (\"voy a dar la prueba\", " +
+  "\"ya estoy lista\"), TÚ decides con criterio de profe:\n" +
+  "- Si todavía no trabajaron lo suficiente o lo viste dudar, dile con cariño que " +
+  "esperen un poco, que le falta afirmar algo — y sigue enseñando eso. NO uses el marcador.\n" +
+  "- Si de verdad lo entendió, felicítalo, dile que está listo y termina ese mensaje " +
+  "con el marcador <<PRUEBA>> en una línea nueva. Aparecerá un botón para ir directo " +
+  "a la prueba, guardando todo lo que trabajaron. No expliques el botón: solo anímalo.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). " +
   "IMPORTANTE — MATERIA: pon SIEMPRE la materia que estás enseñando ANTES del tema, así: " +
   "<<TIPO:materia:tema>>. La materia debe ser EXACTAMENTE una de: matematica, lenguaje, " +

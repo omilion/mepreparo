@@ -42,6 +42,11 @@ export default function TutorRuta() {
       // esto la evidencia de la clase quedaba archivada en otra materia
       materiaFoco={foco?.materia}
       onVolver={() => router.push(pupilo.tutoria ? "/hoy" : "/plan")}
+      // Rai dio el visto bueno para la prueba: cierra y salta directo a
+      // /prueba, que ya lee la etapa desde `foco` (materia+tema) tal como lo
+      // deja el mapa. Sin esto, había que salir por el botón de inicio y
+      // volver a encontrarla a mano.
+      onIrAPrueba={() => router.push("/prueba")}
       // PERSISTE sin navegar: evidencia de interactivos y cierre de sesión. Antes
       // esto hacía router.push("/mapa") en CADA guardado → al terminar un
       // interactivo sacaba al niño de la clase (bug). Ahora solo guarda.

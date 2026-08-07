@@ -347,6 +347,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         texto,
         ejercicioTema,
         ejercicioFormato,
+        ofrecerPrueba,
         sopaTema,
         ruedaTema,
         intrusoTema,
@@ -375,6 +376,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         secuenciaTema, // presente si Rai lanzó una secuencia
         flashcardsTema, // presente si Rai lanzó flashcards
         actividadMateria, // materia del interactivo, si Rai la especificó
+        ofrecerPrueba, // mostrar el botón para ir directo a la prueba de la etapa
         modo: "gemini",
       });
     } catch (e) {
@@ -433,6 +435,8 @@ function separarEjercicio(cruda: string): {
   // materia de la actividad que Rai lanzó (si la incluyó en el marcador). Así el
   // interactivo se genera en la materia que Rai ENSEÑA, no en la agendada del día.
   actividadMateria?: string;
+  // el niño dijo que quiere rendir la prueba y Rai lo aprueba
+  ofrecerPrueba?: boolean;
 } {
   let texto = cruda;
   let actividadMateria: string | undefined;
@@ -451,6 +455,16 @@ function separarEjercicio(cruda: string): {
       return norm(partes.slice(1).join(" "));
     }
     return norm(partes.join(" "));
+  }
+
+  // <<PRUEBA>> no lleva tema: la prueba es siempre la de la etapa en curso.
+  // Sale del uso real: la niña le decía a Rai "voy a dar la prueba" y no tenía
+  // por dónde ir, así que salía por el botón de inicio y perdía el hilo.
+  let ofrecerPrueba = false;
+  const mPrueba = texto.match(/<<PRUEBA>>/i);
+  if (mPrueba) {
+    texto = texto.replace(mPrueba[0], "");
+    ofrecerPrueba = true;
   }
 
   const sopaTema = sacar("SOPA");
@@ -481,6 +495,7 @@ function separarEjercicio(cruda: string): {
     secuenciaTema,
     flashcardsTema,
     actividadMateria,
+    ofrecerPrueba,
   };
 }
 

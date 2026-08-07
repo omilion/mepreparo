@@ -96,6 +96,10 @@ interface Mensaje {
   // órgano con su función" que el mapa no puede leer. Si falta, NO se registra
   // evidencia: mejor ninguna que una que ensucia el camino.
   temaActividad?: string;
+  // Rai dio el visto bueno para rendir la prueba de la etapa: se ofrece el
+  // botón que cierra la clase (guardando) y lleva directo, sin que el niño
+  // tenga que salir y buscarla en el mapa.
+  ofrecePrueba?: boolean;
 }
 
 // Qué tipo de actividad venía anunciada en la respuesta de Rai. Se usa solo
@@ -120,6 +124,7 @@ export function Tutor({
   onVolver,
   onGuardarPerfil,
   onHorarioCreado,
+  onIrAPrueba,
   temaFoco,
   materiaFoco,
 }: {
@@ -130,6 +135,10 @@ export function Tutor({
   onGuardarPerfil?: (p: PerfilNino) => void;
   // Solo la PRIMERA vez, cuando se acuerda el horario: persiste y pasa a "mundos".
   onHorarioCreado?: (p: PerfilNino) => void;
+  // Rai dio el visto bueno para la prueba de la etapa (marcador <<PRUEBA>>):
+  // cierra la clase guardando todo y salta directo, sin que el niño tenga que
+  // salir por el botón de inicio y buscarla en el mapa.
+  onIrAPrueba?: () => void;
   // si viene del mapa de etapas: la lección se centra en este tema…
   temaFoco?: string;
   // …y en ESTA materia. Sin esto la clase se guiaba solo por el horario del
@@ -477,6 +486,7 @@ ${traza}` : m.texto };
     secuenciaTema?: string;
     flashcardsTema?: string;
     actividadMateria?: string;
+    ofrecerPrueba?: boolean;
   }) {
     // Si Rai lanzó una actividad, la resolvemos ANTES de pintar su mensaje y la
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
@@ -574,6 +584,7 @@ ${traza}` : m.texto };
         // el tema del marcador, para que la evidencia se guarde con la clave
         // real del camino y no con un pedazo del enunciado
         temaActividad: tipoFinal && tema ? tema : undefined,
+        ofrecePrueba: !!data.ofrecerPrueba,
       },
     ]);
 
@@ -1374,8 +1385,17 @@ ${traza}` : m.texto };
     ultimo.de === "rai" &&
     !!ultimo.resuelto;
 
-  // Al salir de la tutoría, cerramos sesión de forma estructurada si hubo interacción
-  async function manejarVolver() {
+  // Rai dio el visto bueno para rendir la prueba (marcador <<PRUEBA>> en su
+  // último mensaje). El botón queda mientras ese siga siendo el último
+  // mensaje: si el niño sigue conversando, Rai pudo cambiar de opinión.
+  const mostrarIrAPrueba = !cargando && !sesionTerminada && !!ultimo?.ofrecePrueba;
+
+  // Al salir de la tutoría, cerramos sesión de forma estructurada si hubo
+  // interacción. `despues` es a dónde va el niño una vez guardado todo: al
+  // home por el botón de inicio, o directo a la prueba si Rai lo dio por listo.
+  // Sin este parámetro, ir a la prueba obligaba a salir primero — y ahí se
+  // perdía el hilo de la clase.
+  async function cerrarSesionYSeguir(despues: () => void) {
     // La despedida usa el mismo gesto que la llegada: la esfera se abre, se
     // entibia y lanza un anillo. Rai se va como llegó.
     reaccionar(["saludo", 2600]);
@@ -1384,7 +1404,7 @@ ${traza}` : m.texto };
     if (turnosNino < 2 || !acuerdo) {
       // clase demasiado corta para guardarla como sesión, pero SÍ vale la pena
       // poder retomarla: no se borra la clase en curso.
-      onVolver();
+      despues();
       return;
     }
 
@@ -1457,9 +1477,16 @@ ${traza}` : m.texto };
       });
     } finally {
       setCargando(false);
-      onVolver();
+      despues();
     }
   }
+
+  // El botón de inicio: cierra y vuelve al home del niño.
+  const manejarVolver = () => cerrarSesionYSeguir(onVolver);
+
+  // "Estoy lista": cierra la clase guardando TODO y salta a la prueba de la
+  // etapa. Antes había que salir por el botón de inicio y buscarla en el mapa.
+  const irAPrueba = () => cerrarSesionYSeguir(() => onIrAPrueba?.());
 
   return (
     // 100dvh = altura REAL del viewport en móvil (se ajusta a la barra del
@@ -1550,6 +1577,23 @@ ${traza}` : m.texto };
               className="rounded-full border border-hair px-5 py-2 text-[13.5px] text-ink-soft transition-colors hover:border-sage hover:text-ink disabled:opacity-40"
             >
               Hacer otro
+            </button>
+          </div>
+        )}
+
+        {/* Rai dio el visto bueno: un botón para ir directo a la prueba,
+            guardando la clase antes (mismo camino que "Terminar y Guardar").
+            Antes, para rendir la prueba había que salir por el botón de
+            inicio y buscarla en el mapa — ahí se perdía el hilo. */}
+        {mostrarIrAPrueba && (
+          <div className="flex justify-center pb-2">
+            <button
+              type="button"
+              onClick={irAPrueba}
+              disabled={cargando}
+              className="cta px-8 disabled:opacity-40"
+            >
+              {cargando ? "Guardando…" : "Ir a la prueba →"}
             </button>
           </div>
         )}
