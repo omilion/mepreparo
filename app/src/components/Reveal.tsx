@@ -15,6 +15,15 @@ import { useEffect, useState, useRef } from "react";
 // tiempo total se reduce a la mitad.
 const FACTOR_RITMO = 0.5;
 
+// TOPE DURO: si por lo que sea el observer nunca dispara, nada puede quedar
+// invisible para siempre. Nació de un bug real: el rootMargin (ver abajo)
+// dejaba fuera del área observada el 40% inferior del viewport, y en una
+// página del alto exacto de la pantalla (/hoy, con el botón "Empezar" al
+// final) ese último bloque caía justo ahí. Sin overflow no hay scroll, sin
+// scroll no hay ningún evento que reevalúe la intersección — el botón que
+// abre la clase quedaba invisible sin que nada lo disparara jamás.
+const TOPE_DURO_MS = 1400;
+
 export function Reveal({
   delay = 0,
   variant = "soft",
@@ -46,49 +55,52 @@ export function Reveal({
     if (!element) return;
 
     let timeoutId: NodeJS.Timeout;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // Disparar la animación con el retraso configurado
-            timeoutId = setTimeout(() => {
-              setOn(true);
-              onVisible?.();
-            }, espera);
-            observer.unobserve(element);
-            window.removeEventListener("scroll", handleScroll);
-          }
-        });
-      },
-      {
-        threshold: 0.05, // Se activa cuando el 5% del elemento es visible
-        rootMargin: "0px 0px -40% 0px", // Requiere que el elemento suba un 40% de la altura de la pantalla
-      }
-    );
-
-    const handleScroll = () => {
-      if (typeof window === "undefined") return;
-      const reachedBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 60;
-      if (reachedBottom) {
-        timeoutId = setTimeout(() => {
-          setOn(true);
-          onVisible?.();
-        }, espera);
-        observer.disconnect();
-        window.removeEventListener("scroll", handleScroll);
-      }
+    let disparado = false;
+    const disparar = () => {
+      if (disparado) return;
+      disparado = true;
+      timeoutId = setTimeout(() => {
+        setOn(true);
+        onVisible?.();
+      }, espera);
     };
 
+    // rootMargin -10% (antes -40%): un margen chico sigue dando el efecto de
+    // "aparece un poco antes de llegar" en páginas largas, pero sin dejar
+    // fuera del área observada nada que ya esté a la vista al cargar. Con
+    // -40%, un elemento en el 40% inferior de una página del alto justo de
+    // la pantalla (sin scroll posible) nunca calificaba como "intersecting"
+    // — y sin scroll, IntersectionObserver no tenía ningún evento que lo
+    // hiciera reevaluar. Quedaba invisible para siempre.
+    //
+    // El listener de "scroll" manual que había acá antes intentaba tapar
+    // ese hueco adivinando si la página ya estaba al fondo, pero dependía de
+    // que document.documentElement.scrollHeight estuviera ya estabilizado en
+    // el instante exacto del montaje — antes de que cargaran fuentes o
+    // imágenes. Se saca: IntersectionObserver YA reacciona solo a cambios de
+    // layout (resize, reflow), no necesita que nadie haga scroll.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            disparar();
+            observer.unobserve(element);
+          }
+        }
+      },
+      { threshold: 0.05, rootMargin: "0px 0px -10% 0px" }
+    );
     observer.observe(element);
-    window.addEventListener("scroll", handleScroll, { passive: true });
 
-    // Ejecutar una vez al inicio
-    handleScroll();
+    // TOPE DURO: red de seguridad final. Si por lo que sea (navegador raro,
+    // elemento de alto cero, algo que no previmos) el observer nunca
+    // dispara, esto garantiza que nada se quede invisible más allá de
+    // TOPE_DURO_MS. No debería activarse en el camino normal.
+    const topeDuro = setTimeout(disparar, TOPE_DURO_MS);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(topeDuro);
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [espera, onVisible]);
