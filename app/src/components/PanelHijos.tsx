@@ -12,6 +12,7 @@ import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 import { calcularPlan } from "@/lib/plan/motor";
 import { indicadorExamen } from "@/lib/plan/indicador";
+import { colorDeMateria } from "@/lib/plan/coloresMateria";
 import { EnQueVa } from "./EnQueVa";
 
 // Panel del apoderado (admin): ve a sus hijos ya configurados y elige a cuál
@@ -157,6 +158,40 @@ function TarjetaPupilo({
         // densos (plan, "en qué va") se marcan md:col-span-2 para conservar
         // su ancho completo.
         <div className="mt-2 grid gap-4 border-t border-hair pt-4 md:grid-cols-2 md:items-start">
+          {/* El veredicto arriba de todo: era lo primero que un apoderado
+              quiere saber ("¿llega o no llega?") y estaba enterrado al final,
+              después de veinte temas. */}
+          {diagnosticado && (
+            <div className="grid grid-cols-3 gap-2 text-center md:col-span-2">
+              <div className="rounded-lg border border-hair/60 p-2.5">
+                <div className="font-serif text-[20px] font-bold leading-none tabular-nums text-ink">
+                  {dias !== null ? dias : "—"}
+                </div>
+                <div className="mt-1 text-[10.5px] leading-tight text-ink-soft">días al examen</div>
+              </div>
+              <div className="rounded-lg border border-hair/60 p-2.5">
+                <div
+                  className="font-serif text-[15px] font-bold leading-tight"
+                  style={{
+                    color: plan.veredicto === "apretado" ? "var(--clay)" : "var(--sage-deep)",
+                  }}
+                >
+                  {plan.veredicto === "holgura"
+                    ? "Con holgura"
+                    : plan.veredicto === "justo"
+                      ? "Justo"
+                      : "Apretado"}
+                </div>
+                <div className="mt-1 text-[10.5px] leading-tight text-ink-soft">va el plan</div>
+              </div>
+              <div className="rounded-lg border border-hair/60 p-2.5">
+                <div className="font-serif text-[20px] font-bold leading-none tabular-nums text-ink">
+                  {p.disponibilidad.horasSemana} h
+                </div>
+                <div className="mt-1 text-[10.5px] leading-tight text-ink-soft">por semana</div>
+              </div>
+            </div>
+          )}
           {/* Horario */}
           {filasHorario.length > 0 && (
             <div>
@@ -275,27 +310,43 @@ function TarjetaPupilo({
               </div>
             </div>
           )}
-          {/* Listo para el examen: destacado, por materia */}
+          {/* Listo para el examen. En una sola columna angosta dejaba media
+              pantalla vacía en tablet: ahora es grilla. El color es el de la
+              materia (el mismo del mapa del niño) y el NOMBRE siempre está
+              visible — la paleta es desaturada a propósito y no distingue por
+              sí sola (matemática y lenguaje son casi idénticas en protanopia). */}
           {diagnosticado && (
-            <div className="border-t border-hair pt-3">
+            <div className="border-t border-hair pt-3 md:col-span-2">
               <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
                 Listo para el examen
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                 {p.examen.materias.map((m) => {
                   const ind = indicadorExamen(m, p.curso, p.tutoria, p.examen.fecha);
                   const materiaLabel = MATERIAS.find((x) => x.id === m)?.label ?? m;
-                  const color = ind.porcentaje >= 60 ? "var(--sage-deep)" : "var(--clay)";
+                  const c = colorDeMateria(m);
                   return (
-                    <div key={m} className="rounded-lg border border-hair/60 p-3">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[13px] font-medium text-ink">{materiaLabel}</span>
-                        <span className="font-serif text-[17px] font-bold" style={{ color }}>
+                    <div
+                      key={m}
+                      className="rounded-lg border border-hair/60 p-3"
+                      style={{ background: c.fondo }}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span
+                          className="text-[13px] font-[620] leading-tight"
+                          style={{ color: c.color }}
+                        >
+                          {materiaLabel}
+                        </span>
+                        <span className="font-serif text-[19px] font-bold tabular-nums text-ink">
                           {ind.porcentaje}%
                         </span>
                       </div>
                       <div className="mt-1.5 h-[5px] w-full overflow-hidden rounded-full bg-mist">
-                        <div className="h-full rounded-full" style={{ width: `${ind.porcentaje}%`, background: color }} />
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${ind.porcentaje}%`, background: c.color }}
+                        />
                       </div>
                       <p className="mt-1.5 text-[12px] leading-[1.4] text-ink-soft">{ind.texto}</p>
                     </div>
@@ -314,37 +365,10 @@ function TarjetaPupilo({
                 Plan de estudio sugerido (Apoderado)
               </div>
               
+              {/* El veredicto y los días ya están arriba, en la fila de
+                  números: acá solo va el reparto de horas, que es el detalle. */}
               <div className="rounded-zen border border-hair p-4 bg-surface/50 flex flex-col gap-3">
-                <div className="flex items-center justify-between border-b border-hair pb-2">
-                  <span className="text-[13.5px] font-semibold text-ink">
-                    Veredicto del plan:{" "}
-                    <span 
-                      style={{
-                        color: plan.veredicto === "apretado" ? "var(--clay)" : "var(--sage-deep)"
-                      }}
-                      className="font-bold"
-                    >
-                      {plan.veredicto === "holgura" ? "Llega con holgura" : plan.veredicto === "justo" ? "Llega justo / a tiempo" : "Va apretado"}
-                    </span>
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded border border-hair/50 p-2">
-                    <div className="font-serif text-[18px] font-bold leading-none">{plan.horasTotales} h</div>
-                    <div className="mt-1 text-[9.5px] leading-tight text-ink-soft">para preparar temario</div>
-                  </div>
-                  <div className="rounded border border-hair/50 p-2">
-                    <div className="font-serif text-[18px] font-bold leading-none">{dias !== null ? dias : "—"}</div>
-                    <div className="mt-1 text-[9.5px] leading-tight text-ink-soft">días al examen</div>
-                  </div>
-                  <div className="rounded border border-hair/50 p-2">
-                    <div className="font-serif text-[18px] font-bold leading-none">{p.disponibilidad.horasSemana} h</div>
-                    <div className="mt-1 text-[9.5px] leading-tight text-ink-soft">disponibilidad semanal</div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2.5 mt-1">
+                <div className="flex flex-col gap-2.5">
                   <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-ink-soft">
                     Distribución de horas sugerida
                   </div>
@@ -355,19 +379,29 @@ function TarjetaPupilo({
                       const label = MATERIAS.find((x) => x.id === m.materia)?.label ?? m.materia;
                       const pct = Math.round((m.horas / maxHoras) * 100);
                       const urgente = m.prioridad === 1;
+                      // La barra lleva el color de LA MATERIA (igual que en el
+                      // resto del panel y en el mapa del niño). La urgencia se
+                      // dice con una palabra, no con color: antes se pintaba de
+                      // terracota, que es justamente el color de Lenguaje — un
+                      // "Matemática urgente" y "Lenguaje" salían idénticos.
+                      const cm = colorDeMateria(m.materia);
                       return (
                         <div key={m.materia} className="text-[12.5px]">
-                          <div className="flex justify-between items-baseline text-[12px] text-ink">
-                            <span className="font-medium">{label}</span>
+                          <div className="flex justify-between items-baseline gap-2 text-[12px] text-ink">
+                            <span className="font-medium" style={{ color: cm.color }}>
+                              {label}
+                              {urgente && (
+                                <span className="ml-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-clay">
+                                  prioridad
+                                </span>
+                              )}
+                            </span>
                             <span className="font-mono text-ink-soft tabular-nums">{m.horas} h sugeridas</span>
                           </div>
                           <div className="mt-1 h-[4px] overflow-hidden rounded-full bg-mist">
                             <div
                               className="h-full rounded-full"
-                              style={{
-                                width: `${pct}%`,
-                                background: urgente ? "var(--clay)" : "var(--sage)",
-                              }}
+                              style={{ width: `${pct}%`, background: cm.color }}
                             />
                           </div>
                         </div>

@@ -6,6 +6,7 @@ import { pupilos as pupilosTable, sesiones as sesionesTable } from "@/lib/db/sch
 import { eq, and } from "drizzle-orm";
 import type { PerfilNino } from "@/lib/profile";
 import { verifyStudentToken } from "@/lib/auth-student";
+import { sanearTutoria } from "@/lib/tutor/sanearMemoria";
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -80,7 +81,10 @@ export async function POST(req: NextRequest) {
           horasSemana: cp.disponibilidad.horasSemana,
           contexto: cp.contexto,
           diagnostico: cp.diagnostico || null,
-          tutoria: cp.tutoria || null,
+          // Se sanea SIEMPRE lo que empuja el cliente: su localStorage puede
+          // traer memoria vieja con enunciados de actividad como clave de
+          // tema. Limpiar solo la base no sirve — el cliente la vuelve a subir.
+          tutoria: sanearTutoria(cp.tutoria, cp.curso),
           creadoEn: new Date(cp.creadoEn || Date.now()),
           updatedAt: new Date(clientUpdateStr),
         };
