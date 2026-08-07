@@ -22,7 +22,10 @@ import { usePathname, useRouter } from "next/navigation";
 // flujo del niño: el arranque no debe moverlo de ahí.) /suscripcion tampoco:
 // es a donde el arranque manda si el acceso está bloqueado, y volver a
 // rutearla desde ahí formaría un loop.
-const RUTAS_LIBRES = ["/rai", "/admin", "/suscripcion"];
+// /alumno/login valida el token del QR y luego avisa por su cuenta
+// (entrarComoAlumno). Si el arranque la ruteara, la mandaría a /landing en
+// mitad de la validación y de paso quemaría `arranqueHecho`.
+const RUTAS_LIBRES = ["/rai", "/admin", "/suscripcion", "/alumno/login"];
 import { authClient } from "@/lib/auth-client";
 import { accesoBloqueado } from "@/lib/pagos/cliente";
 import {
@@ -124,6 +127,7 @@ interface AppState {
   alConfigurarHijo: (perfil: PerfilNino) => void;
   agregarHijo: () => void;
   alTerminarDiagnostico: (resultados: ResultadoMateria[]) => void;
+  entrarComoAlumno: (sesion: SesionAlumno, cuentaAlumno: Cuenta) => void;
   alTerminarPrueba: (correctos: number, total: number) => void;
   alTerminarSimulacro: (
     materia: Materia,
@@ -398,6 +402,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [cuenta, pupilo, router]
   );
 
+  // El niño entró con su QR. Lo llama /alumno/login apenas valida el token,
+  // en vez de guardar en localStorage y esperar que el arranque lo descubra:
+  // ese arranque ya corrió (y ya se marcó como hecho) mientras el token se
+  // validaba, así que nunca volvía a rutear y la pantalla quedaba en blanco
+  // hasta recargar a mano.
+  const entrarComoAlumno = useCallback(
+    (sesion: SesionAlumno, cuentaAlumno: Cuenta) => {
+      const p =
+        cuentaAlumno.pupilos.find((x) => x.id === sesion.pupiloId) ?? cuentaAlumno.pupilos[0];
+      setSesionAlumno(sesion);
+      setCuenta(cuentaAlumno);
+      setEnfocadoId(p?.id ?? null);
+      setPinBloqueado(!!sesion.tienePin);
+      arranqueHecho.current = true;
+      setCargando(false);
+      if (!p) {
+        router.replace("/landing");
+        return;
+      }
+      router.replace(rutaSegunEstado(p));
+      // el bloqueo suave se resuelve después de navegar (ver arranque)
+      void accesoBloqueado(sesion.token).then((bloqueado) => {
+        if (bloqueado) router.replace("/suscripcion");
+      });
+    },
+    [router]
+  );
+
   const alTerminarPrueba = useCallback(
     (correctos: number, total: number) => {
       const p = pupilo;
@@ -526,6 +558,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     alConfigurarHijo,
     agregarHijo,
     alTerminarDiagnostico,
+    entrarComoAlumno,
     alTerminarPrueba,
     alTerminarSimulacro,
     alCerrarSesionAuth,

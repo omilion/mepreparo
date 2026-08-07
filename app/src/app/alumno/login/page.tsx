@@ -3,9 +3,11 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { guardarSesionAlumno, guardarCuenta } from "@/lib/storage";
+import { useApp } from "@/lib/app/AppProvider";
 
 function LoginAlumnoContent() {
   const router = useRouter();
+  const { entrarComoAlumno } = useApp();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [estado, setEstado] = useState("Verificando tu código de acceso...");
@@ -37,23 +39,28 @@ function LoginAlumnoContent() {
         setEstado("¡Listo! Conectando...");
 
         // Guardar la sesión específica del alumno (SIN el PIN: solo si aplica)
-        guardarSesionAlumno({
+        const sesion = {
           token: tokenStr,
           cuentaId: data.cuentaId,
           pupiloId: data.perfil.id,
           nombre: data.perfil.nombre,
           tienePin: !!data.tienePin,
-        });
+        };
+        guardarSesionAlumno(sesion);
 
         // Guardar una "cuenta" simulada con solo este pupilo para que el flujo existente funcione directo
-        guardarCuenta({
+        const cuentaAlumno = {
           id: data.cuentaId,
           creadaEn: new Date().toISOString(),
           pupilos: [data.perfil],
-        });
+        };
+        guardarCuenta(cuentaAlumno);
 
-        // Redirigir a la pantalla principal
-        router.push("/");
+        // Se le avisa DIRECTO al provider en vez de empujar a "/" y confiar en
+        // que el arranque encuentre la sesión: ese arranque ya corrió mientras
+        // validábamos el token, así que no volvía a rutear y el niño se quedaba
+        // mirando una pantalla vacía hasta recargar a mano.
+        entrarComoAlumno(sesion, cuentaAlumno);
       } catch (err) {
         console.error("Error al iniciar sesión de alumno:", err);
         setError("Ocurrió un error al conectar. Revisa tu conexión a internet.");
@@ -61,7 +68,7 @@ function LoginAlumnoContent() {
     }
 
     iniciarSesion();
-  }, [searchParams, router]);
+  }, [searchParams, router, entrarComoAlumno]);
 
   if (error) {
     return (
