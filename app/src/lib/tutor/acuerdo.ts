@@ -276,8 +276,25 @@ export function registrarEjercicios(
 
   // regla dura: ≥80% con al menos 4 ejercicios = superado; ≤40% = le_cuesta
   const ratio = total > 0 ? correctos / total : 0;
+  // Rai registra cada juego como una evidencia individual (por ejemplo, "1 de
+  // 1"). Para que cuatro aciertos reales sí cuenten como dominio, sumamos las
+  // evidencias de ejercicios del tema antes de aplicar el umbral de superación.
+  const acumulado = evidencias.reduce(
+    (acc, e) => {
+      if (e.tipo !== "ejercicios") return acc;
+      const match = /^(\d+) de (\d+) correctos$/.exec(e.nota);
+      if (!match) return acc;
+      return { correctos: acc.correctos + Number(match[1]), total: acc.total + Number(match[2]) };
+    },
+    { correctos: 0, total: 0 }
+  );
+  const ratioAcumulado = acumulado.total > 0 ? acumulado.correctos / acumulado.total : 0;
   const estado: EstadoTema =
-    total >= 4 && ratio >= 0.8 ? "superado" : ratio <= 0.4 ? "le_cuesta" : (previo?.estado ?? "en_proceso");
+    ratio <= 0.4
+      ? "le_cuesta"
+      : acumulado.total >= 4 && ratioAcumulado >= 0.8
+        ? "superado"
+        : (previo?.estado ?? "en_proceso");
 
   const actualizado: TemaDominio = {
     tema: clave,

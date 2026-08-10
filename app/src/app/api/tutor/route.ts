@@ -6,6 +6,12 @@
 // La clave de Gemini vive solo aquí (servidor), nunca llega al navegador.
 
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { and, eq } from "drizzle-orm";
+import { auth } from "@/lib/auth";
+import { verifyStudentToken } from "@/lib/auth-student";
+import { db } from "@/lib/db/db";
+import { pupilos as pupilosTable } from "@/lib/db/schema";
 import { chequearLimite } from "@/lib/rateLimit";
 import { registrarEventoAsync } from "@/lib/telemetria";
 import {
@@ -24,6 +30,11 @@ import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
 
 export const runtime = "nodejs"; // necesitamos fs para leer los chunks
+
+const ACCIONES_VALIDAS = new Set(["saludo", "chat", "cerrar"]);
+const MATERIAS_VALIDAS = new Set(MATERIAS.map((m) => m.id));
+const MAX_HISTORIAL = 24;
+const MAX_TEXTO_TURNO = 1_200;
 
 type Turno = { de: "rai" | "nino"; texto: string };
 
@@ -49,16 +60,91 @@ interface Body {
   cerrandoSesion?: boolean;
 }
 
+function textoLimitado(valor: unknown, max: number): string {
+  return typeof valor === "string" ? valor.trim().slice(0, max) : "";
+}
+
+// El contenido de la conversación es necesariamente libre, pero su forma y
+// tamaño no. Esto evita prompts desmedidos o cuerpos malformados antes de
+// llegar a Gemini.
+function normalizarBody(crudo: unknown): Body | null {
+  if (!crudo || typeof crudo !== "object") return null;
+  const b = crudo as Record<string, unknown>;
+  const accion = typeof b.accion === "string" ? b.accion : "chat";
+  if (!ACCIONES_VALIDAS.has(accion)) return null;
+
+  const historial = Array.isArray(b.historial)
+    ? b.historial.slice(-MAX_HISTORIAL).flatMap((turno) => {
+        if (!turno || typeof turno !== "object") return [];
+        const t = turno as Record<string, unknown>;
+        const de = t.de === "rai" || t.de === "nino" ? t.de : null;
+        const texto = textoLimitado(t.texto, MAX_TEXTO_TURNO);
+        return de && texto ? [{ de, texto }] : [];
+      })
+    : [];
+  const materias = Array.isArray(b.materias)
+    ? b.materias.filter((m): m is Materia => typeof m === "string" && MATERIAS_VALIDAS.has(m as Materia))
+    : [];
+  const materiasHoy = Array.isArray(b.materiasHoy)
+    ? b.materiasHoy.filter((m): m is Materia => typeof m === "string" && MATERIAS_VALIDAS.has(m as Materia))
+    : [];
+  const materia = typeof b.materia === "string" && MATERIAS_VALIDAS.has(b.materia as Materia)
+    ? b.materia as Materia
+    : undefined;
+
+  return {
+    ...b,
+    accion: accion as Body["accion"],
+    pupiloId: textoLimitado(b.pupiloId, 120) || undefined,
+    resumenPerfil: textoLimitado(b.resumenPerfil, 3_000),
+    materias,
+    materiasHoy,
+    materia,
+    curso: textoLimitado(b.curso, 24) as Curso,
+    nombre: textoLimitado(b.nombre, 60) || undefined,
+    pregunta: textoLimitado(b.pregunta, MAX_TEXTO_TURNO) || undefined,
+    historial,
+    temaFoco: textoLimitado(b.temaFoco, 120) || undefined,
+    cerrandoSesion: b.cerrandoSesion === true,
+  } as Body;
+}
+
+async function autorizarTutor(req: NextRequest, pupiloId: string | undefined): Promise<NextResponse | null> {
+  if (!pupiloId) return NextResponse.json({ error: "Falta el pupilo" }, { status: 400 });
+
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session) {
+    const suyo = await db
+      .select({ id: pupilosTable.id })
+      .from(pupilosTable)
+      .where(and(eq(pupilosTable.id, pupiloId), eq(pupilosTable.cuentaId, session.user.id)))
+      .limit(1);
+    return suyo.length ? null : NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
+  }
+
+  const authHeader = req.headers.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? verifyStudentToken(authHeader.slice(7)) : null;
+  if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  return token.pupiloId === pupiloId
+    ? null
+    : NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
+}
+
 export async function POST(req: NextRequest) {
   const limite = chequearLimite(req, { clave: "tutor", max: 30, ventanaMs: 60_000 });
   if (limite) return limite;
 
   let body: Body;
   try {
-    body = await req.json();
+    body = normalizarBody(await req.json()) as Body;
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+
+  if (!body) return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
+
+  const denegado = await autorizarTutor(req, body.pupiloId);
+  if (denegado) return denegado;
 
   const esPrimera = !body.acuerdo;
   const accion = body.accion ?? "chat";

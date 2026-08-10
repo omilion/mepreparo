@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, memo } from "react";
-import { type Materia, type PerfilNino } from "@/lib/profile";
+import { MATERIAS, type Materia, type PerfilNino } from "@/lib/profile";
 import { TUTOR } from "@/lib/tutor/personaje";
 import { resumenPerfil } from "@/lib/tutor/resumenPerfil";
 import {
@@ -39,6 +39,7 @@ import {
   leerClaseEnCurso,
   guardarClaseEnCurso,
   borrarClaseEnCurso,
+  leerSesionAlumno,
 } from "@/lib/storage";
 import { avisarEvento } from "@/lib/telemetriaCliente";
 
@@ -96,6 +97,9 @@ interface Mensaje {
   // órgano con su función" que el mapa no puede leer. Si falta, NO se registra
   // evidencia: mejor ninguna que una que ensucia el camino.
   temaActividad?: string;
+  // Materia REAL de la actividad. Puede diferir de la materia agendada cuando
+  // Rai enseña otra materia a petición del niño.
+  materiaActividad?: Materia;
   // Rai dio el visto bueno para rendir la prueba de la etapa: se ofrece el
   // botón que cierra la clase (guardando) y lleva directo, sin que el niño
   // tenga que salir y buscarla en el mapa.
@@ -161,6 +165,10 @@ export function Tutor({
   // la esquina para dar espacio a la conversación (transición fluida).
   const [compacta, setCompacta] = useState(false);
   const [sesionTerminada, setSesionTerminada] = useState(false);
+  // En algunos navegadores móviles 100dvh tarda en reaccionar al teclado. La
+  // altura del visualViewport sí excluye el teclado, así que la usamos cuando
+  // está disponible para que la caja de escritura nunca quede tapada.
+  const [altoViewport, setAltoViewport] = useState<number | null>(null);
   // Lo que EXPRESA la esfera. Dos capas (ver useExpresionRai):
   //  · `reaccion` — puntual: asiente, celebra, anima, tiene una idea.
   //  · `faseBase` — de fondo: qué está haciendo Rai en la conversación.
@@ -196,6 +204,19 @@ export function Tutor({
   const ultimoRef = useRef<HTMLDivElement>(null);
   const inicioPedido = useRef(false);
   const inicioSesion = useRef(Date.now());
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const actualizar = () => setAltoViewport(Math.round(viewport.height));
+    actualizar();
+    viewport.addEventListener("resize", actualizar);
+    viewport.addEventListener("scroll", actualizar);
+    return () => {
+      viewport.removeEventListener("resize", actualizar);
+      viewport.removeEventListener("scroll", actualizar);
+    };
+  }, []);
 
   const scrollAlFinal = useCallback(() => {
     requestAnimationFrame(() =>
@@ -294,7 +315,7 @@ export function Tutor({
 
   function cuerpoBase() {
     return {
-      acuerdo,
+      acuerdo: acuerdoVivo.current,
       resumenPerfil: resumenPerfil(perfil),
       materias: perfil.examen.materias,
       materiasHoy,
@@ -304,6 +325,13 @@ export function Tutor({
       pupiloId: perfil.id, // solo para telemetría de fallos
       temaFoco, // si viene del mapa: la lección se centra en esta etapa
     };
+  }
+
+  function encabezadosTutor(): Record<string, string> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const sesion = leerSesionAlumno();
+    if (sesion?.token) headers.Authorization = `Bearer ${sesion.token}`;
+    return headers;
   }
 
   // Qué actividad llevaba un turno de Rai, en una línea que la IA pueda leer.
@@ -385,11 +413,12 @@ ${traza}` : m.texto };
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezadosTutor(),
         body: JSON.stringify({ ...cuerpoBase(), accion: "saludo" }),
       });
+      if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
-      void agregarRai(data);
+      await agregarRai(data);
       quizasGuardarHorario(data.horario);
     } catch {
       // Sin conexión: Rai no está. Se aleja, pierde el color y se apaga de a
@@ -435,7 +464,7 @@ ${traza}` : m.texto };
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezadosTutor(),
         body: JSON.stringify({
           ...cuerpoBase(),
           accion: "chat",
@@ -445,15 +474,16 @@ ${traza}` : m.texto };
           cerrandoSesion: cerrandose, // Rai empieza a despedirse con calma
         }),
       });
+      if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
 
       if (topeDuro) {
         // Red de seguridad: mostramos la respuesta de Rai (si la despedida ya vino
         // en ella, mejor) y cerramos la sesión.
-        void agregarRai(data);
+        await agregarRai(data);
         setSesionTerminada(true);
       } else {
-        void agregarRai(data);
+        await agregarRai(data);
         quizasGuardarHorario(data.horario);
       }
     } catch {
@@ -492,7 +522,9 @@ ${traza}` : m.texto };
     // adjuntamos en el MISMO turno (texto + tarjeta juntos). Así evitamos depender
     // de un índice numérico, que llegaba desfasado. La materia del interactivo es
     // la que Rai ENSEÑA (data.actividadMateria), no la agendada del día.
-    const mat = data.actividadMateria || materia;
+    const mat = MATERIAS.some((m) => m.id === data.actividadMateria)
+      ? data.actividadMateria as Materia
+      : materia;
 
     // FRENO: si la actividad anterior sigue sin responder, o acaba de haber una,
     // se ignora el marcador y queda solo el texto. Es la garantía dura contra el
@@ -584,6 +616,7 @@ ${traza}` : m.texto };
         // el tema del marcador, para que la evidencia se guarde con la clave
         // real del camino y no con un pedazo del enunciado
         temaActividad: tipoFinal && tema ? tema : undefined,
+        materiaActividad: tipoFinal && tema ? mat : undefined,
         ofrecePrueba: !!data.ofrecerPrueba,
       },
     ]);
@@ -1121,7 +1154,7 @@ ${traza}` : m.texto };
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezadosTutor(),
         body: JSON.stringify({
           ...cuerpoBase(),
           accion: "chat",
@@ -1136,8 +1169,9 @@ ${traza}` : m.texto };
           historial: historialPlano(),
         }),
       });
+      if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
-      void agregarRai(data);
+      await agregarRai(data);
     } catch {
       reaccionar(["ausente", 5000]);
       avisarEvento("tutor_sin_conexion", {
@@ -1175,7 +1209,7 @@ ${traza}` : m.texto };
 
     if (acuerdo) {
       // evidencia dura de UN ejercicio en la charla (correctos/total)
-      guardarAvance((a) => registrarEjercicios(a, ej.tema, materia, ok ? 1 : 0, 1));
+      guardarAvance((a) => registrarEjercicios(a, ej.tema, mensajes[msgIdx]?.materiaActividad ?? materia, ok ? 1 : 0, 1));
     }
 
     // Si falló, le pedimos a Rai que le explique cuáles eran y por qué, para que
@@ -1193,7 +1227,7 @@ ${traza}` : m.texto };
 
     const tema = mensajes[msgIdx]?.temaActividad;
     if (acuerdo && tema) {
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+      guardarAvance((a) => registrarEjercicios(a, tema, mensajes[msgIdx]?.materiaActividad ?? materia, acerto ? 1 : 0, 1));
     }
     if (!acerto) void raiExplicaIntruso(it, elegido);
   }
@@ -1203,7 +1237,7 @@ ${traza}` : m.texto };
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezadosTutor(),
         body: JSON.stringify({
           ...cuerpoBase(),
           accion: "chat",
@@ -1216,6 +1250,7 @@ ${traza}` : m.texto };
           historial: historialPlano(),
         }),
       });
+      if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
       if (data?.respuesta) {
         setMensajes((m) => [
@@ -1240,7 +1275,7 @@ ${traza}` : m.texto };
 
     const tema = mensajes[msgIdx]?.temaActividad;
     if (tema) {
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+      guardarAvance((a) => registrarEjercicios(a, tema, mensajes[msgIdx]?.materiaActividad ?? materia, acerto ? 1 : 0, 1));
     }
   }
 
@@ -1255,7 +1290,7 @@ ${traza}` : m.texto };
 
     const tema = mensajes[msgIdx]?.temaActividad;
     if (tema) {
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, acerto ? 1 : 0, 1));
+      guardarAvance((a) => registrarEjercicios(a, tema, mensajes[msgIdx]?.materiaActividad ?? materia, acerto ? 1 : 0, 1));
     }
   }
 
@@ -1267,7 +1302,7 @@ ${traza}` : m.texto };
     marcarResuelto(msgIdx);
     const tema = mensajes[msgIdx]?.temaActividad;
     if (acuerdo && tema) {
-      guardarAvance((a) => registrarEjercicios(a, tema, materia, 1, 1));
+      guardarAvance((a) => registrarEjercicios(a, tema, mensajes[msgIdx]?.materiaActividad ?? materia, 1, 1));
     }
   }
 
@@ -1310,7 +1345,7 @@ ${traza}` : m.texto };
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezadosTutor(),
         body: JSON.stringify({
           ...cuerpoBase(),
           accion: "chat",
@@ -1324,6 +1359,7 @@ ${traza}` : m.texto };
           historial: historialPlano(),
         }),
       });
+      if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
       if (data?.respuesta) {
         setMensajes((m) => [
@@ -1401,7 +1437,8 @@ ${traza}` : m.texto };
     reaccionar(["saludo", 2600]);
     const turnosNino = mensajes.filter((m) => m.de === "nino").length;
     // Si no hay acuerdo o el niño conversó menos de 2 turnos, no guardamos sesión
-    if (turnosNino < 2 || !acuerdo) {
+    const acuerdoActual = acuerdoVivo.current;
+    if (turnosNino < 2 || !acuerdoActual) {
       // clase demasiado corta para guardarla como sesión, pero SÍ vale la pena
       // poder retomarla: no se borra la clase en curso.
       despues();
@@ -1417,7 +1454,7 @@ ${traza}` : m.texto };
     try {
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezadosTutor(),
         body: JSON.stringify({
           ...cuerpoBase(),
           accion: "cerrar",
@@ -1426,6 +1463,7 @@ ${traza}` : m.texto };
         }),
       });
 
+      if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
       const nuevaSesion = {
         fecha: new Date().toISOString(),
@@ -1438,16 +1476,16 @@ ${traza}` : m.texto };
       };
 
       // fusiona la memoria por tema + recuerdos que reportó el cierre
-      const conMemoria = aplicarCierre(acuerdo, {
+      const conMemoria = aplicarCierre(acuerdoActual, {
         temasTrabajados: (data.temasTrabajados ?? []) as TemaTrabajado[],
         recuerdos: (data.recuerdos ?? []) as Omit<RecuerdoNino, "fecha">[],
       });
-      notificarLogros(perfil.id, temasSuperadosNuevos(acuerdo.temas, conMemoria.temas));
+      notificarLogros(perfil.id, temasSuperadosNuevos(acuerdoActual.temas, conMemoria.temas));
 
       const tutoriaActualizada: AcuerdoTutoria = {
         ...conMemoria,
-        notasNino: data.notasNino || acuerdo.notasNino,
-        sesiones: [...(acuerdo.sesiones || []), nuevaSesion],
+        notasNino: data.notasNino || acuerdoActual.notasNino,
+        sesiones: [...(acuerdoActual.sesiones || []), nuevaSesion],
       };
 
       onGuardarPerfil?.({
@@ -1466,9 +1504,9 @@ ${traza}` : m.texto };
         resumen: "Se realizó una sesión de tutoría.",
         nMensajes,
       };
-      const nuevasSesiones = [...(acuerdo.sesiones || []), nuevaSesion];
+      const nuevasSesiones = [...(acuerdoActual.sesiones || []), nuevaSesion];
       const tutoriaActualizada = {
-        ...acuerdo,
+        ...acuerdoActual,
         sesiones: nuevasSesiones,
       };
       onGuardarPerfil?.({
@@ -1496,7 +1534,10 @@ ${traza}` : m.texto };
     // tablet+ ocupa ~80% del ancho con un tope, para no dejar márgenes enormes.
     <div
       className="zen-page-tutor flex flex-col"
-      style={{ height: "100dvh", minHeight: "100dvh" }}
+      style={{
+        height: altoViewport ? `${altoViewport}px` : "100dvh",
+        minHeight: altoViewport ? `${altoViewport}px` : "100dvh",
+      }}
     >
       {/* Barra superior de herramientas idéntica a otras vistas */}
       <div className="flex h-[58px] flex-none items-center justify-end gap-2.5">
@@ -1530,7 +1571,7 @@ ${traza}` : m.texto };
       </div>
 
       {/* conversación: solo texto centrado, sin burbujas */}
-      <div className="flex flex-1 flex-col gap-7 overflow-y-auto py-4 text-center">
+      <div className="flex flex-1 flex-col gap-7 overflow-y-auto py-4 text-center [scroll-padding-bottom:1rem]">
         {mensajes.map((m, i) => (
           <div
             key={i}
@@ -1720,7 +1761,10 @@ function CajaTexto({
   return (
     // input DESTACADO: caja con borde completo, fondo sutil, ~90% del ancho y
     // tipografía más grande — pensado para que el niño lo vea claro en tablet.
-    <div className="flex flex-none justify-center py-3">
+    <div
+      className="flex flex-none justify-center py-3"
+      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+    >
       {/* py-2.5 (antes 1.5): la caja quedaba muy baja para tocarla con el dedo
           en tablet — ~20% más alta sin cambiar la tipografía */}
       <div className="flex w-[90%] items-center gap-2 rounded-2xl border border-hair bg-surface/60 px-3 py-2.5 transition-colors focus-within:border-sage">

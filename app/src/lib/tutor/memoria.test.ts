@@ -133,6 +133,13 @@ describe("registrarEjercicios (evidencia dura)", () => {
     a = registrarEjercicios(a, "fracciones", "matematica", 2, 4, "2026-07-06"); // 50%
     expect(a.temas![0].estado).toBe("le_cuesta"); // conserva
   });
+  it("acumula actividades individuales de Rai para reconocer dominio", () => {
+    let a = base();
+    for (let i = 0; i < 4; i++) {
+      a = registrarEjercicios(a, "fracciones", "matematica", 1, 1, `2026-07-0${i + 1}`);
+    }
+    expect(a.temas![0].estado).toBe("superado");
+  });
 });
 
 describe("memoriaParaHoy + textoMemoria", () => {
