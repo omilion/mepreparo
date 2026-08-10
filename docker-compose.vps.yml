@@ -49,6 +49,8 @@ services:
       BETTER_AUTH_URL: ${NEXT_PUBLIC_APP_URL}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       RAG_CHUNKS_PATH: /data/rag/chunks.jsonl
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
     # publicamos SOLO este puerto alto al host (elegir uno libre en .env.vps)
     ports:
       - "${APP_PORT}:3000"
