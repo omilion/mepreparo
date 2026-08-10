@@ -6,15 +6,32 @@ export interface StudentTokenPayload {
   cuentaId: string;
   pupiloId: string;
   exp: number;
+  tipo?: "login" | "sesion";
 }
 
 export function generateStudentToken(cuentaId: string, pupiloId: string): string {
   const payload: StudentTokenPayload = {
     cuentaId,
     pupiloId,
+    tipo: "sesion",
     // Válido por 5 años
     exp: Date.now() + 1000 * 60 * 60 * 24 * 365 * 5,
   };
+  return firmarToken(payload);
+}
+
+// El QR es solo un enlace de emparejamiento de corta duración. Al usarlo se
+// intercambia por el token de sesión persistente de la tablet.
+export function generateStudentLoginToken(cuentaId: string, pupiloId: string): string {
+  return firmarToken({
+    cuentaId,
+    pupiloId,
+    tipo: "login",
+    exp: Date.now() + 1000 * 60 * 10,
+  });
+}
+
+function firmarToken(payload: StudentTokenPayload): string {
   const str = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
   return `${str}.${signature}`;
@@ -26,9 +43,17 @@ export function verifyStudentToken(token: string): StudentTokenPayload | null {
     if (parts.length !== 2) return null;
     const [str, signature] = parts;
     const expectedSignature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
-    if (signature !== expectedSignature) return null;
+    const recibido = Buffer.from(signature);
+    const esperado = Buffer.from(expectedSignature);
+    if (recibido.length !== esperado.length || !crypto.timingSafeEqual(recibido, esperado)) return null;
     const payload = JSON.parse(Buffer.from(str, "base64url").toString("utf-8")) as StudentTokenPayload;
-    if (payload.exp < Date.now()) return null;
+    if (
+      !payload.cuentaId ||
+      !payload.pupiloId ||
+      !Number.isFinite(payload.exp) ||
+      payload.exp < Date.now() ||
+      (payload.tipo !== undefined && payload.tipo !== "login" && payload.tipo !== "sesion")
+    ) return null;
     return payload;
   } catch {
     return null;

@@ -40,7 +40,7 @@ function LoginAlumnoContent() {
 
         // Guardar la sesión específica del alumno (SIN el PIN: solo si aplica)
         const sesion = {
-          token: tokenStr,
+          token: data.token,
           cuentaId: data.cuentaId,
           pupiloId: data.perfil.id,
           nombre: data.perfil.nombre,

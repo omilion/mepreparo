@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { pupilos as pupilosTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { verifyStudentToken } from "@/lib/auth-student";
+import { generateStudentToken, verifyStudentToken } from "@/lib/auth-student";
 import type { PerfilNino } from "@/lib/profile";
 
 export async function POST(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = verifyStudentToken(token);
-  if (!payload) {
+  if (!payload || (payload.tipo !== undefined && payload.tipo !== "login")) {
     return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 });
   }
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       perfil,
       cuentaId: payload.cuentaId,
       tienePin,
-      token,
+      token: generateStudentToken(payload.cuentaId, payload.pupiloId),
     });
   } catch (err) {
     console.error("Error en /api/alumno/login:", err);

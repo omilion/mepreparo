@@ -3,7 +3,8 @@
 // El QR/enlace con que un niño entra desde su propia tablet. Lo usan tanto el
 // panel como la hoja del alumno, así que vive aparte.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { type PerfilNino } from "@/lib/profile";
 
 export function ModalAccesoAlumno({
@@ -21,11 +22,34 @@ export function ModalAccesoAlumno({
   const [pinTemp, setPinTemp] = useState(""); // lo escribe el padre; no se precarga del perfil
   const [error, setError] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [confirmarQuitarPin, setConfirmarQuitarPin] = useState(false);
+  const cerrarRef = useRef<HTMLButtonElement>(null);
 
   // Cargar token inicial al abrir
   useEffect(() => {
     cargarToken();
+    cerrarRef.current?.focus();
+    const alTeclado = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", alTeclado);
+    return () => window.removeEventListener("keydown", alTeclado);
   }, [pupilo]);
+
+  useEffect(() => {
+    if (!tokenInfo?.loginUrl) {
+      setQrDataUrl(null);
+      return;
+    }
+    let activo = true;
+    QRCode.toDataURL(tokenInfo.loginUrl, { width: 360, margin: 1, errorCorrectionLevel: "M" })
+      .then((url) => activo && setQrDataUrl(url))
+      .catch(() => activo && setError("No se pudo generar el código QR. Puedes copiar el enlace."));
+    return () => {
+      activo = false;
+    };
+  }, [tokenInfo?.loginUrl]);
 
   async function cargarToken(nuevoPin?: string) {
     setCargando(true);
@@ -34,10 +58,10 @@ export function ModalAccesoAlumno({
       const res = await fetch("/api/alumno/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pupiloId: pupilo.id,
-          pin: nuevoPin !== undefined ? nuevoPin : pinTemp,
-        }),
+        // Omitir `pin` al abrir es fundamental: `pin: ""` significa quitarlo.
+        body: JSON.stringify(
+          nuevoPin === undefined ? { pupiloId: pupilo.id } : { pupiloId: pupilo.id, pin: nuevoPin }
+        ),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -64,28 +88,39 @@ export function ModalAccesoAlumno({
 
   function alGuardarPin(e: React.FormEvent) {
     e.preventDefault();
-    if (pinTemp !== "" && !/^\d{3}$/.test(pinTemp)) {
+    if (!/^\d{3}$/.test(pinTemp)) {
       setError("El PIN debe constar exactamente de 3 dígitos numéricos.");
       return;
     }
     cargarToken(pinTemp);
   }
 
-  function alCopiarEnlace() {
+  async function alCopiarEnlace() {
     if (!tokenInfo) return;
-    navigator.clipboard.writeText(tokenInfo.loginUrl);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
+    try {
+      await navigator.clipboard.writeText(tokenInfo.loginUrl);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      setError("No se pudo copiar el enlace. Intenta mantenerlo presionado para copiarlo.");
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-md flex-col rounded-zen border border-hair bg-paper p-6 shadow-xl animate-fade-in">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="acceso-alumno-titulo"
+        className="flex w-full max-w-md flex-col rounded-zen border border-hair bg-paper p-6 shadow-xl animate-fade-in"
+      >
         <header className="flex items-center justify-between border-b border-hair pb-3">
-          <h3 className="font-serif text-[18px]">Acceso Alumno: {pupilo.nombre}</h3>
+          <h3 id="acceso-alumno-titulo" className="font-serif text-[18px]">Acceso Alumno: {pupilo.nombre}</h3>
           <button
             type="button"
             onClick={onClose}
+            ref={cerrarRef}
+            aria-label="Cerrar acceso de alumno"
             className="text-ink-soft hover:text-ink text-[18px]"
           >
             ✕
@@ -101,16 +136,17 @@ export function ModalAccesoAlumno({
             <div className="flex gap-2">
               <input
                 type="text"
+                inputMode="numeric"
                 maxLength={3}
                 pattern="\d*"
                 value={pinTemp}
                 onChange={(e) => setPinTemp(e.target.value.replace(/\D/g, ""))}
-                placeholder="Ej: 123 (opcional)"
+                placeholder="Ej: 123"
                 className="flex-1 rounded-zen border border-hair px-3 py-2 text-[14px] bg-paper text-ink focus:border-sage focus:outline-none"
               />
               <button
                 type="submit"
-                disabled={cargando}
+                disabled={cargando || pinTemp.length !== 3}
                 className="rounded-zen bg-sage-deep px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {cargando ? "Guardando..." : "Guardar PIN"}
@@ -120,6 +156,43 @@ export function ModalAccesoAlumno({
               Ingresa un código numérico corto para proteger el acceso del niño. Déjalo vacío si prefieres ingresar sin PIN.
             </p>
           </form>
+
+          {tokenInfo?.tienePin && (
+            <div className="flex flex-col gap-2 rounded-zen border border-clay/25 bg-clay/5 p-3">
+              {confirmarQuitarPin ? (
+                <>
+                  <p className="text-[12px] text-ink">¿Quitar el PIN de este acceso? Cualquier persona con el enlace podrá entrar.</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={cargando}
+                      onClick={() => cargarToken("")}
+                      className="rounded-zen bg-clay px-3 py-2 text-[12px] font-medium text-white disabled:opacity-50"
+                    >
+                      {cargando ? "Quitando..." : "Sí, quitar PIN"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cargando}
+                      onClick={() => setConfirmarQuitarPin(false)}
+                      className="rounded-zen border border-hair px-3 py-2 text-[12px] text-ink-soft"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cargando}
+                  onClick={() => setConfirmarQuitarPin(true)}
+                  className="self-start text-[12px] text-clay underline underline-offset-2 disabled:opacity-50"
+                >
+                  Quitar PIN de acceso
+                </button>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="rounded-zen bg-clay/5 border border-clay/20 p-2.5 text-[12px] text-clay">
@@ -134,11 +207,11 @@ export function ModalAccesoAlumno({
                 Escanea el código QR
               </span>
               <div className="flex h-[200px] w-[200px] items-center justify-center rounded-zen border border-hair bg-white p-2">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(tokenInfo.loginUrl)}`}
+                {qrDataUrl ? <img
+                  src={qrDataUrl}
                   alt="Código QR de inicio de sesión"
                   className="h-[180px] w-[180px] object-contain"
-                />
+                /> : <span className="text-[12px] text-ink-soft">Generando QR…</span>}
               </div>
               <p className="text-center text-[12px] text-ink-soft leading-relaxed max-w-[32ch]">
                 Escanea este código con la cámara de la tablet o celular de <strong>{pupilo.nombre}</strong> para conectarle directo.

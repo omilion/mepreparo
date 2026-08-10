@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db/db";
 import { pupilos as pupilosTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { generateStudentToken, hashPin } from "@/lib/auth-student";
+import { generateStudentLoginToken, hashPin } from "@/lib/auth-student";
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({
@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Generar token firmado
-    const token = generateStudentToken(userId, pupiloId);
+    const token = generateStudentLoginToken(userId, pupiloId);
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3008";
     const loginUrl = `${appUrl}/alumno/login?token=${token}`;
 
     // Nunca devolvemos el PIN; solo si el acceso queda protegido por PIN.
-    return NextResponse.json({ ok: true, token, tienePin, loginUrl });
+    return NextResponse.json({ ok: true, tienePin, loginUrl });
   } catch (err) {
     console.error("Error en /api/alumno/token:", err);
     return NextResponse.json({ error: "Fallo en la base de datos" }, { status: 500 });
