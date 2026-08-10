@@ -25,7 +25,14 @@ import { usePathname, useRouter } from "next/navigation";
 // /alumno/login valida el token del QR y luego avisa por su cuenta
 // (entrarComoAlumno). Si el arranque la ruteara, la mandaría a /landing en
 // mitad de la validación y de paso quemaría `arranqueHecho`.
-const RUTAS_LIBRES = ["/rai", "/admin", "/suscripcion", "/alumno/login"];
+// /auth/verificado: a donde better-auth redirige tras confirmar el correo.
+// Si el enlace lo "gatilló" antes un escáner de seguridad del correo (Gmail,
+// Outlook), el clic real de la persona llega SIN sesión (better-auth solo
+// deja logueado al primer GET, y ese fue el del escáner) — el arranque la
+// mandaría a /landing sin explicar nada. Esta pantalla decide su propio
+// mensaje según si hay sesión o no, así que no puede dejar que el arranque
+// la pise antes de mostrarlo.
+const RUTAS_LIBRES = ["/rai", "/admin", "/suscripcion", "/alumno/login", "/auth/verificado"];
 import { authClient } from "@/lib/auth-client";
 import { accesoBloqueado } from "@/lib/pagos/cliente";
 import {

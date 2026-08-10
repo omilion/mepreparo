@@ -49,7 +49,7 @@ export function AuthForm({
     try {
       await authClient.sendVerificationEmail({
         email: email.trim(),
-        callbackURL: "/",
+        callbackURL: "/auth/verificado",
       });
       setReenviado(true);
     } catch (err) {
@@ -127,6 +127,7 @@ export function AuthForm({
           email: email.trim(),
           password,
           name: nombre.trim(),
+          callbackURL: "/auth/verificado",
         });
 
         if (authError) {
