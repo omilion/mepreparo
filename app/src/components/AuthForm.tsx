@@ -18,10 +18,13 @@ const RELACIONES = [
 export function AuthForm({
   onSuccess,
   modoInicial = "login",
+  errorInicial,
 }: {
   onSuccess: (apoderadoName: string, email: string) => void;
   // desde la landing entramos en "registro"; desde "Ingresar", en "login".
   modoInicial?: "login" | "registro";
+  // mensaje ya traducido, ej. desde ?error= al volver de confirmar el correo
+  errorInicial?: string;
 }) {
   const [esLogin, setEsLogin] = useState(modoInicial === "login");
   const [nombre, setNombre] = useState("");
@@ -34,7 +37,27 @@ export function AuthForm({
   const [comuna, setComuna] = useState("");
   const [consiente, setConsiente] = useState(false);
   const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(errorInicial || "");
+  // true = mostrar "confirma tu correo" en vez del form (tras registro, o al
+  // intentar entrar sin haber verificado todavía)
+  const [esperandoVerificacion, setEsperandoVerificacion] = useState(false);
+  const [reenviado, setReenviado] = useState(false);
+
+  async function reenviarVerificacion() {
+    if (!email.trim()) return;
+    setCargando(true);
+    try {
+      await authClient.sendVerificationEmail({
+        email: email.trim(),
+        callbackURL: "/",
+      });
+      setReenviado(true);
+    } catch (err) {
+      console.error("No se pudo reenviar el correo de verificación:", err);
+    } finally {
+      setCargando(false);
+    }
+  }
 
   // Guarda los datos extra del apoderado tras crear la cuenta (endpoint propio).
   async function guardarPerfilApoderado() {
@@ -91,7 +114,11 @@ export function AuthForm({
         });
 
         if (authError) {
-          setError(authError.message || "Error al iniciar sesión.");
+          if (authError.code === "EMAIL_NOT_VERIFIED") {
+            setEsperandoVerificacion(true);
+          } else {
+            setError(authError.message || "Error al iniciar sesión.");
+          }
         } else if (data?.user) {
           onSuccess(data.user.name, data.user.email);
         }
@@ -106,7 +133,14 @@ export function AuthForm({
           setError(authError.message || "Error al registrarse.");
         } else if (data?.user) {
           await guardarPerfilApoderado();
-          onSuccess(data.user.name, data.user.email);
+          // Con requireEmailVerification, el registro NO deja sesión abierta
+          // (data.token viene null) hasta confirmar el correo — mostramos el
+          // aviso en vez de onSuccess(), que asume que ya hay sesión.
+          if (data.token) {
+            onSuccess(data.user.name, data.user.email);
+          } else {
+            setEsperandoVerificacion(true);
+          }
         }
       }
     } catch (err) {
@@ -115,6 +149,50 @@ export function AuthForm({
     } finally {
       setCargando(false);
     }
+  }
+
+  if (esperandoVerificacion) {
+    return (
+      <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col items-center justify-center gap-[20px] pb-24 pt-10 text-center">
+        <Reveal variant="lead" delay={80}>
+          <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
+            Falta un paso
+          </div>
+        </Reveal>
+        <Reveal variant="lead" delay={120}>
+          <h1 className="text-[26px]">Confirma tu correo</h1>
+        </Reveal>
+        <Reveal delay={300}>
+          <p className="max-w-[42ch] text-[15px] leading-[1.4] text-ink-soft">
+            Te mandamos un enlace a <strong>{email.trim()}</strong>. Ábrelo
+            para activar tu cuenta y los avisos de progreso.
+          </p>
+        </Reveal>
+        <Reveal delay={450}>
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={reenviarVerificacion}
+              disabled={cargando || reenviado}
+              className="text-[13.5px] text-sage-deep underline underline-offset-4 hover:opacity-85 disabled:opacity-50"
+            >
+              {reenviado ? "Correo reenviado ✓" : "No me llegó, reenviar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEsperandoVerificacion(false);
+                setReenviado(false);
+                setError("");
+              }}
+              className="text-[13px] text-ink-soft underline underline-offset-4 hover:opacity-85"
+            >
+              Volver
+            </button>
+          </div>
+        </Reveal>
+      </div>
+    );
   }
 
   return (

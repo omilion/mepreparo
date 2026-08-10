@@ -43,6 +43,31 @@ export const auth = betterAuth({
         html,
       });
     },
+    // Sin correo verificado no hay lista de contactos válida para avisos de
+    // progreso/logros — y sin eso, el resumen semanal (ya implementado en
+    // /api/cron/alertas) le llega a nadie o a una dirección mal escrita.
+    requireEmailVerification: true,
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    // Al hacer clic en el enlace queda con sesión iniciada de una: sin esto,
+    // tendría que volver a /auth y loguearse a mano después de verificar.
+    autoSignInAfterVerification: true,
+    expiresIn: 3600,
+    sendVerificationEmail: async ({ user, url }) => {
+      const html = plantillaZen({
+        titulo: `Hola, ${user.name || "apoderado"}`,
+        cuerpoHtml:
+          "<p>Confirma tu correo para activar los avisos de progreso de tus hijos (resumen semanal, logros, alertas de inactividad) y para poder recuperar tu cuenta si alguna vez olvidas la contraseña.</p>" +
+          "<p>Este enlace es válido por 1 hora.</p>",
+        cta: { texto: "Confirmar mi correo", url },
+      });
+      await enviarEmail({
+        para: user.email,
+        asunto: "Confirma tu correo — mepreparo",
+        html,
+      });
+    },
   },
   user: {
     additionalFields: {
