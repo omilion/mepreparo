@@ -4,6 +4,7 @@ import { AppProvider, useApp } from "@/lib/app/AppProvider";
 import { PinScreen } from "@/components/PinScreen";
 import { DevPanel } from "@/components/DevPanel";
 import { RegistrarSW } from "@/components/RegistrarSW";
+import { DetectorDespliegue } from "@/components/DetectorDespliegue";
 import { devToolsActivas } from "@/lib/devTools";
 import { useRouter } from "next/navigation";
 
@@ -35,6 +36,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <RegistrarSW />
+      <DetectorDespliegue />
       {children}
       {devToolsActivas() && (
         <DevPanel
