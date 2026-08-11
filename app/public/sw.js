@@ -4,7 +4,13 @@
 // offline sería peor que decir la verdad. Si /api/* falla, falla: el cliente
 // (Tutor.tsx) ya sabe mostrar el mensaje honesto.
 
-const VERSION = "v1";
+// Subir a mano cada vez que cambie este archivo o la lista de PRECACHE: es lo
+// único que hace que `activate` borre el caché de la versión anterior (ver
+// más abajo). Con "v1" fijo para siempre, un despliegue nuevo NUNCA
+// invalidaba los assets estáticos ya cacheados — un cliente que alguna vez
+// cacheó un chunk viejo lo seguía sirviendo indefinidamente, incluso después
+// de recargar, porque la estrategia de assets estáticos es cache-primero.
+const VERSION = "v2";
 const CACHE_SHELL = `mepreparo-shell-${VERSION}`;
 const CACHE_ESTATICOS = `mepreparo-estaticos-${VERSION}`;
 
