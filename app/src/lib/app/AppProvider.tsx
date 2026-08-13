@@ -62,7 +62,7 @@ import {
 } from "@/lib/profile";
 import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 import {
-  registrarEjercicios,
+  registrarPruebaEtapa,
   registrarSimulacro,
   sembrarTemasDesdeDiagnostico,
   temasSuperadosNuevos,
@@ -135,7 +135,7 @@ interface AppState {
   agregarHijo: () => void;
   alTerminarDiagnostico: (resultados: ResultadoMateria[]) => void;
   entrarComoAlumno: (sesion: SesionAlumno, cuentaAlumno: Cuenta) => void;
-  alTerminarPrueba: (correctos: number, total: number) => void;
+  alTerminarPrueba: (correctos: number, total: number, enunciadosFallados?: string[]) => void;
   alTerminarSimulacro: (
     materia: Materia,
     desglose: { tema: string; correctos: number; total: number }[]
@@ -438,7 +438,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const alTerminarPrueba = useCallback(
-    (correctos: number, total: number) => {
+    (correctos: number, total: number, enunciadosFallados: string[] = []) => {
       const p = pupilo;
       if (!cuenta || !p || !foco) {
         router.push("/mapa");
@@ -450,7 +450,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { creadoEn: new Date().toISOString(), horario: {}, notasNino: "", sesiones: [] },
           p.diagnostico
         );
-      const tutoria = registrarEjercicios(base, foco.tema, foco.materia, correctos, total);
+      // La prueba de etapa es la ÚNICA vía para pasar a "superado" — la
+      // práctica suelta (registrarEjercicios) ya no otorga eso por sí sola.
+      const tutoria = registrarPruebaEtapa(base, foco.tema, foco.materia, correctos, total, enunciadosFallados);
       notificarLogros(p.id, temasSuperadosNuevos(base.temas, tutoria.temas));
       setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
       setFoco(null);

@@ -3,21 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { Curso, Materia } from "@/lib/profile";
 import { tituloDeTema } from "@/lib/plan/etapas";
+import { UMBRAL_PRUEBA_ETAPA, MINIMO_EVALUABLE_PRUEBA } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 import { Fireworks } from "./Fireworks";
 
-// La "prueba" de una etapa del camino: 5 preguntas del banco SOLO de ese tema.
-// ≥80% (4 de 5) supera la etapa; menos = refuerzo con Rai, sin castigo.
-// Las respuestas se validan en el servidor (HMAC), igual que el diagnóstico.
-
+// La "prueba" de una etapa del camino: 8 preguntas del banco SOLO de ese tema.
+// ≥80% supera la etapa; menos = refuerzo con Rai, sin castigo. Las respuestas
+// se validan en el servidor (HMAC), igual que el diagnóstico. Los umbrales
+// viven en acuerdo.ts (no acá) porque registrarPruebaEtapa necesita EXACTAMENTE
+// el mismo criterio al guardar la evidencia — si cada uno tuviera su copia,
+// la pantalla podía decir "aprobada" y el mapa no marcar la etapa, o al revés.
 const TOTAL = 8;
-const UMBRAL = 0.8;
-// Mínimo de preguntas para que la prueba sea EVALUABLE. Antes eran 4, y varios
-// temas del banco tienen solo 2: la niña respondía 2 de 2 correctas y el
-// resultado era "buen intento" — reprobada para siempre, por más veces que lo
-// intentara. Si el banco solo ofrece 2, esa es la mejor evidencia disponible y
-// no es culpa de ella. Bajo 2 no se evalúa: se avisa que faltan preguntas.
-const MINIMO_EVALUABLE = 2;
+const UMBRAL = UMBRAL_PRUEBA_ETAPA;
+// Mínimo de preguntas para que la prueba sea EVALUABLE. Varios temas del
+// banco tienen solo 2: la niña respondía 2 de 2 correctas y el resultado era
+// "buen intento" — reprobada para siempre, por más veces que lo intentara. Si
+// el banco solo ofrece 2, esa es la mejor evidencia disponible y no es culpa
+// de ella. Bajo eso no se evalúa: se avisa que faltan preguntas.
+const MINIMO_EVALUABLE = MINIMO_EVALUABLE_PRUEBA;
 
 interface PreguntaCliente {
   id: string;
@@ -36,7 +39,7 @@ export function PruebaEtapa({
   curso: Curso;
   tema: string;
   // reporta el resultado para registrar la evidencia y volver al mapa
-  onTerminar: (correctos: number, total: number) => void;
+  onTerminar: (correctos: number, total: number, enunciadosFallados: string[]) => void;
   onSalir: () => void;
 }) {
   const [pregunta, setPregunta] = useState<PreguntaCliente | null>(null);
@@ -49,6 +52,9 @@ export function PruebaEtapa({
   const [terminada, setTerminada] = useState(false);
   const usadas = useRef<string[]>([]);
   const dificultad = useRef(2); // mini-adaptativo: sube al acertar, baja al fallar
+  // Para que Rai pueda retomar la próxima clase con otro enfoque en vez de
+  // solo saber el puntaje (ver refuerzoPendiente en acuerdo.ts).
+  const falladas = useRef<string[]>([]);
 
   useEffect(() => {
     void cargarPregunta();
@@ -101,6 +107,7 @@ export function PruebaEtapa({
         dificultad.current = Math.min(5, dificultad.current + 1);
       } else {
         dificultad.current = Math.max(1, dificultad.current - 1);
+        falladas.current.push(pregunta.enunciado);
       }
     } catch {
       /* si falla la validación, no contamos la pregunta */
@@ -145,12 +152,12 @@ export function PruebaEtapa({
                 ? `Respondiste bien ${correctos} de ${totalReal} en ${tituloDeTema(tema)}.${
                     incompleta ? ` (De este tema había ${totalReal} preguntas.)` : ""
                   } Rai lo va a recordar.`
-                : `Lograste ${correctos} de ${totalReal} en ${tituloDeTema(tema)}. No pasa nada: Rai lo va a repasar contigo con otro enfoque y lo intentas de nuevo cuando quieras.`}
+                : `Lograste ${correctos} de ${totalReal} en ${tituloDeTema(tema)}. No pasa nada: Rai lo va a repasar contigo con otro enfoque la próxima clase, y cuando hayan practicado un poco más, lo vuelves a intentar.`}
           </p>
         </Reveal>
         <Reveal delay={560}>
           <button
-            onClick={() => (evaluable ? onTerminar(correctos, totalReal) : onSalir())}
+            onClick={() => (evaluable ? onTerminar(correctos, totalReal, falladas.current) : onSalir())}
             className="cta px-9"
           >
             Volver a mi camino

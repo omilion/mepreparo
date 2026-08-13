@@ -258,22 +258,35 @@ function NodoEtapa({
         </div>
 
         {esActual && (
-          <div className="mt-3 flex flex-wrap gap-2.5">
-            <button
-              onClick={onEstudiar}
-              className="btn-estudiar rounded-full px-4 py-2 text-[13px] font-[560] text-white transition-colors"
-              style={{
-                backgroundColor: "var(--materia-primary-deep)",
-              }}
-            >
-              Estudiar con Rai
-            </button>
-            <button
-              onClick={onPrueba}
-              className="btn-prueba rounded-full border border-hair px-4 py-2 text-[13px] text-ink transition-colors"
-            >
-              Rendir la prueba
-            </button>
+          <div className="mt-3 flex flex-col gap-1.5">
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                onClick={onEstudiar}
+                className="btn-estudiar rounded-full px-4 py-2 text-[13px] font-[560] text-white transition-colors"
+                style={{
+                  backgroundColor: "var(--materia-primary-deep)",
+                }}
+              >
+                Estudiar con Rai
+              </button>
+              {/* Antes este botón aparecía SIEMPRE, sin chequear nada: se podía
+                  rendir la prueba de una etapa recién empezada. Ahora usa la
+                  misma regla determinista que decide si Rai ofrece el marcador
+                  <<PRUEBA>> — los dos caminos ya no pueden contradecirse. */}
+              {etapa.preparacion === "lista_para_prueba" && (
+                <button
+                  onClick={onPrueba}
+                  className="btn-prueba rounded-full border border-hair px-4 py-2 text-[13px] text-ink transition-colors"
+                >
+                  Rendir la prueba
+                </button>
+              )}
+            </div>
+            {etapa.preparacion === "refuerzo_tras_prueba" && (
+              <p className="text-[12px] text-clay">
+                Repasando esto con Rai antes de volver a intentar la prueba.
+              </p>
+            )}
           </div>
         )}
 

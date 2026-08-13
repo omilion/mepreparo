@@ -5,7 +5,7 @@
 
 import RUTAS from "./rutaEtapas.json";
 import type { Curso, Materia } from "@/lib/profile";
-import type { AcuerdoTutoria } from "@/lib/tutor/acuerdo";
+import { evaluarPreparacion, type AcuerdoTutoria, type PreparacionPrueba } from "@/lib/tutor/acuerdo";
 
 export type EstadoEtapa = "superada" | "actual" | "refuerzo" | "pendiente";
 
@@ -14,6 +14,11 @@ export interface Etapa {
   tema: string; // clave interna (la del banco / TemaDominio)
   titulo: string; // para mostrar ("resolucion_problemas" → "Resolución de problemas")
   estado: EstadoEtapa;
+  // Si corresponde ofrecer la prueba formal de ESTA etapa — misma regla
+  // determinista que usa Rai para el marcador <<PRUEBA>>. Antes el botón
+  // "Rendir la prueba" del mapa no chequeaba nada; ahora los dos caminos
+  // (Rai y el mapa) están de acuerdo siempre.
+  preparacion: PreparacionPrueba;
 }
 
 // Títulos humanos para los temas del banco (fallback: capitalizar).
@@ -78,7 +83,13 @@ export function etapasDeMateria(
     } else {
       estado = "pendiente";
     }
-    return { numero: i + 1, tema, titulo: tituloDeTema(tema), estado };
+    return {
+      numero: i + 1,
+      tema,
+      titulo: tituloDeTema(tema),
+      estado,
+      preparacion: evaluarPreparacion(acuerdo, materia, tema),
+    };
   });
 }
 

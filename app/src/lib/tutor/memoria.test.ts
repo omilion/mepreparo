@@ -3,6 +3,8 @@ import {
   aplicarCierre,
   sembrarTemasDesdeDiagnostico,
   registrarEjercicios,
+  registrarPruebaEtapa,
+  evaluarPreparacion,
   memoriaParaHoy,
   textoMemoria,
   type AcuerdoTutoria,
@@ -65,7 +67,7 @@ describe("aplicarCierre (capa 2 + 3)", () => {
   });
 
   it("'avanzo' posterior NO degrada un tema ya superado", () => {
-    let a = registrarEjercicios(base(), "fracciones", "matematica", 5, 6, "2026-07-02");
+    let a = registrarPruebaEtapa(base(), "fracciones", "matematica", 5, 6, [], "2026-07-02");
     expect(a.temas![0].estado).toBe("superado");
     a = aplicarCierre(
       a,
@@ -120,10 +122,10 @@ describe("sembrarTemasDesdeDiagnostico", () => {
   });
 });
 
-describe("registrarEjercicios (evidencia dura)", () => {
-  it("≥80% con 4+ ejercicios marca superado", () => {
+describe("registrarEjercicios (práctica — YA NO otorga superado)", () => {
+  it("≥80% con 4+ ejercicios en una sola vez NO marca superado (falta la prueba real)", () => {
     const a = registrarEjercicios(base(), "fracciones", "matematica", 5, 6, "2026-07-05");
-    expect(a.temas![0].estado).toBe("superado");
+    expect(a.temas![0].estado).toBe("en_proceso");
     expect(a.temas![0].evidencias[0].nota).toBe("5 de 6 correctos");
   });
 
@@ -133,12 +135,82 @@ describe("registrarEjercicios (evidencia dura)", () => {
     a = registrarEjercicios(a, "fracciones", "matematica", 2, 4, "2026-07-06"); // 50%
     expect(a.temas![0].estado).toBe("le_cuesta"); // conserva
   });
-  it("acumula actividades individuales de Rai para reconocer dominio", () => {
+
+  it("ni acumulando 4 actividades seguidas la práctica sola llega a superado", () => {
     let a = base();
     for (let i = 0; i < 4; i++) {
       a = registrarEjercicios(a, "fracciones", "matematica", 1, 1, `2026-07-0${i + 1}`);
     }
+    expect(a.temas![0].estado).toBe("en_proceso");
+  });
+});
+
+describe("registrarPruebaEtapa (única vía a 'superado')", () => {
+  it("aprobada (≥80%, ≥2 preguntas) marca superado y limpia el refuerzo pendiente", () => {
+    const a = registrarPruebaEtapa(base(), "fracciones", "matematica", 5, 6, [], "2026-07-05");
     expect(a.temas![0].estado).toBe("superado");
+    expect(a.temas![0].evidencias[0].tipo).toBe("prueba_etapa");
+    expect(a.temas![0].refuerzoPendiente).toBeUndefined();
+  });
+
+  it("reprobada deja refuerzoPendiente con lo que falló, sin marcar le_cuesta si no fue tan mal", () => {
+    const a = registrarPruebaEtapa(
+      base(),
+      "fracciones",
+      "matematica",
+      5,
+      8,
+      ["¿Cuánto es 1/2 + 1/4?"],
+      "2026-07-05"
+    );
+    expect(a.temas![0].estado).toBe("en_proceso"); // 62.5%: no es ≤40%
+    expect(a.temas![0].refuerzoPendiente?.enunciadosFallados).toEqual(["¿Cuánto es 1/2 + 1/4?"]);
+  });
+
+  it("reprobada con ≤40% marca le_cuesta", () => {
+    const a = registrarPruebaEtapa(base(), "fracciones", "matematica", 1, 8, [], "2026-07-05");
+    expect(a.temas![0].estado).toBe("le_cuesta");
+  });
+});
+
+describe("evaluarPreparacion (gate determinista para ofrecer la prueba)", () => {
+  it("sin ningún tema registrado: aprendiendo", () => {
+    expect(evaluarPreparacion(base(), "matematica", "fracciones")).toBe("aprendiendo");
+  });
+
+  it("con práctica insuficiente (< 4 o < 75%): aprendiendo", () => {
+    const a = registrarEjercicios(base(), "fracciones", "matematica", 1, 1, "2026-07-05");
+    expect(evaluarPreparacion(a, "matematica", "fracciones")).toBe("aprendiendo");
+  });
+
+  it("con ≥4 ejercicios acumulados y ≥75%: lista_para_prueba", () => {
+    let a = base();
+    for (let i = 0; i < 4; i++) {
+      a = registrarEjercicios(a, "fracciones", "matematica", 1, 1, `2026-07-0${i + 1}`);
+    }
+    expect(evaluarPreparacion(a, "matematica", "fracciones")).toBe("lista_para_prueba");
+  });
+
+  it("ya superado: lista_para_prueba (repetirla es libre)", () => {
+    const a = registrarPruebaEtapa(base(), "fracciones", "matematica", 5, 6, [], "2026-07-05");
+    expect(evaluarPreparacion(a, "matematica", "fracciones")).toBe("lista_para_prueba");
+  });
+
+  it("tras reprobar, la práctica VIEJA (de antes de la prueba) no cuenta para volver a habilitarla", () => {
+    let a = base();
+    for (let i = 0; i < 4; i++) {
+      a = registrarEjercicios(a, "fracciones", "matematica", 1, 1, `2026-07-0${i + 1}`); // práctica vieja
+    }
+    a = registrarPruebaEtapa(a, "fracciones", "matematica", 1, 8, [], "2026-07-10"); // reprueba
+    expect(evaluarPreparacion(a, "matematica", "fracciones")).toBe("refuerzo_tras_prueba");
+  });
+
+  it("tras reprobar, práctica NUEVA suficiente vuelve a habilitar la prueba", () => {
+    let a = registrarPruebaEtapa(base(), "fracciones", "matematica", 1, 8, [], "2026-07-10");
+    for (let i = 0; i < 4; i++) {
+      a = registrarEjercicios(a, "fracciones", "matematica", 1, 1, `2026-07-1${i + 1}`); // práctica nueva
+    }
+    expect(evaluarPreparacion(a, "matematica", "fracciones")).toBe("lista_para_prueba");
   });
 });
 

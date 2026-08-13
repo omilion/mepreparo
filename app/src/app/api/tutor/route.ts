@@ -27,7 +27,7 @@ import { recuperar } from "@/lib/tutor/rag";
 import { rutaDeTemas, tituloDeTema } from "@/lib/plan/etapas";
 import { emparejarConRuta, pareceEnunciado } from "@/lib/plan/claveTema";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
-import type { AcuerdoTutoria, Dia } from "@/lib/tutor/acuerdo";
+import { evaluarPreparacion, type AcuerdoTutoria, type Dia } from "@/lib/tutor/acuerdo";
 
 export const runtime = "nodejs"; // necesitamos fs para leer los chunks
 
@@ -448,6 +448,16 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
       // "[icono:pizza]" (si no, se ven como texto literal en el chat).
       const textoFinal = normalizarIconosInline(texto);
 
+      // Rai puede EQUIVOCARSE de criterio (o el prompt puede fallar) y ofrecer
+      // <<PRUEBA>> sin que haya práctica real detrás — el botón del mapa usa
+      // esta MISMA función, así que si el código no está de acuerdo, no se
+      // muestra, sin importar lo que haya escrito el modelo.
+      const pruebaHabilitada =
+        ofrecerPrueba &&
+        !!body.materia &&
+        !!body.temaFoco?.trim() &&
+        evaluarPreparacion(body.acuerdo ?? null, body.materia, body.temaFoco.trim()) === "lista_para_prueba";
+
       return NextResponse.json({
         respuesta: textoFinal,
         fuentes,
@@ -462,7 +472,7 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
         secuenciaTema, // presente si Rai lanzó una secuencia
         flashcardsTema, // presente si Rai lanzó flashcards
         actividadMateria, // materia del interactivo, si Rai la especificó
-        ofrecerPrueba, // mostrar el botón para ir directo a la prueba de la etapa
+        ofrecerPrueba: pruebaHabilitada, // mostrar el botón para ir directo a la prueba de la etapa
         modo: "gemini",
       });
     } catch (e) {

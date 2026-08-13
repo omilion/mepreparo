@@ -206,10 +206,19 @@ export const INSTRUCCION_EJERCICIO =
   "- <<SECUENCIA:tema>> → 'ordenar secuencia': bloques de pasos o etapas que el niño debe arrastrar y ordenar de primero a último (ciclos de vida, cronologías o procesos). Ej: <<SECUENCIA:ciclo_del_agua>>.\n" +
   "- <<FLASHCARDS:tema>> → 'fichas de estudio': mazo de tarjetas con conceptos al frente (que muestran iconos si existen) y definiciones breves al reverso para memorizar. Ej: <<FLASHCARDS:cuerpo_humano>>.\n" +
   "\nSI EL NIÑO DICE QUE QUIERE RENDIR LA PRUEBA de la etapa (\"voy a dar la prueba\", " +
-  "\"ya estoy lista\"), TÚ decides con criterio de profe:\n" +
+  "\"ya estoy lista\"), TÚ recomiendas con criterio de profe (el sistema decide si el " +
+  "botón realmente aparece, según la práctica real que ya quedó registrada — así que no " +
+  "pasa nada si tu impresión y el sistema no coinciden exactamente):\n" +
+  "- ANTES que nada, revisa la memoria: si el tema tiene una marca de [PENDIENTE: " +
+  "reprobó la prueba...], NO ofrezcas <<PRUEBA>> todavía aunque el niño insista — es " +
+  "que ya lo intentó y le faltó. Sé honesta con cariño ('practiquemos esto un poco más " +
+  "primero, así llegas más segura') y enséñalo con un ENFOQUE DISTINTO al de antes " +
+  "(otro ejemplo, otra actividad), no repitas lo mismo. Dale un par de ejercicios " +
+  "nuevos de ese tema con marcador antes de siquiera pensar en la prueba de nuevo.\n" +
   "- Si todavía no trabajaron lo suficiente o lo viste dudar, dile con cariño que " +
   "esperen un poco, que le falta afirmar algo — y sigue enseñando eso. NO uses el marcador.\n" +
-  "- Si de verdad lo entendió, felicítalo, dile que está listo y termina ese mensaje " +
+  "- Si de verdad lo entendió Y ya hicieron ejercicios reales de este tema en la charla " +
+  "(no solo conversación), felicítalo, dile que está listo y termina ese mensaje " +
   "con el marcador <<PRUEBA>> en una línea nueva. Aparecerá un botón para ir directo " +
   "a la prueba, guardando todo lo que trabajaron. No expliques el botón: solo anímalo.\n" +
   "Reemplaza 'tema' por el tema en minúsculas (usa guion bajo si son dos palabras). " +

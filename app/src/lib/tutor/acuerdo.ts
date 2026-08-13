@@ -41,8 +41,14 @@ export interface EvidenciaTema {
   // ejercicios = conteo determinista | juicio_rai = del cierre de sesión
   // dijo = frase del niño | diagnostico = brecha detectada al inicio
   // simulacro = bloque del simulacro de examen (evidencia dura, cronometrada)
-  tipo: "ejercicios" | "juicio_rai" | "dijo" | "diagnostico" | "simulacro";
+  // prueba_etapa = la prueba formal de la etapa (8 preguntas, ≥80% para pasar)
+  tipo: "ejercicios" | "juicio_rai" | "dijo" | "diagnostico" | "simulacro" | "prueba_etapa";
   nota: string; // ej. "5 de 6 correctos" | "dijo 'no las entiendo'"
+  // Para "ejercicios" y "prueba_etapa": el conteo real, sin tener que volver a
+  // parsear `nota` con regex para sumarlo (evidencias viejas sin esto igual
+  // funcionan: el código que suma cae de vuelta a parsear la nota).
+  correctos?: number;
+  total?: number;
 }
 
 export interface TemaDominio {
@@ -51,6 +57,17 @@ export interface TemaDominio {
   estado: EstadoTema;
   evidencias: EvidenciaTema[]; // la más reciente al final
   actualizadoEn: string; // ISO
+  // La ÚLTIMA prueba formal de este tema que NO se aprobó, y que todavía no se
+  // resolvió con práctica nueva. Rai lo lee en la memoria para retomarlo la
+  // próxima clase ("quedamos en repasar esto") en vez de que la promesa se
+  // pierda apenas termina la sesión. Se limpia (se sobreescribe con undefined
+  // vía spread) cuando una prueba nueva SÍ se aprueba.
+  refuerzoPendiente?: {
+    desde: string; // ISO date de la prueba reprobada
+    correctos: number;
+    total: number;
+    enunciadosFallados: string[]; // lo que le costó, para que Rai lo retome con otro ángulo
+  };
 }
 
 // --- Capa 3: recuerdos personales ----------------------------------------
@@ -256,8 +273,53 @@ export function sembrarTemasDesdeDiagnostico(
   return { ...acuerdo, temas };
 }
 
-// Evidencia dura: resultado de un bloque de ejercicios sobre un tema
-// (lo llama el flujo de estudio cuando el niño responde ejercicios reales).
+// Umbrales de la PRUEBA formal de etapa (8 preguntas del banco, servidor
+// valida con HMAC — ver PruebaEtapa.tsx). Compartidos con el cliente para que
+// la pantalla de resultado y el guardado de evidencia usen exactamente el
+// mismo criterio y nunca se contradigan ("buen intento" en pantalla pero el
+// mapa la marca superada, o al revés).
+export const UMBRAL_PRUEBA_ETAPA = 0.8;
+export const MINIMO_EVALUABLE_PRUEBA = 2;
+
+// Umbral para que el CÓDIGO (no la impresión de Rai en la charla) considere
+// que hay práctica suficiente para ofrecer la prueba formal. Más bajo que el
+// de la prueba misma (0.75 vs. 0.8): esto solo habilita el botón, no aprueba
+// la etapa — approvar sigue exigiendo la prueba real.
+const UMBRAL_LISTO = 0.75;
+const MINIMO_LISTO = 4;
+
+// Suma correctos/total de un tipo de evidencia dentro de una lista, solo
+// contando evidencia CON o DESPUÉS de `desde` (para exigir práctica NUEVA
+// tras reprobar una prueba, no reciclar la de antes). Usa los campos
+// estructurados si existen; si no (evidencia vieja, de antes de este
+// cambio), cae a parsear la nota — así los acuerdos existentes no pierden su
+// historial.
+function acumularEvidencia(
+  evidencias: EvidenciaTema[],
+  tipo: EvidenciaTema["tipo"],
+  desde?: string
+): { correctos: number; total: number } {
+  return evidencias.reduce(
+    (acc, e) => {
+      if (e.tipo !== tipo) return acc;
+      if (desde && e.fecha < desde) return acc;
+      if (e.correctos !== undefined && e.total !== undefined) {
+        return { correctos: acc.correctos + e.correctos, total: acc.total + e.total };
+      }
+      const match = /^(\d+) de (\d+) correctos/.exec(e.nota);
+      if (!match) return acc;
+      return { correctos: acc.correctos + Number(match[1]), total: acc.total + Number(match[2]) };
+    },
+    { correctos: 0, total: 0 }
+  );
+}
+
+// Evidencia de PRÁCTICA (no la prueba formal): un bloque de ejercicios/juego
+// interactivo sobre un tema. YA NO otorga "superado" por sí sola — antes,
+// práctica suelta (un par de sopas de letras acertadas) podía marcar toda la
+// etapa como superada sin que existiera una prueba real detrás. Ahora la
+// práctica solo mueve entre "le_cuesta"/"en_proceso" y alimenta
+// evaluarPreparacion(): superar la etapa exige pasar registrarPruebaEtapa.
 export function registrarEjercicios(
   acuerdo: AcuerdoTutoria,
   tema: string,
@@ -272,31 +334,20 @@ export function registrarEjercicios(
   const previo = idx >= 0 ? temas[idx] : undefined;
 
   const evidencias = [...(previo?.evidencias ?? [])];
-  evidencias.push({ fecha, tipo: "ejercicios", nota: `${correctos} de ${total} correctos` });
+  evidencias.push({ fecha, tipo: "ejercicios", nota: `${correctos} de ${total} correctos`, correctos, total });
 
-  // regla dura: ≥80% con al menos 4 ejercicios = superado; ≤40% = le_cuesta
   const ratio = total > 0 ? correctos / total : 0;
-  // Rai registra cada juego como una evidencia individual (por ejemplo, "1 de
-  // 1"). Para que cuatro aciertos reales sí cuenten como dominio, sumamos las
-  // evidencias de ejercicios del tema antes de aplicar el umbral de superación.
-  const acumulado = evidencias.reduce(
-    (acc, e) => {
-      if (e.tipo !== "ejercicios") return acc;
-      const match = /^(\d+) de (\d+) correctos$/.exec(e.nota);
-      if (!match) return acc;
-      return { correctos: acc.correctos + Number(match[1]), total: acc.total + Number(match[2]) };
-    },
-    { correctos: 0, total: 0 }
-  );
-  const ratioAcumulado = acumulado.total > 0 ? acumulado.correctos / acumulado.total : 0;
   const estado: EstadoTema =
     ratio <= 0.4
       ? "le_cuesta"
-      : acumulado.total >= 4 && ratioAcumulado >= 0.8
-        ? "superado"
-        : (previo?.estado ?? "en_proceso");
+      // zona media: conserva lo que ya había (un "superado" real de una
+      // prueba no se degrada por un ejercicio suelto; un "le_cuesta" tampoco
+      // se borra solo porque un ejercicio salió bien). Practicar bien nunca
+      // OTORGA "superado" por sí solo — eso exige registrarPruebaEtapa.
+      : (previo?.estado ?? "en_proceso");
 
   const actualizado: TemaDominio = {
+    ...previo,
     tema: clave,
     materia,
     estado,
@@ -306,6 +357,83 @@ export function registrarEjercicios(
   if (idx >= 0) temas[idx] = actualizado;
   else temas.push(actualizado);
   return { ...acuerdo, temas };
+}
+
+// Evidencia DURA formal: el resultado de la prueba de etapa (8 preguntas,
+// validadas en el servidor). Es la ÚNICA vía para que un tema pase a
+// "superado" (ver registrarEjercicios). Si no aprueba, queda un
+// refuerzoPendiente con lo que falló, para que Rai lo retome la próxima
+// clase con otro enfoque en vez de que la promesa se pierda.
+export function registrarPruebaEtapa(
+  acuerdo: AcuerdoTutoria,
+  tema: string,
+  materia: Materia,
+  correctos: number,
+  total: number,
+  enunciadosFallados: string[] = [],
+  fecha = hoyIso()
+): AcuerdoTutoria {
+  const clave = tema.trim().toLowerCase();
+  const temas = [...(acuerdo.temas ?? [])];
+  const idx = temas.findIndex((x) => x.tema === clave && x.materia === materia);
+  const previo = idx >= 0 ? temas[idx] : undefined;
+
+  const ratio = total > 0 ? correctos / total : 0;
+  const aprobada = total >= MINIMO_EVALUABLE_PRUEBA && ratio >= UMBRAL_PRUEBA_ETAPA;
+
+  const evidencias = [...(previo?.evidencias ?? [])];
+  evidencias.push({
+    fecha,
+    tipo: "prueba_etapa",
+    nota: `prueba de etapa: ${correctos} de ${total}${aprobada ? " — aprobada" : ""}`,
+    correctos,
+    total,
+  });
+
+  const actualizado: TemaDominio = {
+    tema: clave,
+    materia,
+    estado: aprobada ? "superado" : ratio <= 0.4 ? "le_cuesta" : (previo?.estado ?? "en_proceso"),
+    evidencias: evidencias.slice(-8),
+    actualizadoEn: fecha,
+    // aprobada: se resuelve cualquier refuerzo pendiente anterior.
+    // no aprobada: queda (o se reemplaza) el pendiente con esta prueba.
+    refuerzoPendiente: aprobada
+      ? undefined
+      : { desde: fecha, correctos, total, enunciadosFallados },
+  };
+  if (idx >= 0) temas[idx] = actualizado;
+  else temas.push(actualizado);
+  return { ...acuerdo, temas };
+}
+
+export type PreparacionPrueba = "aprendiendo" | "lista_para_prueba" | "refuerzo_tras_prueba";
+
+// LA decisión de si corresponde ofrecer la prueba de la etapa — determinista,
+// NO el criterio de Rai en la charla. La usa tanto el marcador <<PRUEBA>> (vía
+// api/tutor) como el botón "Rendir la prueba" del mapa: antes cada uno hacía
+// lo suyo (Rai por impresión, el mapa sin ningún chequeo), y podían
+// contradecirse o dejar rendir sin ninguna base.
+export function evaluarPreparacion(
+  acuerdo: AcuerdoTutoria | null | undefined,
+  materia: Materia,
+  tema: string
+): PreparacionPrueba {
+  const clave = tema.trim().toLowerCase();
+  const dominio = (acuerdo?.temas ?? []).find((t) => t.tema === clave && t.materia === materia);
+  if (!dominio) return "aprendiendo";
+  if (dominio.estado === "superado") return "lista_para_prueba"; // repetirla es libre
+
+  // Si reprobó una prueba, exige práctica NUEVA (desde esa fecha) antes de
+  // volver a habilitar el botón — evita que "inténtalo de nuevo" se vuelva
+  // adivinar por repetición apenas terminada la prueba anterior.
+  const desde = dominio.refuerzoPendiente?.desde;
+  const acumulado = acumularEvidencia(dominio.evidencias, "ejercicios", desde);
+  const ratio = acumulado.total > 0 ? acumulado.correctos / acumulado.total : 0;
+  const listo = acumulado.total >= MINIMO_LISTO && ratio >= UMBRAL_LISTO;
+
+  if (!listo) return desde ? "refuerzo_tras_prueba" : "aprendiendo";
+  return "lista_para_prueba";
 }
 
 // Detecta qué temas pasaron a "superado" recién ahora (no lo estaban antes).
@@ -409,7 +537,14 @@ export function textoMemoria(m: { temas: TemaDominio[]; recuerdos: RecuerdoNino[
   const partes: string[] = [];
   for (const t of m.temas) {
     const ev = t.evidencias.slice(-2).map((e) => `${e.fecha.slice(5)}: ${e.nota}`).join("; ");
-    partes.push(`${t.tema} (${t.estado})${ev ? ` [${ev}]` : ""}`);
+    // Sin esto, "quedamos en repasar esto la próxima clase" era una promesa
+    // que se perdía apenas terminaba la sesión: Rai no tenía forma de saber,
+    // al empezar la siguiente, que había un refuerzo pendiente de una prueba
+    // reprobada.
+    const pendiente = t.refuerzoPendiente
+      ? ` [PENDIENTE: reprobó la prueba de este tema (${t.refuerzoPendiente.correctos}/${t.refuerzoPendiente.total}) — retómalo con otro enfoque antes de sugerir la prueba de nuevo]`
+      : "";
+    partes.push(`${t.tema} (${t.estado})${ev ? ` [${ev}]` : ""}${pendiente}`);
   }
   for (const r of m.recuerdos) {
     partes.push(`recuerdo ${r.fecha.slice(5)}: ${r.texto}`);

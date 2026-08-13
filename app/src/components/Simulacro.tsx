@@ -16,7 +16,7 @@ import { Fireworks } from "./Fireworks";
 // etapa (10 respondidas en total, no 2).
 
 const MIN_PREGUNTAS = 20;
-// 4 preguntas por tema es lo que exige registrarEjercicios para dar un tema por
+// 4 preguntas por tema es lo que exige registrarSimulacro para dar un tema por
 // superado. Con 3 el simulacro solo podía BAJAR un tema a "le_cuesta", nunca
 // subirlo: un niño que rendía perfecto no avanzaba ninguna etapa. El tope sale
 // de la materia con más temas del banco (matemática de 3°, 4° y 6°: 9 temas).
