@@ -38,6 +38,7 @@ export function DashboardAlumno({
   const onAbrirAcceso = () => setMostrarAcceso(true);
 
   const dias = diasHastaExamen(p.examen.fecha);
+  const examenVencido = dias !== null && dias < 0;
   const materias = p.examen.materias
     .map((id) => MATERIAS.find((m) => m.id === id)?.label ?? id)
     .join(" · ");
@@ -75,9 +76,11 @@ export function DashboardAlumno({
           </div>
           <div className="text-right">
             <div className="font-serif text-[30px] font-bold leading-none tabular-nums text-ink">
-              {est.avance}%
+              {diagnosticado ? `${est.avance}%` : "—"}
             </div>
-            <div className="text-[11px] text-ink-soft">preparado</div>
+            <div className="text-[11px] text-ink-soft">
+              {diagnosticado ? "preparado" : "diagnóstico pendiente"}
+            </div>
             <div
               className="mt-1.5 text-[12px] font-medium"
               style={{ color: colorDelEstado(est.nivel) }}
@@ -173,7 +176,7 @@ export function DashboardAlumno({
         {p.tutoria?.sesiones && p.tutoria.sesiones.length > 0 && (
           <div className="border-t border-hair pt-3">
             <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sage-deep">
-              Progreso de Estudio (Minutos por Sesión)
+              Tiempo de estudio (minutos por sesión)
             </div>
             <div className="h-[95px] w-full rounded-lg bg-sage/5 border border-hair/50 p-2 flex items-center justify-center">
               {(() => {

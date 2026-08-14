@@ -7,8 +7,13 @@ import { eq, and } from "drizzle-orm";
 import type { PerfilNino } from "@/lib/profile";
 import { verifyStudentToken } from "@/lib/auth-student";
 import { sanearTutoria } from "@/lib/tutor/sanearMemoria";
+import { chequearLimite } from "@/lib/rateLimit";
+import { obtenerOCrearSuscripcion } from "@/lib/pagos/repositorio";
 
 export async function POST(req: NextRequest) {
+  const limite = chequearLimite(req, { clave: "sync", max: 60, ventanaMs: 60_000 });
+  if (limite) return limite;
+
   let userId: string;
   let isStudentMode = false;
   let studentPupiloId: string | null = null;
@@ -64,6 +69,31 @@ export async function POST(req: NextRequest) {
 
     const dbPupilosMap = new Map(dbPupilosList.map((p) => [p.id, p]));
 
+    if (!isStudentMode) {
+      const idsNuevos = new Set(
+        clientPupilos.filter((p) => !dbPupilosMap.has(p.id)).map((p) => p.id)
+      );
+      if (idsNuevos.size > 0) {
+        const sub = await obtenerOCrearSuscripcion(userId);
+        const esFamiliaNueva = dbPupilosList.length === 0;
+        if (esFamiliaNueva && !sub.cuponId && !sub.ultimoPagoEn) {
+          return NextResponse.json(
+            { error: "Necesitas un cupón de invitación para completar la inscripción." },
+            { status: 403 }
+          );
+        }
+        if (
+          sub.limitePupilos !== null &&
+          dbPupilosList.length + idsNuevos.size > sub.limitePupilos
+        ) {
+          return NextResponse.json(
+            { error: `Este cupón permite un máximo de ${sub.limitePupilos} niños.` },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     for (const cp of clientPupilos) {
       const dbPupilo = dbPupilosMap.get(cp.id);
       const clientUpdateStr = cp.updatedAt || cp.creadoEn || new Date().toISOString();
@@ -71,6 +101,13 @@ export async function POST(req: NextRequest) {
 
       // Si no existe en la BD o el cliente es más reciente: guardamos en la BD
       if (!dbPupilo || clientUpdateMs > dbPupilo.updatedAt.getTime()) {
+        // Preservar pinHash si existe en la BD y el cliente no lo envía (o si viene en modo alumno)
+        let contextoFinal = (cp.contexto || {}) as Record<string, unknown>;
+        const dbContexto = (dbPupilo?.contexto || {}) as Record<string, unknown>;
+        if (dbContexto.pinHash && (!contextoFinal.pinHash || isStudentMode)) {
+          contextoFinal = { ...contextoFinal, pinHash: dbContexto.pinHash };
+        }
+
         const insertData = {
           id: cp.id,
           cuentaId: userId,
@@ -79,7 +116,7 @@ export async function POST(req: NextRequest) {
           examenFecha: cp.examen.fecha,
           examenMaterias: cp.examen.materias,
           horasSemana: cp.disponibilidad.horasSemana,
-          contexto: cp.contexto,
+          contexto: contextoFinal,
           diagnostico: cp.diagnostico || null,
           // Se sanea SIEMPRE lo que empuja el cliente: su localStorage puede
           // traer memoria vieja con enunciados de actividad como clave de
@@ -151,23 +188,29 @@ export async function POST(req: NextRequest) {
           .where(eq(pupilosTable.cuentaId, userId))
           .orderBy(pupilosTable.creadoEn);
 
-    const finalPupilos: PerfilNino[] = listFinal.map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      curso: p.curso as any,
-      examen: {
-        fecha: p.examenFecha,
-        materias: p.examenMaterias as any[],
-      },
-      disponibilidad: {
-        horasSemana: p.horasSemana,
-      },
-      contexto: p.contexto as any,
-      diagnostico: (p.diagnostico || undefined) as any,
-      tutoria: (p.tutoria || undefined) as any,
-      creadoEn: p.creadoEn.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    }));
+    const finalPupilos: PerfilNino[] = listFinal.map((p) => {
+      // El pinHash NUNCA sale al cliente en respuestas de sincronización
+      const contextoBruto = (p.contexto ?? {}) as Record<string, unknown>;
+      const { pinHash: _h, pin: _p, ...contextoSeguro } = contextoBruto;
+
+      return {
+        id: p.id,
+        nombre: p.nombre,
+        curso: p.curso as any,
+        examen: {
+          fecha: p.examenFecha,
+          materias: p.examenMaterias as any[],
+        },
+        disponibilidad: {
+          horasSemana: p.horasSemana,
+        },
+        contexto: contextoSeguro as any,
+        diagnostico: (p.diagnostico || undefined) as any,
+        tutoria: (p.tutoria || undefined) as any,
+        creadoEn: p.creadoEn.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      };
+    });
 
     return NextResponse.json({ pupilos: finalPupilos });
   } catch (err) {

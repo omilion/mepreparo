@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { leads } from "@/lib/db/schema";
 import { crearId } from "@/lib/profile";
+import { chequearLimite } from "@/lib/rateLimit";
 
 // Captura el email del APODERADO antes de la demo (para remarketing). No crea
 // cuenta ni sesión; solo guarda un lead. No requiere auth.
 export async function POST(req: NextRequest) {
+  const limite = chequearLimite(req, { clave: "demo-lead", max: 5, ventanaMs: 60_000 });
+  if (limite) return limite;
   let body: { email?: string; nombreNino?: string; aceptaContacto?: boolean };
   try {
     body = await req.json();

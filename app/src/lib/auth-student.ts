@@ -1,6 +1,15 @@
 import crypto from "crypto";
 
-const SECRET = process.env.DIAG_HMAC_SECRET || "mepreparo_dev_secret_key_12345";
+export function getHmacSecret(): string {
+  const secret = process.env.DIAG_HMAC_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("ALERTA DE SEGURIDAD: DIAG_HMAC_SECRET no está configurada en producción.");
+    }
+    return "mepreparo_dev_secret_key_12345";
+  }
+  return secret;
+}
 
 export interface StudentTokenPayload {
   cuentaId: string;
@@ -33,7 +42,7 @@ export function generateStudentLoginToken(cuentaId: string, pupiloId: string): s
 
 function firmarToken(payload: StudentTokenPayload): string {
   const str = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
+  const signature = crypto.createHmac("sha256", getHmacSecret()).update(str).digest("base64url");
   return `${str}.${signature}`;
 }
 
@@ -42,7 +51,7 @@ export function verifyStudentToken(token: string): StudentTokenPayload | null {
     const parts = token.split(".");
     if (parts.length !== 2) return null;
     const [str, signature] = parts;
-    const expectedSignature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
+    const expectedSignature = crypto.createHmac("sha256", getHmacSecret()).update(str).digest("base64url");
     const recibido = Buffer.from(signature);
     const esperado = Buffer.from(expectedSignature);
     if (recibido.length !== esperado.length || !crypto.timingSafeEqual(recibido, esperado)) return null;
@@ -64,7 +73,7 @@ export function verifyStudentToken(token: string): StudentTokenPayload | null {
 // El PIN NUNCA se guarda ni se compara en texto plano. Guardamos un HMAC del PIN
 // ligado al pupilo (evita que el mismo PIN dé el mismo hash entre niños).
 export function hashPin(pin: string, pupiloId: string): string {
-  return crypto.createHmac("sha256", SECRET).update(`${pupiloId}:${pin}`).digest("base64url");
+  return crypto.createHmac("sha256", getHmacSecret()).update(`${pupiloId}:${pin}`).digest("base64url");
 }
 
 // Comparación resistente a timing attacks.

@@ -4,10 +4,9 @@ import BANCO_PREGUNTAS from "@/lib/diagnostico/banco.json";
 import type { BancoPreguntas, Pregunta, Dificultad } from "@/lib/diagnostico/tipos";
 import type { Materia, Curso } from "@/lib/profile";
 import { obtenerPreguntaGenerada } from "@/lib/diagnostico/generarPrueba";
-
+import { getHmacSecret } from "@/lib/auth-student";
 
 const banco = BANCO_PREGUNTAS as BancoPreguntas;
-const SECRET = process.env.DIAG_HMAC_SECRET || "mepreparo_dev_secret_key_12345";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -60,7 +59,7 @@ export async function GET(req: NextRequest) {
         }
         const correctaShuffled = indices.indexOf(gen.correctaIndex);
         const hmac = crypto
-          .createHmac("sha256", SECRET)
+          .createHmac("sha256", getHmacSecret())
           .update(`${gen.id}:${correctaShuffled}`)
           .digest("hex");
 
@@ -99,7 +98,7 @@ export async function GET(req: NextRequest) {
 
   // Generar HMAC token del ID de la pregunta y el índice de su opción correcta
   const hmac = crypto
-    .createHmac("sha256", SECRET)
+    .createHmac("sha256", getHmacSecret())
     .update(`${elegida.id}:${correctaShuffled}`)
     .digest("hex");
 

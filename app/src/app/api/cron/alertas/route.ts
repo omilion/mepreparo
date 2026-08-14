@@ -6,6 +6,7 @@
 // Protegido por CRON_SECRET: sin él, cualquiera podría hacer que mandemos
 // correo a toda la base con un solo GET.
 
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { pupilos as pupilosTable, user, apoderadoPerfil } from "@/lib/db/schema";
@@ -22,12 +23,27 @@ const UN_DIA_MS = 86_400_000;
 const DIAS_INACTIVIDAD = 5;
 const COOLDOWN_SEMANAL_MS = 6 * UN_DIA_MS;
 
+function seguroComprobar(recibido: string | null, esperado: string): boolean {
+  if (!recibido) return false;
+  const a = Buffer.from(recibido);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 function autorizado(req: NextRequest): boolean {
   const secreto = process.env.CRON_SECRET;
   if (!secreto) return false; // sin secreto configurado, la ruta no opera
   const deHeader = req.headers.get("x-cron-secret");
+  const authHeader = req.headers.get("authorization") || "";
+  const deBearer = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : null;
   const deQuery = new URL(req.url).searchParams.get("secret");
-  return deHeader === secreto || deQuery === secreto;
+
+  return (
+    seguroComprobar(deHeader, secreto) ||
+    seguroComprobar(deBearer, secreto) ||
+    seguroComprobar(deQuery, secreto)
+  );
 }
 
 export async function GET(req: NextRequest) {

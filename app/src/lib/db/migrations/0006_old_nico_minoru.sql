@@ -1,0 +1,1 @@
+ALTER TABLE "cupones_acceso" ADD COLUMN "usado" boolean DEFAULT false NOT NULL;

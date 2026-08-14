@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { nuevoPerfil, type PerfilNino } from "@/lib/profile";
 import { Reveal } from "./Reveal";
 
@@ -13,11 +13,32 @@ export function Registro({
   onListo: (pupilos: PerfilNino[]) => void;
 }) {
   const [nombres, setNombres] = useState<string[]>([""]);
+  const [limitePupilos, setLimitePupilos] = useState<number | null>(null);
+  const [pupilosRegistrados, setPupilosRegistrados] = useState(0);
+
+  useEffect(() => {
+    void fetch("/api/pagos/estado")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setLimitePupilos(typeof data.limitePupilos === "number" ? data.limitePupilos : null);
+        setPupilosRegistrados(
+          typeof data.pupilosRegistrados === "number" ? data.pupilosRegistrados : 0
+        );
+      })
+      .catch(() => {
+        // El servidor vuelve a validar el límite al sincronizar.
+      });
+  }, []);
+
+  const cuposDisponibles =
+    limitePupilos === null ? null : Math.max(0, limitePupilos - pupilosRegistrados);
 
   function set(i: number, valor: string) {
     setNombres((ns) => ns.map((n, j) => (j === i ? valor : n)));
   }
   function agregar() {
+    if (cuposDisponibles !== null && nombres.length >= cuposDisponibles) return;
     setNombres((ns) => [...ns, ""]);
   }
   function quitar(i: number) {
@@ -25,7 +46,8 @@ export function Registro({
   }
 
   const limpios = nombres.map((n) => n.trim()).filter(Boolean);
-  const puedeSeguir = limpios.length > 0;
+  const puedeSeguir =
+    limpios.length > 0 && (cuposDisponibles === null || limpios.length <= cuposDisponibles);
 
   function continuar() {
     if (!puedeSeguir) return;
@@ -53,7 +75,12 @@ export function Registro({
 
       <Reveal delay={950}>
       <section className="flex w-[300px] max-w-full flex-col gap-3 text-left md:w-[400px]">
-        {nombres.map((nombre, i) => (
+        {cuposDisponibles === 0 && (
+          <p className="rounded-xl border border-hair p-4 text-center text-[13px] text-ink-soft">
+            Ya registraste los {limitePupilos} niños permitidos por esta invitación.
+          </p>
+        )}
+        {cuposDisponibles !== 0 && nombres.map((nombre, i) => (
           <div key={i} className="flex items-center gap-3">
             <span className="w-6 text-center font-mono text-[13px] tabular-nums text-ink-soft">
               {i + 1}
@@ -82,19 +109,28 @@ export function Registro({
           </div>
         ))}
 
-        <button
-          type="button"
-          onClick={agregar}
-          className="mt-1 self-start text-[13px] text-sage-deep underline-offset-4 hover:underline"
-        >
-          + Agregar otro hijo
-        </button>
+        {cuposDisponibles !== 0 &&
+          (cuposDisponibles === null || nombres.length < cuposDisponibles) && (
+          <button
+            type="button"
+            onClick={agregar}
+            className="mt-1 self-start text-[13px] text-sage-deep underline-offset-4 hover:underline"
+          >
+            + Agregar otro hijo
+          </button>
+        )}
+        {cuposDisponibles !== null && (
+          <p className="text-[12px] text-ink-soft">
+            Tu invitación permite hasta {limitePupilos} niños
+            {pupilosRegistrados > 0 ? ` · ya registraste ${pupilosRegistrados}` : ""}.
+          </p>
+        )}
       </section>
       </Reveal>
 
       <Reveal delay={1150}>
         <div className="w-[280px] max-w-full md:w-[360px]">
-          <button
+          {cuposDisponibles !== 0 && <button
             type="button"
             onClick={continuar}
             disabled={!puedeSeguir}
@@ -103,7 +139,7 @@ export function Registro({
             {limpios.length <= 1
               ? "Continuar"
               : `Continuar con ${limpios.length} hijos`}
-          </button>
+          </button>}
         </div>
       </Reveal>
 

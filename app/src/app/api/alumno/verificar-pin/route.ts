@@ -3,11 +3,14 @@ import { db } from "@/lib/db/db";
 import { pupilos as pupilosTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyStudentToken, verificarPin } from "@/lib/auth-student";
+import { chequearLimite } from "@/lib/rateLimit";
 
 // Valida el PIN del alumno EN EL SERVIDOR. Requiere un token de alumno válido
 // (que ya prueba pertenencia a la cuenta). El PIN nunca se compara en el cliente
 // ni se guarda en texto plano: aquí se compara contra su hash.
 export async function POST(req: NextRequest) {
+  const limite = chequearLimite(req, { clave: "verificar-pin", max: 5, ventanaMs: 60_000 });
+  if (limite) return limite;
   let body: { token: string; pin: string };
   try {
     body = await req.json();

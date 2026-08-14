@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { type Cuenta, MATERIAS } from "@/lib/profile";
+import { sincronizarConServidor } from "@/lib/storage";
 import { DIAS } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
 import { Suscripcion } from "./Suscripcion";
@@ -35,6 +36,7 @@ export function MiCuenta({
     alertaLogro: true,
   });
   const [guardandoAlerta, setGuardandoAlerta] = useState<keyof PreferenciasAlertas | null>(null);
+  const [mensajeAlertas, setMensajeAlertas] = useState("");
 
   // precarga las preferencias reales (por defecto asumimos todas activas,
   // que es lo que la base también asume si el apoderado nunca las tocó)
@@ -55,14 +57,17 @@ export function MiCuenta({
 
   async function alternarAlerta(clave: keyof PreferenciasAlertas) {
     const nuevoValor = !alertas[clave];
+    setMensajeAlertas("");
     setAlertas((a) => ({ ...a, [clave]: nuevoValor }));
     setGuardandoAlerta(clave);
     try {
-      await fetch("/api/apoderado/perfil", {
+      const res = await fetch("/api/apoderado/perfil", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [clave]: nuevoValor }),
       });
+      if (!res.ok) throw new Error("No se pudo guardar la preferencia.");
+      setMensajeAlertas("Preferencia guardada.");
     } catch (err) {
       console.error("No se pudo guardar la preferencia de alerta:", err);
       setAlertas((a) => ({ ...a, [clave]: !nuevoValor })); // revierte si falló
@@ -88,6 +93,9 @@ export function MiCuenta({
   async function handleExportar() {
     setExportando(true);
     try {
+      // La exportación es un derecho sobre los datos reales: primero empujamos
+      // cualquier cambio local pendiente para no entregar un archivo atrasado.
+      await sincronizarConServidor(cuenta);
       const res = await fetch("/api/apoderado/exportar");
       if (!res.ok) throw new Error("fallo export");
       const blob = await res.blob();
@@ -363,6 +371,9 @@ export function MiCuenta({
               onToggle={() => alternarAlerta("alertaLogro")}
             />
           </div>
+          <p aria-live="polite" className="min-h-4 text-[12px] text-sage-deep">
+            {mensajeAlertas}
+          </p>
         </div>
       </Reveal>
     </div>

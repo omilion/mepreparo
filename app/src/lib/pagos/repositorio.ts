@@ -3,21 +3,34 @@
 
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/db";
-import { suscripciones } from "@/lib/db/schema";
+import { pupilos, suscripciones } from "@/lib/db/schema";
 import { DIAS_PRUEBA_GRATIS } from "./suscripcion";
 
 export type FilaSuscripcion = typeof suscripciones.$inferSelect;
 
-// Toda cuenta nueva entra en período de prueba desde que se consulta por
-// primera vez (lazy init: no depende de engancharse al flujo de signup).
+// Las familias que ya alcanzaron a registrar niños antes del modo por
+// invitación conservan su prueba gratis. Una cuenta nueva, sin niños, nace
+// bloqueada hasta canjear un cupón o completar un pago.
 export async function obtenerOCrearSuscripcion(cuentaId: string): Promise<FilaSuscripcion> {
   const filas = await db.select().from(suscripciones).where(eq(suscripciones.cuentaId, cuentaId));
   if (filas[0]) return filas[0];
 
-  const pruebaHasta = new Date(Date.now() + DIAS_PRUEBA_GRATIS * 86_400_000);
+  const [pupiloExistente] = await db
+    .select({ id: pupilos.id })
+    .from(pupilos)
+    .where(eq(pupilos.cuentaId, cuentaId))
+    .limit(1);
+  const tieneFamiliaExistente = !!pupiloExistente;
+  const pruebaHasta = tieneFamiliaExistente
+    ? new Date(Date.now() + DIAS_PRUEBA_GRATIS * 86_400_000)
+    : null;
   const [nueva] = await db
     .insert(suscripciones)
-    .values({ cuentaId, estado: "prueba", pruebaHasta })
+    .values({
+      cuentaId,
+      estado: tieneFamiliaExistente ? "prueba" : "vencida",
+      pruebaHasta,
+    })
     .onConflictDoNothing({ target: suscripciones.cuentaId })
     .returning();
 

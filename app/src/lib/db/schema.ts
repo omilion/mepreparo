@@ -182,6 +182,22 @@ export const cacheRespuestas = pgTable("cache_respuestas", {
   creadoEn: timestamp("creado_en").defaultNow().notNull(),
 });
 
+// Cupones de invitación para el acceso controlado al piloto. Guardamos solo el
+// SHA-256 normalizado del código: el texto que se entrega a una familia no queda
+// visible en la base. Por ahora todos son de un solo uso.
+export const cuponesAcceso = pgTable("cupones_acceso", {
+  id: text("id").primaryKey(),
+  codigoHash: text("codigo_hash").notNull().unique(),
+  activo: boolean("activo").notNull().default(true),
+  usado: boolean("usado").notNull().default(false),
+  limitePupilos: integer("limite_pupilos").notNull().default(3),
+  canjeadoPor: text("canjeado_por")
+    .unique()
+    .references(() => user.id, { onDelete: "set null" }),
+  canjeadoEn: timestamp("canjeado_en"),
+  creadoEn: timestamp("creado_en").defaultNow().notNull(),
+});
+
 // Suscripción por FAMILIA (una fila por cuenta de apoderado, no por niño).
 // Estados: prueba → activa → vencida | cancelada. "cancelada" NO corta el
 // acceso de inmediato: periodoHasta sigue siendo la fecha real hasta la que
@@ -197,6 +213,8 @@ export const suscripciones = pgTable("suscripciones", {
   flowToken: text("flow_token"), // token que devuelve Flow al crear el pago
   ultimoPagoEn: timestamp("ultimo_pago_en"),
   canceladaEn: timestamp("cancelada_en"), // cuándo pidió cancelar (no cuándo pierde acceso)
+  cuponId: text("cupon_id").references(() => cuponesAcceso.id, { onDelete: "set null" }),
+  limitePupilos: integer("limite_pupilos"), // null = plan normal; cupón piloto = 3
   creadoEn: timestamp("creado_en").defaultNow().notNull(),
   actualizadoEn: timestamp("actualizado_en").defaultNow().notNull(),
 });

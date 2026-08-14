@@ -50,18 +50,22 @@ export async function GET(_req: NextRequest) {
             consentimientoVersion: perfil.consentimientoVersion,
           }
         : null,
-      hijos: misPupilos.map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        curso: p.curso,
-        examenFecha: p.examenFecha,
-        examenMaterias: p.examenMaterias,
-        horasSemana: p.horasSemana,
-        contexto: p.contexto,
-        diagnostico: p.diagnostico,
-        tutoria: p.tutoria,
-        creadoEn: p.creadoEn,
-      })),
+      hijos: misPupilos.map((p) => {
+        const rawCtx = (p.contexto ?? {}) as Record<string, unknown>;
+        const { pinHash: _h, pin: _p, ...contextoSeguro } = rawCtx;
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          curso: p.curso,
+          examenFecha: p.examenFecha,
+          examenMaterias: p.examenMaterias,
+          horasSemana: p.horasSemana,
+          contexto: contextoSeguro,
+          diagnostico: p.diagnostico,
+          tutoria: p.tutoria,
+          creadoEn: p.creadoEn,
+        };
+      }),
       sesionesDeEstudio: misSesiones.map((s) => ({
         pupiloId: s.pupiloId,
         fecha: s.fecha,

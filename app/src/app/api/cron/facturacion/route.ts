@@ -12,6 +12,7 @@
 // suscripciones (ver flow.ts). Renovar es un clic del apoderado sobre el
 // link del correo, que reusa POST /api/pagos/crear.
 
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db/db";
@@ -22,12 +23,27 @@ export const runtime = "nodejs";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3008";
 
+function seguroComprobar(recibido: string | null, esperado: string): boolean {
+  if (!recibido) return false;
+  const a = Buffer.from(recibido);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 function autorizado(req: NextRequest): boolean {
   const secreto = process.env.CRON_SECRET;
   if (!secreto) return false;
   const deHeader = req.headers.get("x-cron-secret");
+  const authHeader = req.headers.get("authorization") || "";
+  const deBearer = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : null;
   const deQuery = new URL(req.url).searchParams.get("secret");
-  return deHeader === secreto || deQuery === secreto;
+
+  return (
+    seguroComprobar(deHeader, secreto) ||
+    seguroComprobar(deBearer, secreto) ||
+    seguroComprobar(deQuery, secreto)
+  );
 }
 
 export async function GET(req: NextRequest) {

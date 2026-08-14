@@ -15,6 +15,9 @@ interface EstadoPagos {
   periodoHasta: string | null;
   precioMensualClp: number;
   pagosDisponibles: boolean;
+  requiereCupon?: boolean;
+  limitePupilos?: number | null;
+  pupilosRegistrados?: number;
 }
 
 const ETIQUETA_ESTADO: Record<EstadoPagos["estado"], string> = {
@@ -30,6 +33,7 @@ export function Suscripcion() {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
+  const [cupon, setCupon] = useState("");
 
   useEffect(() => {
     cargar();
@@ -37,11 +41,14 @@ export function Suscripcion() {
 
   async function cargar() {
     setCargando(true);
+    setError("");
     try {
       const res = await fetch("/api/pagos/estado");
-      if (res.ok) setInfo(await res.json());
+      if (!res.ok) throw new Error("No se pudo consultar el estado de la suscripción.");
+      setInfo(await res.json());
     } catch {
-      /* la tarjeta de abajo simplemente no se muestra */
+      setInfo(null);
+      setError("No pudimos cargar tu suscripción. Revisa tu conexión e inténtalo de nuevo.");
     } finally {
       setCargando(false);
     }
@@ -69,7 +76,8 @@ export function Suscripcion() {
     setProcesando(true);
     setError("");
     try {
-      await fetch("/api/pagos/cancelar", { method: "POST" });
+      const res = await fetch("/api/pagos/cancelar", { method: "POST" });
+      if (!res.ok) throw new Error("No se pudo cancelar la suscripción.");
       setMostrarCancelar(false);
       await cargar();
     } catch {
@@ -79,13 +87,50 @@ export function Suscripcion() {
     }
   }
 
-  if (cargando || !info) {
+  async function canjearCupon() {
+    if (!cupon.trim()) return;
+    setProcesando(true);
+    setError("");
+    try {
+      const res = await fetch("/api/cupones/canjear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: cupon }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error || "El cupón no pudo ser utilizado.");
+        return;
+      }
+      window.location.href = "/registro";
+    } catch {
+      setError("No se pudo validar el cupón. Intenta nuevamente.");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  if (cargando) {
     return (
       <div className="rounded-zen border border-hair p-6 flex flex-col gap-4 bg-sage/5">
         <h2 className="font-serif text-[20px] text-ink border-b border-hair pb-2">
           Suscripción y Pagos
         </h2>
         <p className="text-[13px] text-ink-soft">Cargando…</p>
+      </div>
+    );
+  }
+
+  if (!info) {
+    return (
+      <div className="rounded-zen border border-hair p-6 flex flex-col gap-4 bg-sage/5">
+        <h2 className="font-serif text-[20px] text-ink border-b border-hair pb-2">
+          Suscripción y Pagos
+        </h2>
+        <p role="alert" className="text-[13px] text-clay">{error || "No pudimos cargar la información."}</p>
+        <button type="button" onClick={cargar} className="self-start rounded-xl border border-hair px-4 py-2 text-[13px] text-ink hover:border-sage">
+          Reintentar
+        </button>
       </div>
     );
   }
@@ -109,31 +154,70 @@ export function Suscripcion() {
             "text-[16px] font-semibold " + (info.bloqueado ? "text-clay" : "text-sage-deep")
           }
         >
-          {ETIQUETA_ESTADO[info.estado]}
+          {info.requiereCupon ? "Invitación requerida" : ETIQUETA_ESTADO[info.estado]}
         </span>
       </div>
 
       <p className="text-[13px] text-ink-soft leading-[1.4]">
-        {info.estado === "prueba" &&
+        {info.requiereCupon &&
+          "La inscripción está disponible solo con invitación. Ingresa el cupón que recibiste para continuar."}
+        {!info.requiereCupon && info.estado === "prueba" &&
           (info.bloqueado
             ? "Tu prueba gratis terminó. Suscríbete para seguir estudiando con Rai."
             : `Te quedan ${info.diasRestantes ?? 0} días de prueba gratis.`)}
-        {info.estado === "activa" && fechaLimite && `Tu acceso está activo hasta el ${fechaLimite}.`}
-        {info.estado === "cancelada" &&
+        {!info.requiereCupon && info.estado === "activa" &&
+          (fechaLimite ? `Tu acceso está activo hasta el ${fechaLimite}.` : "Tu acceso está activo.")}
+        {!info.requiereCupon && info.estado === "cancelada" &&
           (info.bloqueado
             ? "Tu período pagado terminó."
             : `Cancelaste la renovación, pero mantienes acceso hasta el ${fechaLimite}.`)}
-        {info.estado === "vencida" && "Tu suscripción venció. Renueva para seguir estudiando con Rai."}
+        {!info.requiereCupon && info.estado === "vencida" &&
+          "Tu suscripción venció. Renueva para seguir estudiando con Rai."}
       </p>
 
-      <div className="flex flex-col gap-1.5 border-t border-hair pt-3">
+      {(info.requiereCupon || info.bloqueado) && info.estado !== "activa" && (
+        <div className="flex flex-col gap-2.5 rounded-xl border border-sage/40 bg-white/50 p-4">
+          <label htmlFor="cupon-acceso" className="text-[12px] font-semibold text-ink">
+            Cupón de invitación
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="cupon-acceso"
+              type="text"
+              value={cupon}
+              onChange={(e) => setCupon(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void canjearCupon();
+              }}
+              autoComplete="off"
+              maxLength={80}
+              placeholder="Escribe tu cupón"
+              className="input min-w-0 flex-1"
+            />
+            <button
+              type="button"
+              onClick={canjearCupon}
+              disabled={procesando || !cupon.trim()}
+              className="rounded-xl bg-sage-deep px-4 py-2 text-[13px] text-white disabled:opacity-40"
+            >
+              {procesando ? "Validando…" : "Activar"}
+            </button>
+          </div>
+          <p className="text-[11.5px] text-ink-soft">
+            Cada cupón puede utilizarse una sola vez y habilita el límite asignado a esa invitación.
+          </p>
+          {error && <p role="alert" className="text-[12.5px] text-clay">{error}</p>}
+        </div>
+      )}
+
+      {!info.requiereCupon && <div className="flex flex-col gap-1.5 border-t border-hair pt-3">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
           Precio
         </span>
         <span className="text-[15px] font-medium text-ink">{clp(info.precioMensualClp)} / mes</span>
-      </div>
+      </div>}
 
-      {!info.pagosDisponibles ? (
+      {!info.requiereCupon && (!info.pagosDisponibles ? (
         <div className="mt-1 rounded-lg border border-dashed border-hair p-3 text-center text-[12px] text-ink-soft bg-white/40">
           Métodos de pago en configuración — pronto disponibles.
         </div>
@@ -181,7 +265,7 @@ export function Suscripcion() {
             </div>
           )}
         </>
-      )}
+      ))}
     </div>
   );
 }
