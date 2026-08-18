@@ -41,6 +41,10 @@ export default function HoyRuta() {
           router.push("/tutor");
         }}
         onVerCamino={() => router.push("/mapa")}
+        onHablarConRai={() => {
+          setFoco(null);
+          router.push("/tutor");
+        }}
       />
     </main>
   );

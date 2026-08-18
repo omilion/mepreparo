@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { queHacerHoy, yaEstudioHoy } from "./hoy";
-import type { PerfilNino } from "@/lib/profile";
-import type { AcuerdoTutoria } from "@/lib/tutor/acuerdo";
+import { queHacerHoy, todoElCaminoCompleto, yaEstudioHoy } from "./hoy";
+import type { Materia, PerfilNino } from "@/lib/profile";
+import type { AcuerdoTutoria, TemaDominio } from "@/lib/tutor/acuerdo";
 import { diaDeHoy } from "@/lib/tutor/acuerdo";
+
+const MATEMATICA_5B = ["division", "multiplicacion", "numeros", "decimales", "fracciones", "algebra", "geometria", "resolucion_problemas"];
+const LENGUAJE_5B = ["vocabulario", "comprension_lectora", "gramatica", "ortografia", "inferencias"];
+
+function todosSuperados(materia: Materia, temasRuta: string[]): TemaDominio[] {
+  return temasRuta.map((tema) => ({
+    tema,
+    materia,
+    estado: "superado" as const,
+    evidencias: [],
+    actualizadoEn: "2026-07-15",
+  }));
+}
 
 const perfilBase = (acuerdo: AcuerdoTutoria | null): PerfilNino => ({
   id: "p1",
@@ -59,6 +72,48 @@ describe("queHacerHoy", () => {
     const acuerdo = acuerdoCon({ horario: {} });
     const plan = queHacerHoy(perfilBase(acuerdo), "5basico");
     expect(plan?.minutos).toBe(20);
+  });
+
+  it("materia de hoy 100% completa: ofrece la siguiente materia del examen, avisando cuál se completó", () => {
+    const hoy = diaDeHoy();
+    const acuerdo = acuerdoCon({
+      horario: { [hoy]: ["matematica"] },
+      temas: todosSuperados("matematica", MATEMATICA_5B),
+    });
+    const plan = queHacerHoy(perfilBase(acuerdo), "5basico");
+    expect(plan?.materia).toBe("lenguaje");
+    expect(plan?.materiaRecienCompletada).toBe("matematica");
+  });
+
+  it("TODAS las materias completas: no hay plan (ver todoElCaminoCompleto)", () => {
+    const acuerdo = acuerdoCon({
+      temas: [
+        ...todosSuperados("matematica", MATEMATICA_5B),
+        ...todosSuperados("lenguaje", LENGUAJE_5B),
+      ],
+    });
+    expect(queHacerHoy(perfilBase(acuerdo), "5basico")).toBeNull();
+  });
+});
+
+describe("todoElCaminoCompleto", () => {
+  it("false sin tutoria", () => {
+    expect(todoElCaminoCompleto(perfilBase(null), "5basico")).toBe(false);
+  });
+
+  it("false si falta una materia por completar", () => {
+    const acuerdo = acuerdoCon({ temas: todosSuperados("matematica", MATEMATICA_5B) });
+    expect(todoElCaminoCompleto(perfilBase(acuerdo), "5basico")).toBe(false);
+  });
+
+  it("true cuando todas las materias del examen están 100% superadas", () => {
+    const acuerdo = acuerdoCon({
+      temas: [
+        ...todosSuperados("matematica", MATEMATICA_5B),
+        ...todosSuperados("lenguaje", LENGUAJE_5B),
+      ],
+    });
+    expect(todoElCaminoCompleto(perfilBase(acuerdo), "5basico")).toBe(true);
   });
 });
 

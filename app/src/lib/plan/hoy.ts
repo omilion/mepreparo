@@ -9,6 +9,23 @@ export interface PlanDeHoy {
   materia: Materia;
   etapa: Etapa;
   minutos: number;
+  // Si la materia agendada para hoy ya está 100% completa, se ofrece la
+  // siguiente materia del examen que aún tenga camino — esto avisa cuál fue
+  // la que se saltó, para poder celebrarla en vez de solo cambiar de tema
+  // sin explicación.
+  materiaRecienCompletada?: Materia;
+}
+
+// Sin esto, un niño que termina TODAS las materias del examen se topaba con
+// "aún estamos preparando tu camino" — el mensaje exactamente opuesto a lo
+// que pasó. queHacerHoy() ya no puede distinguir este caso de "todavía no
+// hay datos" porque ambos devuelven null; por eso vive aparte.
+export function todoElCaminoCompleto(perfil: PerfilNino, curso: Curso): boolean {
+  if (!perfil.tutoria) return false;
+  return perfil.examen.materias.every((m) => {
+    const etapas = etapasDeMateria(m, curso, perfil.tutoria);
+    return etapas.length > 0 && etapas.every((e) => e.estado === "superada");
+  });
 }
 
 const MINUTOS_POR_DEFECTO = 20;
@@ -40,11 +57,26 @@ export function queHacerHoy(perfil: PerfilNino, curso: Curso): PlanDeHoy | null 
   const materia = materiaDeHoy(perfil, acuerdo);
   if (!materia) return null;
 
+  const minutos = minutosSugeridos(perfil, acuerdo);
   const etapas = etapasDeMateria(materia, curso, acuerdo);
   const etapa = etapas.find((e) => e.estado === "actual");
-  if (!etapa) return null;
+  if (etapa) return { materia, etapa, minutos };
 
-  return { materia, etapa, minutos: minutosSugeridos(perfil, acuerdo) };
+  // La materia de hoy no tiene etapa "actual": o no hay camino armado para
+  // ella (perfil recién creado — el `!etapa` de siempre), o YA ESTÁ 100%
+  // completa. Solo en el segundo caso corresponde ofrecer otra materia; si
+  // no hay etapas en absoluto, es el caso "sin camino todavía" de antes.
+  const materiaCompleta = etapas.length > 0 && etapas.every((e) => e.estado === "superada");
+  if (!materiaCompleta) return null;
+
+  for (const otra of perfil.examen.materias) {
+    if (otra === materia) continue;
+    const etapasOtra = etapasDeMateria(otra, curso, acuerdo);
+    const etapaOtra = etapasOtra.find((e) => e.estado === "actual");
+    if (etapaOtra) return { materia: otra, etapa: etapaOtra, minutos, materiaRecienCompletada: materia };
+  }
+
+  return null; // todas las materias completas — ver todoElCaminoCompleto()
 }
 
 // ¿Ya tuvo una sesión de estudio hoy? (mismo día calendario, hora local).
