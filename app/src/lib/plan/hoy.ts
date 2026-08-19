@@ -3,32 +3,48 @@
 
 import type { Curso, Materia, PerfilNino } from "@/lib/profile";
 import { materiasDeHoy, type AcuerdoTutoria, type Dia } from "@/lib/tutor/acuerdo";
-import { etapasDeMateria, type Etapa } from "./etapas";
+import { etapasDeMateria, faseDeMateria, temasEnRepaso, type Etapa } from "./etapas";
 
 export interface PlanDeHoy {
   materia: Materia;
-  etapa: Etapa;
   minutos: number;
-  // Si la materia agendada para hoy ya está 100% completa, se ofrece la
-  // siguiente materia del examen que aún tenga camino — esto avisa cuál fue
-  // la que se saltó, para poder celebrarla en vez de solo cambiar de tema
-  // sin explicación.
+  // Presente en una sesión normal de camino (incluida una de repaso — ver
+  // `enRepaso`). Ausente cuando lo que toca es rendir un simulacro de
+  // cierre: ese no es "una etapa", es la evaluación mixta de la materia
+  // entera, así que no tiene sentido forzarlo en esta forma.
+  etapa?: Etapa;
+  // Camino completo, simulacro 1 aprobado con temas débiles, y ya con
+  // práctica nueva suficiente en esos temas (o directo, tras completar el
+  // camino): toca rendir el simulacro 1 o el 2 de cierre.
+  numeroSimulacro?: 1 | 2;
+  // La etapa de arriba es un tema débil del simulacro 1, no un tema nuevo:
+  // la sesión debería ser más corta y enfocada, no una clase normal.
+  enRepaso?: boolean;
+  // Si la materia agendada para hoy no tenía nada pendiente AHORA (ya
+  // completó su camino, está esperando el simulacro, o ya está lista del
+  // todo) se ofrece la siguiente materia del examen con algo por hacer —
+  // esto avisa cuál fue la que se saltó, para celebrarla en vez de
+  // solo cambiar de tema sin explicación.
   materiaRecienCompletada?: Materia;
 }
 
 // Sin esto, un niño que termina TODAS las materias del examen se topaba con
 // "aún estamos preparando tu camino" — el mensaje exactamente opuesto a lo
 // que pasó. queHacerHoy() ya no puede distinguir este caso de "todavía no
-// hay datos" porque ambos devuelven null; por eso vive aparte.
+// hay datos" porque ambos devuelven null; por eso vive aparte. "Completo" es
+// materia_lista de verdad (aprobó un simulacro de cierre, o llegó al tope de
+// 2 ciclos) — no basta con tener todas las etapas superadas.
 export function todoElCaminoCompleto(perfil: PerfilNino, curso: Curso): boolean {
   if (!perfil.tutoria) return false;
-  return perfil.examen.materias.every((m) => {
-    const etapas = etapasDeMateria(m, curso, perfil.tutoria);
-    return etapas.length > 0 && etapas.every((e) => e.estado === "superada");
-  });
+  return perfil.examen.materias.every(
+    (m) => faseDeMateria(m, curso, perfil.tutoria) === "materia_lista"
+  );
 }
 
 const MINUTOS_POR_DEFECTO = 20;
+// El repaso dirigido es más corto que una clase normal a propósito: apunta a
+// UN tema puntual, no a enseñar algo nuevo de cero.
+const MINUTOS_REPASO = 12;
 
 // Minutos sugeridos para HOY: reparte las horas/semana acordadas entre los
 // días que de verdad tienen materias agendadas. Sin horario aún, usa un
@@ -50,33 +66,53 @@ function materiaDeHoy(perfil: PerfilNino, acuerdo: AcuerdoTutoria): Materia | nu
   return perfil.examen.materias[0] ?? null;
 }
 
+// Qué ofrecer para UNA materia puntual, según su fase de cierre. null =
+// nada pendiente ahora para esta materia (aprendiendo sin etapa armada
+// todavía, o materia_lista).
+function planParaMateria(
+  materia: Materia,
+  curso: Curso,
+  acuerdo: AcuerdoTutoria,
+  minutos: number
+): Omit<PlanDeHoy, "materiaRecienCompletada"> | null {
+  const fase = faseDeMateria(materia, curso, acuerdo);
+
+  if (fase === "aprendiendo") {
+    const etapa = etapasDeMateria(materia, curso, acuerdo).find((e) => e.estado === "actual");
+    return etapa ? { materia, etapa, minutos } : null;
+  }
+  if (fase === "simulacro_1_pendiente") return { materia, minutos, numeroSimulacro: 1 };
+  if (fase === "simulacro_2_pendiente") return { materia, minutos, numeroSimulacro: 2 };
+  if (fase === "repaso") {
+    const temaDebil = temasEnRepaso(materia, curso, acuerdo)[0];
+    const etapa = etapasDeMateria(materia, curso, acuerdo).find((e) => e.tema === temaDebil);
+    return etapa ? { materia, etapa, minutos: MINUTOS_REPASO, enRepaso: true } : null;
+  }
+  return null; // materia_lista: nada que ofrecer hoy para esta materia
+}
+
 export function queHacerHoy(perfil: PerfilNino, curso: Curso): PlanDeHoy | null {
   const acuerdo = perfil.tutoria;
   if (!acuerdo) return null;
 
-  const materia = materiaDeHoy(perfil, acuerdo);
-  if (!materia) return null;
+  const materiaHoy = materiaDeHoy(perfil, acuerdo);
+  if (!materiaHoy) return null;
 
   const minutos = minutosSugeridos(perfil, acuerdo);
-  const etapas = etapasDeMateria(materia, curso, acuerdo);
-  const etapa = etapas.find((e) => e.estado === "actual");
-  if (etapa) return { materia, etapa, minutos };
+  const plan = planParaMateria(materiaHoy, curso, acuerdo, minutos);
+  if (plan) return plan;
 
-  // La materia de hoy no tiene etapa "actual": o no hay camino armado para
-  // ella (perfil recién creado — el `!etapa` de siempre), o YA ESTÁ 100%
-  // completa. Solo en el segundo caso corresponde ofrecer otra materia; si
-  // no hay etapas en absoluto, es el caso "sin camino todavía" de antes.
-  const materiaCompleta = etapas.length > 0 && etapas.every((e) => e.estado === "superada");
-  if (!materiaCompleta) return null;
-
+  // La materia de hoy no tiene nada pendiente ahora (recién completó su
+  // camino, está en pausa esperando el simulacro más adelante, o ya quedó
+  // lista del todo): se ofrece la siguiente materia del examen con algo
+  // pendiente, avisando cuál fue la que se saltó.
   for (const otra of perfil.examen.materias) {
-    if (otra === materia) continue;
-    const etapasOtra = etapasDeMateria(otra, curso, acuerdo);
-    const etapaOtra = etapasOtra.find((e) => e.estado === "actual");
-    if (etapaOtra) return { materia: otra, etapa: etapaOtra, minutos, materiaRecienCompletada: materia };
+    if (otra === materiaHoy) continue;
+    const planOtra = planParaMateria(otra, curso, acuerdo, minutos);
+    if (planOtra) return { ...planOtra, materiaRecienCompletada: materiaHoy };
   }
 
-  return null; // todas las materias completas — ver todoElCaminoCompleto()
+  return null; // todo listo, o todo esperando su simulacro — ver todoElCaminoCompleto()
 }
 
 // ¿Ya tuvo una sesión de estudio hoy? (mismo día calendario, hora local).

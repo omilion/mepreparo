@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MATERIAS, diasHastaExamen, type Materia, type PerfilNino } from "@/lib/profile";
-import { etapasDeMateria, progresoDeMateria, type Etapa } from "@/lib/plan/etapas";
+import { etapasDeMateria, progresoDeMateria, faseDeMateria, temasEnRepaso, tituloDeTema, type Etapa } from "@/lib/plan/etapas";
 import { indicadorExamen } from "@/lib/plan/indicador";
 import { materiasDeHoy } from "@/lib/tutor/acuerdo";
 import { Reveal } from "./Reveal";
@@ -68,6 +68,11 @@ export function MapaEtapas({
   const dias = diasHastaExamen(perfil.examen.fecha);
   const nombre = perfil.nombre.trim() || "tú";
   const indicador = indicadorExamen(materia, perfil.curso, perfil.tutoria, perfil.examen.fecha);
+  // Camino completo (todas las etapas superadas) ya no es "listo": falta el
+  // simulacro de cierre. Sin esto, el mapa seguía mostrando solo "9 de 9
+  // etapas superadas" sin ninguna pista de que faltaba algo más.
+  const fase = faseDeMateria(materia, perfil.curso, perfil.tutoria);
+  const debiles = temasEnRepaso(materia, perfil.curso, perfil.tutoria);
 
   const theme = TEMAS_MATERIAS[materia] || TEMAS_MATERIAS.matematica;
 
@@ -96,6 +101,26 @@ export function MapaEtapas({
           </p>
         </header>
       </Reveal>
+
+      {/* El camino completo ya no basta por sí solo: falta el simulacro de
+          cierre (mixto, cronometrado, sin ayuda de Rai) que confirma que no
+          se olvidó nada. Esta franja evita que el mapa diga solo "9 de 9"
+          sin explicar qué falta todavía. */}
+      {fase !== "aprendiendo" && (
+        <Reveal delay={120}>
+          <div
+            className="mx-auto max-w-[360px] rounded-xl border px-4 py-2.5 text-center text-[13px]"
+            style={{ borderColor: "var(--materia-primary)", color: "var(--materia-primary-deep)" }}
+          >
+            {fase === "simulacro_1_pendiente" &&
+              "Camino completo — falta tu simulacro de cierre para confirmarlo."}
+            {fase === "repaso" &&
+              `En repaso antes del segundo simulacro: ${debiles.map(tituloDeTema).join(", ")}.`}
+            {fase === "simulacro_2_pendiente" && "Repaso listo — falta tu segundo simulacro."}
+            {fase === "materia_lista" && "¡Materia lista! Tu simulacro de cierre lo confirmó."}
+          </div>
+        </Reveal>
+      )}
 
       {/* indicador "listo para tu examen": sutil para el niño (solo la barra
           y el %, sin el texto largo — eso queda para el apoderado) */}

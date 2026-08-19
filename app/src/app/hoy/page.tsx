@@ -45,6 +45,7 @@ export default function HoyRuta() {
           setFoco(null);
           router.push("/tutor");
         }}
+        onSimulacro={(materia) => router.push(`/simulacro?materia=${materia}`)}
       />
     </main>
   );

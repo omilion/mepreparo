@@ -19,6 +19,7 @@ export function QueHacerHoy({
   onEmpezar,
   onVerCamino,
   onHablarConRai,
+  onSimulacro,
 }: {
   perfil: PerfilNino;
   curso: Curso;
@@ -27,6 +28,8 @@ export function QueHacerHoy({
   // Charla libre, sin una etapa puntual — la única acción con sentido cuando
   // ya no queda ningún tema pendiente en ninguna materia.
   onHablarConRai: () => void;
+  // Rendir el simulacro de cierre (1° o 2°) de una materia recién completada.
+  onSimulacro: (materia: Materia) => void;
 }) {
   const plan = queHacerHoy(perfil, curso);
   const yaEstudio = yaEstudioHoy(perfil);
@@ -109,7 +112,48 @@ export function QueHacerHoy({
         </Reveal>
       )}
 
-      {yaEstudio ? (
+      {plan.materiaRecienCompletada && (
+        <Reveal delay={100}>
+          <p className="max-w-[32ch] text-[13px] font-medium text-sage-deep">
+            ¡Completaste {labelDe(plan.materiaRecienCompletada)}! Seguimos con otra materia.
+          </p>
+        </Reveal>
+      )}
+
+      {plan.numeroSimulacro ? (
+        // El camino de la materia ya está completo: lo que corresponde ahora
+        // NO es una clase más, es el simulacro (mixto, cronometrado, sin
+        // ayuda de Rai) que de verdad confirma que no se olvidó nada.
+        <>
+          <Reveal variant="lead" delay={160}>
+            <h1 className="max-w-[20ch] text-[28px] leading-[1.25]">
+              {plan.numeroSimulacro === 1
+                ? `¡Terminaste tu camino de ${materiaLabel}!`
+                : `Segundo simulacro de ${materiaLabel}`}
+            </h1>
+          </Reveal>
+          <Reveal delay={320}>
+            <p className="max-w-[34ch] text-[15px] leading-[1.5] text-ink-soft">
+              {plan.numeroSimulacro === 1
+                ? "Ahora toca tu simulacro de cierre: mezcla todos los temas, cronometrado, sin ayuda de Rai — así sabemos de verdad qué tan firme quedó todo."
+                : "Repasaste lo que te faltaba. Es hora de intentar de nuevo el simulacro de cierre."}
+            </p>
+          </Reveal>
+          <Reveal delay={460}>
+            <div className="flex flex-col items-center gap-3">
+              <button onClick={() => onSimulacro(plan.materia)} className="cta px-10 py-3.5 text-[16px]">
+                Rendir simulacro
+              </button>
+              <button
+                onClick={onVerCamino}
+                className="text-[13.5px] text-sage-deep underline underline-offset-4 hover:opacity-85"
+              >
+                Ver mi camino
+              </button>
+            </div>
+          </Reveal>
+        </>
+      ) : yaEstudio ? (
         <>
           <Reveal variant="lead" delay={160}>
             <h1 className="max-w-[18ch] text-[27px]">¡Ya estudiaste hoy!</h1>
@@ -121,7 +165,7 @@ export function QueHacerHoy({
           </Reveal>
           <Reveal delay={460}>
             <div className="flex flex-col items-center gap-3">
-              <button onClick={() => onEmpezar(plan.materia, plan.etapa.tema)} className="cta px-9">
+              <button onClick={() => onEmpezar(plan.materia, plan.etapa!.tema)} className="cta px-9">
                 Repasar {materiaLabel}
               </button>
               <button
@@ -135,26 +179,23 @@ export function QueHacerHoy({
         </>
       ) : (
         <>
-          {plan.materiaRecienCompletada && (
-            <Reveal delay={100}>
-              <p className="max-w-[32ch] text-[13px] font-medium text-sage-deep">
-                ¡Completaste {labelDe(plan.materiaRecienCompletada)}! Seguimos con otra materia.
-              </p>
-            </Reveal>
-          )}
           <Reveal variant="lead" delay={160}>
             <h1 className="max-w-[20ch] text-[28px] leading-[1.25]">
-              Hoy toca {materiaLabel} · Etapa {plan.etapa.numero} · {plan.minutos} min
+              {plan.enRepaso
+                ? `Repaso de ${materiaLabel} · ${plan.minutos} min`
+                : `Hoy toca ${materiaLabel} · Etapa ${plan.etapa!.numero} · ${plan.minutos} min`}
             </h1>
           </Reveal>
           <Reveal delay={320}>
             <p className="max-w-[32ch] text-[15px] leading-[1.5] text-ink-soft">
-              {plan.etapa.titulo}
+              {plan.enRepaso
+                ? `Afirmemos ${plan.etapa!.titulo.toLowerCase()} antes de intentar de nuevo el simulacro.`
+                : plan.etapa!.titulo}
             </p>
           </Reveal>
           <Reveal delay={460}>
             <div className="flex flex-col items-center gap-3">
-              <button onClick={() => onEmpezar(plan.materia, plan.etapa.tema)} className="cta px-10 py-3.5 text-[16px]">
+              <button onClick={() => onEmpezar(plan.materia, plan.etapa!.tema)} className="cta px-10 py-3.5 text-[16px]">
                 Empezar
               </button>
               <button

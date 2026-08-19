@@ -64,10 +64,12 @@ import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 import {
   registrarPruebaEtapa,
   registrarSimulacro,
+  registrarSimulacroCierre,
   sembrarTemasDesdeDiagnostico,
   temasSuperadosNuevos,
   type AcuerdoTutoria,
 } from "@/lib/tutor/acuerdo";
+import { faseDeMateria } from "@/lib/plan/etapas";
 import { notificarLogros } from "@/lib/logros";
 import { cuentaDePrueba } from "@/lib/dev/seed";
 
@@ -476,7 +478,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { creadoEn: new Date().toISOString(), horario: {}, notasNino: "", sesiones: [] },
           p.diagnostico
         );
-      const tutoria = registrarSimulacro(base, materia, desglose);
+      // El simulacro se puede rendir en cualquier momento como práctica
+      // libre (el mapa lo ofrece apenas hay alguna etapa superada). Solo
+      // cuenta como el CIERRE documentado de la materia si, ANTES de este
+      // resultado, el camino ya estaba esperando justo ese simulacro — así
+      // el niño no "gasta" un intento del ciclo de cierre por practicar.
+      const fase = faseDeMateria(materia, p.curso, base);
+      const numeroCierre =
+        fase === "simulacro_1_pendiente" ? 1 : fase === "simulacro_2_pendiente" ? 2 : null;
+      const tutoria = numeroCierre
+        ? registrarSimulacroCierre(base, materia, numeroCierre, desglose)
+        : registrarSimulacro(base, materia, desglose);
       notificarLogros(p.id, temasSuperadosNuevos(base.temas, tutoria.temas));
       setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
       router.push("/mapa");

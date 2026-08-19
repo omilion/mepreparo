@@ -24,7 +24,7 @@ import {
 import { generarConUso, tieneClave, MODELO_CHAT, MODELO_LITE } from "@/lib/tutor/gemini";
 import { normalizarIconosInline } from "@/lib/tutor/iconos";
 import { recuperar } from "@/lib/tutor/rag";
-import { rutaDeTemas, tituloDeTema } from "@/lib/plan/etapas";
+import { rutaDeTemas, tituloDeTema, faseDeMateria, temasEnRepaso } from "@/lib/plan/etapas";
 import { emparejarConRuta, pareceEnunciado } from "@/lib/plan/claveTema";
 import { MATERIAS, type Curso, type Materia } from "@/lib/profile";
 import { evaluarPreparacion, type AcuerdoTutoria, type Dia } from "@/lib/tutor/acuerdo";
@@ -306,18 +306,37 @@ Incluye 1 a 3 temasTrabajados (solo los realmente tocados) y 0 a 2 recuerdos (so
   }
 
   // Lección de etapa: el niño tocó una etapa del camino → foco en ese tema.
-  if (body.temaFoco?.trim()) {
-    sistema +=
-      `\nFOCO DE HOY: el niño eligió la etapa "${body.temaFoco.trim()}" de su camino. ` +
-      "Centra la lección en ese tema. Como un buen tutor, sigue este orden: " +
-      "(1) PRIMERO una INTRODUCCIÓN al tema MACRO: en 1-2 frases dile de qué se " +
-      "trata en general, para qué sirve o por qué es interesante, con un ejemplo " +
-      "cercano — dale el panorama antes del detalle. (2) LUEGO desglosa el tema en " +
-      "sus partes y trabájalas UNA a la vez, comprobando que entendió antes de " +
-      "pasar a la siguiente. Intercala preguntas y alguna actividad como dulce. " +
-      "(3) Cuando lo notes listo, anímalo a rendir la prueba de la etapa desde su " +
-      "camino. No cambies de tema salvo que él lo pida. Empieza SIEMPRE por la " +
-      "introducción macro, nunca saltes directo a un subtema.";
+  // Puede ser una etapa NUEVA, o un repaso dirigido tras un simulacro de
+  // cierre que reveló que ese tema (ya "superado" hace tiempo) se olvidó —
+  // dos situaciones distintas que merecen instrucciones distintas: la
+  // segunda es más corta, más variada, y NO termina en "rinde la prueba de
+  // la etapa" (esa ya la pasó; lo que sigue es el simulacro de cierre).
+  if (body.temaFoco?.trim() && body.materia && body.curso) {
+    const temaFoco = body.temaFoco.trim();
+    const enRepaso =
+      faseDeMateria(body.materia, body.curso, body.acuerdo ?? null) === "repaso" &&
+      temasEnRepaso(body.materia, body.curso, body.acuerdo ?? null).includes(temaFoco);
+
+    sistema += enRepaso
+      ? `\nREPASO DIRIGIDO: "${temaFoco}" ya estaba superado, pero el simulacro de ` +
+        "cierre de la materia mostró que se le olvidó o quedó flojo. NO es una " +
+        "lección desde cero: sesión CORTA y concreta, con 1-2 ejemplos frescos " +
+        "(distintos a como lo enseñaste la primera vez) y actividades interactivas " +
+        "variadas para afirmarlo — más práctica que explicación. Cuando lo notes " +
+        "firme, dile con calidez que este tema ya quedó mejor, sin mencionar 'la " +
+        "prueba de la etapa' (esa ya la pasó): lo que sigue es un nuevo intento del " +
+        "simulacro más adelante, cuando haya repasado también los demás temas " +
+        "pendientes."
+      : `\nFOCO DE HOY: el niño eligió la etapa "${temaFoco}" de su camino. ` +
+        "Centra la lección en ese tema. Como un buen tutor, sigue este orden: " +
+        "(1) PRIMERO una INTRODUCCIÓN al tema MACRO: en 1-2 frases dile de qué se " +
+        "trata en general, para qué sirve o por qué es interesante, con un ejemplo " +
+        "cercano — dale el panorama antes del detalle. (2) LUEGO desglosa el tema en " +
+        "sus partes y trabájalas UNA a la vez, comprobando que entendió antes de " +
+        "pasar a la siguiente. Intercala preguntas y alguna actividad como dulce. " +
+        "(3) Cuando lo notes listo, anímalo a rendir la prueba de la etapa desde su " +
+        "camino. No cambies de tema salvo que él lo pida. Empieza SIEMPRE por la " +
+        "introducción macro, nunca saltes directo a un subtema.";
   }
 
   // CIERRE NATURAL: la sesión se acerca a su fin. Rai NO corta en seco: redondea

@@ -4,6 +4,7 @@ import {
   sembrarTemasDesdeDiagnostico,
   registrarEjercicios,
   registrarPruebaEtapa,
+  registrarSimulacroCierre,
   evaluarPreparacion,
   memoriaParaHoy,
   textoMemoria,
@@ -271,5 +272,58 @@ describe("memoriaParaHoy + textoMemoria", () => {
     );
     const m = memoriaParaHoy(a, []);
     expect(m.temas).toHaveLength(1);
+  });
+});
+
+describe("registrarSimulacroCierre (cierre de materia)", () => {
+  it("≥80% mixto: aprobado, sin temas débiles", () => {
+    const a = registrarSimulacroCierre(
+      base(),
+      "matematica",
+      1,
+      [
+        { tema: "fracciones", correctos: 4, total: 5 },
+        { tema: "algebra", correctos: 4, total: 5 },
+      ],
+      "2026-07-20"
+    );
+    const cierre = a.simulacrosCierre![0];
+    expect(cierre.numero).toBe(1);
+    expect(cierre.aprobado).toBe(true);
+    expect(cierre.temasDebiles).toEqual([]);
+  });
+
+  it("<80% mixto: no aprobado, marca los temas bajo el umbral como débiles", () => {
+    const a = registrarSimulacroCierre(
+      base(),
+      "matematica",
+      1,
+      [
+        { tema: "fracciones", correctos: 1, total: 5 }, // 20%: débil
+        { tema: "algebra", correctos: 5, total: 5 }, // 100%: no débil
+      ],
+      "2026-07-20"
+    );
+    const cierre = a.simulacrosCierre![0];
+    expect(cierre.aprobado).toBe(false);
+    expect(cierre.temasDebiles).toEqual(["fracciones"]);
+  });
+
+  it("también registra evidencia dura por tema (como cualquier simulacro)", () => {
+    const a = registrarSimulacroCierre(
+      base(),
+      "matematica",
+      1,
+      [{ tema: "fracciones", correctos: 4, total: 5 }],
+      "2026-07-20"
+    );
+    expect(a.temas![0].evidencias[0].tipo).toBe("simulacro");
+  });
+
+  it("un segundo cierre se agrega a la lista sin pisar el primero", () => {
+    let a = registrarSimulacroCierre(base(), "matematica", 1, [{ tema: "fracciones", correctos: 1, total: 5 }], "2026-07-20");
+    a = registrarSimulacroCierre(a, "matematica", 2, [{ tema: "fracciones", correctos: 5, total: 5 }], "2026-07-27");
+    expect(a.simulacrosCierre).toHaveLength(2);
+    expect(a.simulacrosCierre!.map((c) => c.numero)).toEqual([1, 2]);
   });
 });

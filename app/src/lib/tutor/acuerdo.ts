@@ -112,6 +112,27 @@ export interface AcuerdoTutoria {
   // biblioteca le devolvía exactamente el mismo juego. Se recorta a los
   // últimos MAX_VISTOS para no engordar el perfil (que viaja en cada sync).
   contenidosVistos?: string[];
+  // El CIERRE de una materia (ver etapas.ts → faseDeMateria): al superar
+  // todas sus etapas, un simulacro documentado (mixto, cronometrado, sin
+  // ayuda de Rai) reemplaza el "listo" superficial por evidencia real de que
+  // no se olvidó nada. Si revela huecos, se arma un repaso dirigido a esos
+  // temas y se rinde un segundo simulacro — tope de 2: si el segundo tampoco
+  // alcanza, la materia queda igual "lista" pero con los huecos anotados
+  // para que Rai los siga tocando en charlas normales, sin bloquear el avance.
+  simulacrosCierre?: SimulacroCierre[];
+}
+
+export interface SimulacroCierre {
+  materia: Materia;
+  numero: 1 | 2; // qué lugar ocupa en el ciclo de cierre de ESA materia
+  fecha: string; // ISO date
+  desglose: { tema: string; correctos: number; total: number }[];
+  aprobado: boolean; // ≥80% del total mixto de la materia
+  // Temas bajo el umbral EN ESTE simulacro — el insumo directo del repaso
+  // dirigido (no es lo mismo que "le_cuesta": un tema puede estar
+  // "superado" por su prueba de etapa y aun así salir débil acá, que es
+  // justo el olvido que el simulacro está pensado para detectar).
+  temasDebiles: string[];
 }
 
 // Cuántos interactivos recordamos por niño. ~120 cubre varias semanas de
@@ -294,7 +315,7 @@ const MINIMO_LISTO = 4;
 // estructurados si existen; si no (evidencia vieja, de antes de este
 // cambio), cae a parsear la nota — así los acuerdos existentes no pierden su
 // historial.
-function acumularEvidencia(
+export function acumularEvidencia(
   evidencias: EvidenciaTema[],
   tipo: EvidenciaTema["tipo"],
   desde?: string
@@ -497,6 +518,43 @@ export function registrarSimulacro(
     siguiente = { ...siguiente, temas };
   }
   return siguiente;
+}
+
+// Umbral del simulacro de CIERRE (mixto, toda la materia) — mismo criterio
+// que la prueba de etapa, por consistencia: 80% para dar la materia por
+// afirmada de verdad, no solo "cada tema por separado alguna vez".
+export const UMBRAL_SIMULACRO_CIERRE = 0.8;
+// Un tema individual sale "débil" en el desglose del simulacro con menos de
+// esto — más laxo que le_cuesta (≤40%): el simulacro es cronometrado y mixto,
+// así que un tropiezo puntual no debería mandar un tema entero a repaso.
+const UMBRAL_TEMA_DEBIL_EN_SIMULACRO = 0.7;
+
+// El simulacro DOCUMENTADO que cierra una materia (ver faseDeMateria en
+// etapas.ts). `numero` lo decide quien llama (1 o 2, según en qué punto del
+// ciclo esté la materia) — acuerdo.ts no conoce las etapas, así que no puede
+// calcularlo solo sin crear un import circular con etapas.ts.
+export function registrarSimulacroCierre(
+  acuerdo: AcuerdoTutoria,
+  materia: Materia,
+  numero: 1 | 2,
+  desglose: { tema: string; correctos: number; total: number }[],
+  fecha = hoyIso()
+): AcuerdoTutoria {
+  // Evidencia dura por tema, igual que cualquier simulacro.
+  const conEvidencia = registrarSimulacro(acuerdo, materia, desglose, fecha);
+
+  const totalMixto = desglose.reduce((acc, d) => acc + d.total, 0);
+  const correctosMixto = desglose.reduce((acc, d) => acc + d.correctos, 0);
+  const aprobado = totalMixto > 0 && correctosMixto / totalMixto >= UMBRAL_SIMULACRO_CIERRE;
+  const temasDebiles = desglose
+    .filter((d) => d.total > 0 && d.correctos / d.total < UMBRAL_TEMA_DEBIL_EN_SIMULACRO)
+    .map((d) => d.tema.trim().toLowerCase());
+
+  const cierre: SimulacroCierre = { materia, numero, fecha, desglose, aprobado, temasDebiles };
+  return {
+    ...conEvidencia,
+    simulacrosCierre: [...(conEvidencia.simulacrosCierre ?? []), cierre],
+  };
 }
 
 // Recuperación selectiva: los recuerdos y temas que valen para la sesión de HOY.
