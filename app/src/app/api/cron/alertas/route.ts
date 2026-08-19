@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 import { enviarEmail, plantillaZen } from "@/lib/email";
 import { MATERIAS } from "@/lib/profile";
 import { tituloDeTema } from "@/lib/plan/etapas";
-import type { AcuerdoTutoria } from "@/lib/tutor/acuerdo";
+import { fechaUltimaActividad, type AcuerdoTutoria } from "@/lib/tutor/acuerdo";
 
 export const runtime = "nodejs";
 
@@ -75,9 +75,13 @@ export async function GET(req: NextRequest) {
     const tutoria = (p.tutoria as AcuerdoTutoria | null) ?? null;
 
     // --- inactividad: "Emilia no estudia hace 5 días" ---
-    if (p.alertaInactividad !== false && tutoria?.sesiones?.length) {
-      const ultimaSesion = tutoria.sesiones.at(-1)!;
-      const fechaUltima = new Date(ultimaSesion.fecha);
+    // Antes miraba solo `sesiones`: una niña que rendía y aprobaba pruebas
+    // de etapa toda la semana (sin una charla completa con Rai) igual
+    // recibía este correo — confirmado con cuentas reales, 4 niñas activas
+    // marcadas con más de una semana de inactividad. fechaUltimaActividad
+    // también cuenta ejercicios y pruebas, no solo sesiones cerradas.
+    const fechaUltima = fechaUltimaActividad(tutoria);
+    if (p.alertaInactividad !== false && fechaUltima) {
       const diasInactivo = Math.floor((ahora - fechaUltima.getTime()) / UN_DIA_MS);
       // no repetir la alerta por el MISMO período de inactividad: solo si la
       // última alerta fue ANTES de la última sesión (o nunca hubo alerta)

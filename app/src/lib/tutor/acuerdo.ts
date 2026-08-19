@@ -609,3 +609,33 @@ export function textoMemoria(m: { temas: TemaDominio[]; recuerdos: RecuerdoNino[
   }
   return partes.join(" · ");
 }
+
+// Última fecha de actividad real en la tutoría: una sesión de charla
+// terminada, O cualquier evidencia registrada en un tema (ejercicio suelto,
+// prueba de etapa, simulacro). Antes cada consumidor (dashboard del
+// apoderado, alerta por correo) miraba solo `sesiones` — así que un niño que
+// rendía y aprobaba una prueba de etapa HOY (que no genera una entrada en
+// `sesiones`) igual aparecía con "8 días sin estudiar". Confirmado con
+// cuentas reales: 4 niñas que sí habían estudiado esa semana aparecían
+// todas con más de una semana de inactividad.
+export function fechaUltimaActividad(acuerdo: AcuerdoTutoria | null | undefined): Date | null {
+  if (!acuerdo) return null;
+  const fechas: number[] = [];
+  for (const s of acuerdo.sesiones ?? []) {
+    const t = new Date(s.fecha).getTime();
+    if (!Number.isNaN(t)) fechas.push(t);
+  }
+  for (const tema of acuerdo.temas ?? []) {
+    for (const ev of tema.evidencias) {
+      // ev.fecha es solo YYYY-MM-DD (sin hora, en UTC — mismo criterio que
+      // hoyIso()): se ancla al final del día EN UTC ("Z" explícito) para no
+      // restar un día de más al comparar contra la hora exacta de "ahora".
+      // Sin la "Z", Date la interpreta en la zona horaria del SERVIDOR, lo
+      // que corría el resultado según dónde corriera el proceso.
+      const t = new Date(`${ev.fecha}T23:59:59Z`).getTime();
+      if (!Number.isNaN(t)) fechas.push(t);
+    }
+  }
+  if (fechas.length === 0) return null;
+  return new Date(Math.max(...fechas));
+}

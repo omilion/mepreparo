@@ -51,6 +51,60 @@ describe("diasDesdeUltimaSesion", () => {
   it("sin sesiones devuelve null, no cero", () => {
     expect(diasDesdeUltimaSesion(perfil(acuerdo({ sesiones: [] })), AHORA)).toBeNull();
   });
+
+  // Reportado con cuentas reales: 4 niñas que sí habían estudiado esa semana
+  // (rindiendo pruebas de etapa, sin necesariamente una charla completa)
+  // aparecían todas con 8+ días de inactividad — porque esto solo miraba
+  // `sesiones`, y una prueba de etapa no genera una entrada ahí.
+  it("una prueba de etapa reciente cuenta como actividad, aunque la última SESIÓN sea vieja", () => {
+    const a = acuerdo({
+      sesiones: [sesion(9)],
+      temas: [
+        {
+          tema: "numeros",
+          materia: "matematica",
+          estado: "superado",
+          evidencias: [{ fecha: "2026-08-06", tipo: "prueba_etapa", nota: "5 de 5 — aprobada", correctos: 5, total: 5 }],
+          actualizadoEn: "2026-08-06",
+        },
+      ],
+    });
+    expect(diasDesdeUltimaSesion(perfil(a), AHORA)).toBe(0);
+  });
+
+  it("un ejercicio suelto (sin sesión cerrada ese día) también cuenta", () => {
+    const a = acuerdo({
+      sesiones: [sesion(9)],
+      temas: [
+        {
+          tema: "ortografia",
+          materia: "matematica",
+          estado: "en_proceso",
+          evidencias: [{ fecha: "2026-08-04", tipo: "ejercicios", nota: "1 de 1 correctos", correctos: 1, total: 1 }],
+          actualizadoEn: "2026-08-04",
+        },
+      ],
+    });
+    // AHORA es 2026-08-06T12:00Z; el ejercicio se ancla al final del
+    // 2026-08-04 (UTC) → ~1.5 días de diferencia, floor = 1.
+    expect(diasDesdeUltimaSesion(perfil(a), AHORA)).toBe(1);
+  });
+
+  it("sin sesiones pero con evidencia reciente: NO es null", () => {
+    const a = acuerdo({
+      sesiones: [],
+      temas: [
+        {
+          tema: "numeros",
+          materia: "matematica",
+          estado: "en_proceso",
+          evidencias: [{ fecha: "2026-08-06", tipo: "ejercicios", nota: "1 de 1 correctos", correctos: 1, total: 1 }],
+          actualizadoEn: "2026-08-06",
+        },
+      ],
+    });
+    expect(diasDesdeUltimaSesion(perfil(a), AHORA)).toBe(0);
+  });
 });
 
 describe("estadoDelAlumno", () => {
@@ -68,6 +122,22 @@ describe("estadoDelAlumno", () => {
 
   it("4 días todavía no lo es (el umbral es el mismo del correo)", () => {
     expect(estadoDelAlumno(perfil(acuerdo({ sesiones: [sesion(4)] })), AHORA).nivel).not.toBe("alerta");
+  });
+
+  it("prueba de etapa reciente evita la falsa alerta de inactividad, aunque la última sesión sea vieja", () => {
+    const a = acuerdo({
+      sesiones: [sesion(9)],
+      temas: [
+        {
+          tema: "numeros",
+          materia: "matematica",
+          estado: "superado",
+          evidencias: [{ fecha: "2026-08-06", tipo: "prueba_etapa", nota: "5 de 5 — aprobada", correctos: 5, total: 5 }],
+          actualizadoEn: "2026-08-06",
+        },
+      ],
+    });
+    expect(estadoDelAlumno(perfil(a), AHORA).nivel).not.toBe("alerta");
   });
 
   it("la inactividad manda sobre lo demás: sin estudiar, nada más importa", () => {

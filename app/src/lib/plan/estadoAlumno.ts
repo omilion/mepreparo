@@ -11,6 +11,7 @@
 
 import { calcularPlan } from "./motor";
 import { indicadorExamen } from "./indicador";
+import { fechaUltimaActividad } from "@/lib/tutor/acuerdo";
 import type { PerfilNino } from "@/lib/profile";
 
 // Mismo umbral que la alerta por correo (lib cron/alertas): que la app y el
@@ -32,12 +33,9 @@ export interface EstadoAlumno {
 }
 
 export function diasDesdeUltimaSesion(perfil: PerfilNino, ahora = new Date()): number | null {
-  const sesiones = perfil.tutoria?.sesiones ?? [];
-  const ultima = sesiones.at(-1);
+  const ultima = fechaUltimaActividad(perfil.tutoria);
   if (!ultima) return null;
-  const t = new Date(ultima.fecha).getTime();
-  if (Number.isNaN(t)) return null;
-  return Math.floor((ahora.getTime() - t) / 86_400_000);
+  return Math.max(0, Math.floor((ahora.getTime() - ultima.getTime()) / 86_400_000));
 }
 
 // Promedio simple de la preparación de cada materia del examen. Simple a
@@ -57,8 +55,12 @@ export function estadoDelAlumno(perfil: PerfilNino, ahora = new Date()): EstadoA
   const avance = avanceGeneral(perfil);
   const dias = diasDesdeUltimaSesion(perfil, ahora);
 
-  // Todavía no empieza: no es una alerta, es que falta arrancar.
-  if (!perfil.tutoria || (perfil.tutoria.sesiones ?? []).length === 0) {
+  // Todavía no empieza: no es una alerta, es que falta arrancar. `dias` ya
+  // sale null en el mismo caso (ninguna sesión NI evidencia registrada) —
+  // antes esto miraba solo `sesiones`, así que un niño que solo había
+  // rendido una prueba de etapa (sin charla completa con Rai) aparecía acá
+  // como si nunca hubiera empezado.
+  if (!perfil.tutoria || dias === null) {
     return { nivel: "sin_datos", titulo: "Aún no comienza", avance, diasSinEstudiar: dias };
   }
 
