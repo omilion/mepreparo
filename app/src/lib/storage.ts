@@ -277,30 +277,41 @@ export async function sincronizarConServidor(cuenta: Cuenta): Promise<Cuenta> {
       body: JSON.stringify({ pupilos: cuenta.pupilos }),
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.pupilos)) {
-        let nuevosPupilos = data.pupilos;
-        
-        // Si es alumno, mezclar con cuidado para no pisar hermanos en el storage local
-        if (sesionAlumno?.token) {
-          const actual = cuenta.pupilos;
-          const nuevos = data.pupilos as PerfilNino[];
-          nuevosPupilos = actual.map((p) => {
-            const upd = nuevos.find((n) => n.id === p.id);
-            return upd ? upd : p;
-          });
-        }
-        
-        const cuentaActualizada = { ...cuenta, pupilos: nuevosPupilos };
-        guardarCuenta(cuentaActualizada);
-        
-        // Notificar a las pantallas que se completó una sincronización de fondo
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("sync-completed"));
-        }
-        return cuentaActualizada;
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      if (typeof window !== "undefined" && errData.error) {
+        window.dispatchEvent(
+          new CustomEvent("sync-error", { detail: errData.error })
+        );
       }
+      return cuenta;
+    }
+
+    const data = await res.json();
+    if (data && Array.isArray(data.pupilos)) {
+      const serverPupilos = data.pupilos as PerfilNino[];
+
+      // Actualiza o conserva los pupilos locales para no pisar ni borrar datos no sincronizados
+      const nuevosPupilos = cuenta.pupilos.map((p) => {
+        const upd = serverPupilos.find((n) => n.id === p.id);
+        return upd ? upd : p;
+      });
+
+      // Incorpora cualquier pupilo remoto que no estuviera en local (ej: agregado en otro navegador)
+      for (const sp of serverPupilos) {
+        if (!nuevosPupilos.some((p) => p.id === sp.id)) {
+          nuevosPupilos.push(sp);
+        }
+      }
+      
+      const cuentaActualizada = { ...cuenta, pupilos: nuevosPupilos };
+      guardarCuenta(cuentaActualizada);
+      
+      // Notificar a las pantallas que se completó una sincronización de fondo
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("sync-completed"));
+      }
+      return cuentaActualizada;
     }
   } catch (err) {
     console.warn("Sincronización en segundo plano falló (modo offline activo):", err);
