@@ -152,6 +152,30 @@ export function Secuencia({
     setErrorFeedback(false);
   }, [datos, n]);
 
+  // Verifica SOLA al completar las casillas — antes exigía un botón extra
+  // "Verificar secuencia" que aparecía recién con todo lleno: el niño
+  // terminaba de ordenar y, si no notaba el botón, la actividad se quedaba
+  // ahí sin decirle si estaba bien ni registrar nada. El resto de los
+  // interactivos de arrastrar (Clasificador) ya validan solos al soltar la
+  // última pieza — esto solo lo alinea con ese mismo comportamiento.
+  useEffect(() => {
+    if (resuelto) return;
+    if (slots.some((s) => s === null)) return;
+
+    const correcto = slots.every((s, i) => s === datos.pasosCorrectos[i]);
+    if (correcto) {
+      setResuelto(true);
+      tocarLira(8); // nota alta de éxito
+      onCompleta?.();
+    } else {
+      setErrorFeedback(true);
+      tocarLira(0); // nota grave de error
+      const t = setTimeout(() => setErrorFeedback(false), 800);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots]);
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over) return;
@@ -199,27 +223,6 @@ export function Secuencia({
     tocarLira(index);
   }
 
-  function verificar() {
-    const todoLleno = slots.every((s) => s !== null);
-    if (!todoLleno) return;
-
-    // Comparar uno a uno con el orden correcto
-    const correcto = slots.every((s, i) => s === datos.pasosCorrectos[i]);
-
-    if (correcto) {
-      setResuelto(true);
-      tocarLira(8); // nota alta de éxito
-      onCompleta?.();
-    } else {
-      setErrorFeedback(true);
-      tocarLira(0); // nota grave de error
-      // Breve feedback visual de vibración, luego reiniciamos feedback
-      setTimeout(() => setErrorFeedback(false), 800);
-    }
-  }
-
-  const todoLleno = slots.every((s) => s !== null);
-
   return (
     <div className="relative flex flex-col items-center gap-5 text-center">
       {resuelto && <Fireworks />}
@@ -255,16 +258,6 @@ export function Secuencia({
           </div>
         )}
       </DndContext>
-
-      {/* Botón de Validación */}
-      {!resuelto && todoLleno && (
-        <button
-          onClick={verificar}
-          className="rounded-full bg-sage-deep text-white font-semibold px-6 py-2 text-[14px] transition-all hover:scale-105 hover:opacity-90 shadow-sm active:scale-95"
-        >
-          Verificar secuencia
-        </button>
-      )}
 
       {/* Retroalimentación final */}
       {resuelto && (
