@@ -1435,10 +1435,19 @@ ${traza}` : m.texto };
     // La despedida usa el mismo gesto que la llegada: la esfera se abre, se
     // entibia y lanza un anillo. Rai se va como llegó.
     reaccionar(["saludo", 2600]);
+    // Un ejercicio interactivo (tocar, arrastrar) NO agrega un mensaje "nino":
+    // solo escribir SÍ cuenta como turno. Un niño que resuelve 2 actividades
+    // a pura interacción, sin teclear nada, tenía turnosNino=0 y la sesión
+    // completa se perdía — quedaba la evidencia del ejercicio (se guarda al
+    // toque, aparte) pero SIN sesión, SIN resumen y sin aparecer como
+    // actividad reciente. Confirmado con cuentas reales: 3 niñas distintas
+    // con evidencia real de ayer y ninguna con sesión guardada.
     const turnosNino = mensajes.filter((m) => m.de === "nino").length;
-    // Si no hay acuerdo o el niño conversó menos de 2 turnos, no guardamos sesión
+    const actividadesResueltas = mensajes.filter((m) => m.resuelto).length;
+    const participacion = turnosNino + actividadesResueltas;
+    // Si no hay acuerdo o el niño participó menos de 2 veces, no guardamos sesión
     const acuerdoActual = acuerdoVivo.current;
-    if (turnosNino < 2 || !acuerdoActual) {
+    if (participacion < 2 || !acuerdoActual) {
       // clase demasiado corta para guardarla como sesión, pero SÍ vale la pena
       // poder retomarla: no se borra la clase en curso.
       despues();
