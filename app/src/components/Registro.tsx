@@ -94,7 +94,7 @@ export function Registro({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && nombre.trim()) agregar();
               }}
-              className="input flex-1"
+              className="input min-w-0 flex-1"
             />
             {nombres.length > 1 && (
               <button

@@ -1918,7 +1918,12 @@ function CajaTexto({
               ? "Responde a Rai o usa el micrófono…"
               : `Escríbele o háblale a ${tutorNombre}…`
           }
-          className="flex-1 border-none bg-transparent px-1 py-2 text-[19px] text-ink outline-none focus:outline-none focus:ring-0 placeholder:text-ink-soft/60"
+          // min-w-0 es imprescindible: un item flex NO se encoge por debajo de su
+          // ancho intrínseco (min-width:auto), y el ancho intrínseco de un input
+          // sale de su atributo `size`, no del contenido. En un Android de 360px
+          // eso empujaba la fila más allá de la pantalla y el botón de enviar
+          // quedaba fuera, con scroll horizontal en la pantalla más usada.
+          className="min-w-0 flex-1 border-none bg-transparent px-1 py-2 text-[19px] text-ink outline-none focus:outline-none focus:ring-0 placeholder:text-ink-soft/60"
         />
         <button
           type="button"
