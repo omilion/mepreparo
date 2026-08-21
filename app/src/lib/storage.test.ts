@@ -12,6 +12,15 @@ import {
   leerClaseEnCurso,
   guardarClaseEnCurso,
   borrarClaseEnCurso,
+  leerDiagnosticoMateriaEnCurso,
+  guardarDiagnosticoMateriaEnCurso,
+  borrarDiagnosticoMateriaEnCurso,
+  leerPruebaEtapaEnCurso,
+  guardarPruebaEtapaEnCurso,
+  borrarPruebaEtapaEnCurso,
+  leerSimulacroEnCurso,
+  guardarSimulacroEnCurso,
+  borrarSimulacroEnCurso,
 } from "./storage";
 import { nuevoPerfil } from "./profile";
 import type { ResultadoMateria } from "./diagnostico/tipos";
@@ -190,5 +199,113 @@ describe("clase en curso (la conversación con Rai)", () => {
     });
     borrarClaseEnCurso();
     expect(leerClaseEnCurso("nina-1", "matematica", "fracciones")).toBeNull();
+  });
+});
+
+describe("checkpoints de evaluaciones", () => {
+  it("retoma una materia de diagnóstico sin guardar texto ni respuesta correcta", () => {
+    guardarDiagnosticoMateriaEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      curso: "5basico",
+      dificultad: 4,
+      hechas: [
+        {
+          id: "mat-1",
+          materia: "matematica",
+          curso: "5basico",
+          dificultad: 3,
+          tema: "fracciones",
+        },
+      ],
+      aciertos: [true],
+      usadasIds: ["mat-1"],
+    });
+
+    const checkpoint = leerDiagnosticoMateriaEnCurso("nina-1", "matematica", "5basico");
+    expect(checkpoint?.aciertos).toEqual([true]);
+    expect(checkpoint?.hechas[0]).toEqual({
+      id: "mat-1",
+      materia: "matematica",
+      curso: "5basico",
+      dificultad: 3,
+      tema: "fracciones",
+    });
+    expect(leerDiagnosticoMateriaEnCurso("nina-2", "matematica", "5basico")).toBeNull();
+    borrarDiagnosticoMateriaEnCurso();
+    expect(leerDiagnosticoMateriaEnCurso("nina-1", "matematica", "5basico")).toBeNull();
+  });
+
+  it("retoma una prueba solo para el mismo niño, materia y tema", () => {
+    guardarPruebaEtapaEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      curso: "5basico",
+      tema: "fracciones",
+      respondidas: 3,
+      correctos: 2,
+      usadasIds: ["p1", "p2", "p3"],
+      dificultad: 3,
+      enunciadosFallados: ["¿Cuál fracción es mayor?"],
+    });
+
+    expect(leerPruebaEtapaEnCurso("nina-1", "matematica", "5basico", "fracciones")?.correctos).toBe(2);
+    expect(leerPruebaEtapaEnCurso("nina-1", "matematica", "5basico", "decimales")).toBeNull();
+    expect(leerPruebaEtapaEnCurso("nina-2", "matematica", "5basico", "fracciones")).toBeNull();
+    borrarPruebaEtapaEnCurso();
+    expect(leerPruebaEtapaEnCurso("nina-1", "matematica", "5basico", "fracciones")).toBeNull();
+  });
+
+  it("retoma el simulacro con sus respuestas confirmadas y su tiempo real", () => {
+    const deadline = Date.now() + 12_000;
+    guardarSimulacroEnCurso({
+      pupiloId: "nina-1",
+      materia: "ciencias",
+      curso: "5basico",
+      temas: ["ciclo_del_agua", "seres_vivos"],
+      totalPreguntas: 20,
+      puntero: 3,
+      usadasPorTema: { ciclo_del_agua: ["c1", "c2"], seres_vivos: ["s1"] },
+      resultados: [
+        { tema: "ciclo_del_agua", acierto: true },
+        { tema: "ciclo_del_agua", acierto: false },
+        { tema: "seres_vivos", acierto: true },
+      ],
+      deadlineMs: deadline,
+      numeroCierre: 1,
+    });
+
+    const checkpoint = leerSimulacroEnCurso(
+      "nina-1",
+      "ciencias",
+      "5basico",
+      ["ciclo_del_agua", "seres_vivos"],
+      20,
+      1
+    );
+    expect(checkpoint?.resultados).toHaveLength(3);
+    expect(checkpoint?.deadlineMs).toBe(deadline);
+    expect(
+      leerSimulacroEnCurso("nina-1", "ciencias", "5basico", ["seres_vivos"], 20, 1)
+    ).toBeNull();
+    borrarSimulacroEnCurso();
+  });
+
+  it("descarta un checkpoint vencido para no retomar una evaluación antigua", () => {
+    guardarPruebaEtapaEnCurso({
+      pupiloId: "nina-1",
+      materia: "matematica",
+      curso: "5basico",
+      tema: "fracciones",
+      respondidas: 1,
+      correctos: 1,
+      usadasIds: ["p1"],
+      dificultad: 3,
+      enunciadosFallados: [],
+    });
+    const crudo = JSON.parse(window.localStorage.getItem("mp-prueba-etapa-en-curso")!);
+    crudo.guardadoEn = Date.now() - 25 * 60 * 60 * 1000;
+    window.localStorage.setItem("mp-prueba-etapa-en-curso", JSON.stringify(crudo));
+    expect(leerPruebaEtapaEnCurso("nina-1", "matematica", "5basico", "fracciones")).toBeNull();
   });
 });

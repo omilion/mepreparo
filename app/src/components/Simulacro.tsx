@@ -5,6 +5,11 @@ import type { Curso, Materia } from "@/lib/profile";
 import { UMBRAL_SIMULACRO_CIERRE, type AcuerdoTutoria } from "@/lib/tutor/acuerdo";
 import { rutaDeTemas, tituloDeTema } from "@/lib/plan/etapas";
 import { avisarEvento } from "@/lib/telemetriaCliente";
+import {
+  borrarSimulacroEnCurso,
+  guardarSimulacroEnCurso,
+  leerSimulacroEnCurso,
+} from "@/lib/storage";
 import { Reveal } from "./Reveal";
 import { Fireworks } from "./Fireworks";
 
@@ -98,13 +103,15 @@ export function Simulacro({
   const [segundosRestantes, setSegundosRestantes] = useState(totalPreguntas * SEGUNDOS_POR_PREGUNTA);
   const [comentarioRai, setComentarioRai] = useState("");
   const [cargandoComentario, setCargandoComentario] = useState(false);
+  const [restaurado, setRestaurado] = useState(false);
 
   const puntero = useRef(0);
   const usadasPorTema = useRef<Record<string, string[]>>({});
-  const resultados = useRef<Promise<ResultadoTema>[]>([]);
+  const resultados = useRef<ResultadoTema[]>([]);
   const fallidasSeguidas = useRef(0);
   const enviando = useRef(false);
   const terminadaRef = useRef(false);
+  const deadline = useRef(Date.now() + totalPreguntas * SEGUNDOS_POR_PREGUNTA * 1000);
   const ultimoResultado = useRef<{ desglose: DesgloseSimulacro[]; correctos: number; total: number }>({
     desglose: [],
     correctos: 0,
@@ -112,6 +119,29 @@ export function Simulacro({
   });
 
   useEffect(() => {
+    const borrador = pupiloId
+      ? leerSimulacroEnCurso(
+          pupiloId,
+          materia,
+          curso,
+          temas,
+          totalPreguntas,
+          numeroCierreInicial
+        )
+      : null;
+    if (borrador) {
+      puntero.current = borrador.puntero;
+      usadasPorTema.current = borrador.usadasPorTema;
+      resultados.current = borrador.resultados;
+      deadline.current = borrador.deadlineMs;
+      setRespondidas(borrador.resultados.length);
+      setSegundosRestantes(Math.max(0, Math.ceil((borrador.deadlineMs - Date.now()) / 1000)));
+    }
+    setRestaurado(true);
+  }, [pupiloId, materia, curso, temas, totalPreguntas, numeroCierreInicial]);
+
+  useEffect(() => {
+    if (!restaurado) return;
     if (temas.length === 0) {
       setTerminada(true);
       setCargando(false);
@@ -119,24 +149,42 @@ export function Simulacro({
     }
     void cargarPregunta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [restaurado]);
+
+  function guardarCheckpoint() {
+    if (!pupiloId) return;
+    guardarSimulacroEnCurso({
+      pupiloId,
+      materia,
+      curso,
+      temas,
+      totalPreguntas,
+      puntero: puntero.current,
+      usadasPorTema: usadasPorTema.current,
+      resultados: resultados.current,
+      deadlineMs: deadline.current,
+      numeroCierre: numeroCierreInicial,
+    });
+  }
 
   // cronómetro: baja cada segundo; al llegar a 0, termina con lo respondido
   useEffect(() => {
-    if (terminada || temas.length === 0) return;
+    if (!restaurado || terminada || temas.length === 0) return;
+    const actualizarReloj = () => {
+      const restantes = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
+      setSegundosRestantes(restantes);
+      if (restantes <= 0) void terminar();
+      return restantes;
+    };
+    if (actualizarReloj() <= 0) return;
     const id = setInterval(() => {
-      setSegundosRestantes((s) => {
-        if (s <= 1) {
-          clearInterval(id);
-          void terminar();
-          return 0;
-        }
-        return s - 1;
-      });
+      if (actualizarReloj() <= 0) {
+        clearInterval(id);
+      }
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminada]);
+  }, [restaurado, terminada]);
 
   async function cargarPregunta() {
     if (puntero.current >= cola.length) {
@@ -161,6 +209,7 @@ export function Simulacro({
         // este tema se quedó sin preguntas: saltamos el turno, no lo contamos
         fallidasSeguidas.current++;
         puntero.current++;
+        guardarCheckpoint();
         if (fallidasSeguidas.current >= 4) {
           await terminar();
           return;
@@ -169,7 +218,6 @@ export function Simulacro({
         return;
       }
       fallidasSeguidas.current = 0;
-      usadasPorTema.current[tema] = [...usadas, data.pregunta.id];
       setPregunta(data.pregunta);
       setToken(data.token);
       setTemaActual(tema);
@@ -177,6 +225,7 @@ export function Simulacro({
     } catch {
       fallidasSeguidas.current++;
       puntero.current++;
+      guardarCheckpoint();
       if (fallidasSeguidas.current >= 4) {
         await terminar();
         return;
@@ -188,32 +237,37 @@ export function Simulacro({
     }
   }
 
-  // Responde SIN mostrar si acertó (eso es lo que distingue al simulacro de
-  // la prueba de etapa): dispara la validación en segundo plano y avanza.
-  function responder(indice: number) {
+  // Responde sin mostrar si acertó. Solo persiste cuando el servidor terminó
+  // de validar, por lo que una recarga no duplica ni inventa puntaje.
+  async function responder(indice: number) {
     if (!pregunta || enviando.current) return;
     enviando.current = true;
     const tema = temaActual;
-    const promesa: Promise<ResultadoTema> = fetch("/api/diagnostico/responder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ preguntaId: pregunta.id, indice, token }),
-    })
-      .then((r) => r.json())
-      .then((d) => ({ tema, acierto: !!d.acierto }))
-      .catch(() => ({ tema, acierto: false }));
-    resultados.current.push(promesa);
+    setCargando(true);
+    let acierto = false;
+    try {
+      const res = await fetch("/api/diagnostico/responder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preguntaId: pregunta.id, indice, token }),
+      });
+      const data = await res.json();
+      acierto = res.ok && !!data.acierto;
+    } catch {
+      // Misma regla previa: un error de validación no concede puntaje.
+      acierto = false;
+    }
 
+    resultados.current = [...resultados.current, { tema, acierto }];
+    usadasPorTema.current[tema] = [...(usadasPorTema.current[tema] ?? []), pregunta.id];
     puntero.current++;
-    setRespondidas((n) => n + 1);
-    // enviando sigue en true hasta que cargarPregunta() traiga la siguiente
-    // (o terminar() cierre la pantalla): así un doble-tap no manda dos
-    // respuestas para la misma pregunta.
+    setRespondidas(resultados.current.length);
+    guardarCheckpoint();
 
     if (puntero.current >= cola.length) {
-      void terminar();
+      await terminar();
     } else {
-      void cargarPregunta();
+      await cargarPregunta();
     }
   }
 
@@ -222,7 +276,7 @@ export function Simulacro({
     terminadaRef.current = true;
     setCargando(true);
 
-    const lista = await Promise.all(resultados.current);
+    const lista = resultados.current;
     const desglose: DesgloseSimulacro[] = temas
       .map((tema) => {
         const deTema = lista.filter((r) => r.tema === tema);
@@ -241,6 +295,8 @@ export function Simulacro({
     if (total >= MINIMO_EVALUABLE_SIMULACRO) {
       onRegistrar(desglose, correctos, total);
     }
+
+    borrarSimulacroEnCurso();
 
     setTerminada(true);
     setCargando(false);
@@ -372,7 +428,7 @@ export function Simulacro({
       <div className="flex items-center justify-between py-2">
         <button
           onClick={() => {
-            if (window.confirm("¿Salir del simulacro? Las respuestas de este intento no se guardarán.")) {
+            if (window.confirm("¿Salir del simulacro? Tus respuestas validadas quedan guardadas para retomarlo después.")) {
               onSalir();
             }
           }}

@@ -3,15 +3,20 @@
 // Hoy usa localStorage; la API está aislada para migrar a IndexedDB/Supabase
 // (sincronización entre dispositivos) sin tocar las pantallas.
 
-import type { Cuenta, Materia, PerfilNino } from "./profile";
+import type { Cuenta, Curso, Materia, PerfilNino } from "./profile";
 import type { ResultadoMateria } from "./diagnostico/tipos";
+import type { Dificultad } from "./diagnostico/tipos";
 import { fusionarPerfilNino } from "./tutor/fusion";
 
 const KEY = "mp-cuenta";
 const ALUMNO_KEY = "mp-alumno-sesion";
 const ONBOARDING_KEY = "mp-onboarding";
 const DIAGNOSTICO_KEY = "mp-diagnostico-en-curso";
+const DIAGNOSTICO_MATERIA_KEY = "mp-diagnostico-materia-en-curso";
+const PRUEBA_ETAPA_KEY = "mp-prueba-etapa-en-curso";
+const SIMULACRO_KEY = "mp-simulacro-en-curso";
 const FOCO_KEY = "mp-foco";
+const VIGENCIA_EVALUACION_MS = 24 * 60 * 60 * 1000;
 
 export interface SesionAlumno {
   token: string;
@@ -125,6 +130,224 @@ export function guardarDiagnosticoEnCurso(
     DIAGNOSTICO_KEY,
     JSON.stringify({ pupiloId, hechas } satisfies DiagnosticoEnCurso)
   );
+}
+
+// --- Checkpoints de evaluaciones -----------------------------------------
+//
+// Los resultados definitivos viven dentro del perfil. Estos borradores solo
+// permiten retomar una evaluacion interrumpida y no contienen la respuesta
+// correcta, tokens HMAC ni texto de las preguntas.
+
+export interface PreguntaDiagnosticoGuardada {
+  id: string;
+  materia: Materia;
+  curso: Curso;
+  dificultad: Dificultad;
+  tema: string;
+}
+
+export interface DiagnosticoMateriaEnCurso {
+  pupiloId: string;
+  materia: Materia;
+  curso: Curso;
+  dificultad: Dificultad;
+  hechas: PreguntaDiagnosticoGuardada[];
+  aciertos: boolean[];
+  usadasIds: string[];
+  guardadoEn: number;
+}
+
+function borradorVigente(guardadoEn: unknown): guardadoEn is number {
+  return (
+    typeof guardadoEn === "number" &&
+    Number.isFinite(guardadoEn) &&
+    Date.now() - guardadoEn <= VIGENCIA_EVALUACION_MS
+  );
+}
+
+export function leerDiagnosticoMateriaEnCurso(
+  pupiloId: string,
+  materia: Materia,
+  curso: Curso
+): DiagnosticoMateriaEnCurso | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(DIAGNOSTICO_MATERIA_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as DiagnosticoMateriaEnCurso;
+    if (
+      !data ||
+      data.pupiloId !== pupiloId ||
+      data.materia !== materia ||
+      data.curso !== curso ||
+      !borradorVigente(data.guardadoEn) ||
+      !Array.isArray(data.hechas) ||
+      !Array.isArray(data.aciertos) ||
+      !Array.isArray(data.usadasIds) ||
+      data.hechas.length !== data.aciertos.length
+    ) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarDiagnosticoMateriaEnCurso(
+  datos: Omit<DiagnosticoMateriaEnCurso, "guardadoEn">
+): void {
+  if (!disponible()) return;
+  try {
+    window.localStorage.setItem(
+      DIAGNOSTICO_MATERIA_KEY,
+      JSON.stringify({ ...datos, guardadoEn: Date.now() } satisfies DiagnosticoMateriaEnCurso)
+    );
+  } catch {
+    // El diagnóstico sigue en pantalla; solo no puede retomarse en este equipo.
+  }
+}
+
+export function borrarDiagnosticoMateriaEnCurso(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(DIAGNOSTICO_MATERIA_KEY);
+}
+
+export interface PruebaEtapaEnCurso {
+  pupiloId: string;
+  materia: Materia;
+  curso: Curso;
+  tema: string;
+  respondidas: number;
+  correctos: number;
+  usadasIds: string[];
+  dificultad: number;
+  enunciadosFallados: string[];
+  guardadoEn: number;
+}
+
+export function leerPruebaEtapaEnCurso(
+  pupiloId: string,
+  materia: Materia,
+  curso: Curso,
+  tema: string
+): PruebaEtapaEnCurso | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(PRUEBA_ETAPA_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PruebaEtapaEnCurso;
+    if (
+      !data ||
+      data.pupiloId !== pupiloId ||
+      data.materia !== materia ||
+      data.curso !== curso ||
+      data.tema !== tema ||
+      !borradorVigente(data.guardadoEn) ||
+      !Array.isArray(data.usadasIds) ||
+      !Array.isArray(data.enunciadosFallados) ||
+      !Number.isInteger(data.respondidas) ||
+      !Number.isInteger(data.correctos)
+    ) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarPruebaEtapaEnCurso(
+  datos: Omit<PruebaEtapaEnCurso, "guardadoEn">
+): void {
+  if (!disponible()) return;
+  try {
+    window.localStorage.setItem(
+      PRUEBA_ETAPA_KEY,
+      JSON.stringify({ ...datos, guardadoEn: Date.now() } satisfies PruebaEtapaEnCurso)
+    );
+  } catch {
+    // No interrumpir una evaluación si el almacenamiento no está disponible.
+  }
+}
+
+export function borrarPruebaEtapaEnCurso(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(PRUEBA_ETAPA_KEY);
+}
+
+export interface ResultadoSimulacroGuardado {
+  tema: string;
+  acierto: boolean;
+}
+
+export interface SimulacroEnCurso {
+  pupiloId: string;
+  materia: Materia;
+  curso: Curso;
+  temas: string[];
+  totalPreguntas: number;
+  puntero: number;
+  usadasPorTema: Record<string, string[]>;
+  resultados: ResultadoSimulacroGuardado[];
+  deadlineMs: number;
+  numeroCierre?: 1 | 2;
+  guardadoEn: number;
+}
+
+export function leerSimulacroEnCurso(
+  pupiloId: string,
+  materia: Materia,
+  curso: Curso,
+  temas: string[],
+  totalPreguntas: number,
+  numeroCierre?: 1 | 2
+): SimulacroEnCurso | null {
+  if (!disponible()) return null;
+  try {
+    const raw = window.localStorage.getItem(SIMULACRO_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SimulacroEnCurso;
+    if (
+      !data ||
+      data.pupiloId !== pupiloId ||
+      data.materia !== materia ||
+      data.curso !== curso ||
+      data.totalPreguntas !== totalPreguntas ||
+      data.numeroCierre !== numeroCierre ||
+      data.temas.join("|") !== temas.join("|") ||
+      !borradorVigente(data.guardadoEn) ||
+      !Array.isArray(data.resultados) ||
+      !data.usadasPorTema ||
+      typeof data.usadasPorTema !== "object" ||
+      !Number.isInteger(data.puntero) ||
+      typeof data.deadlineMs !== "number"
+    ) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarSimulacroEnCurso(
+  datos: Omit<SimulacroEnCurso, "guardadoEn">
+): void {
+  if (!disponible()) return;
+  try {
+    window.localStorage.setItem(
+      SIMULACRO_KEY,
+      JSON.stringify({ ...datos, guardadoEn: Date.now() } satisfies SimulacroEnCurso)
+    );
+  } catch {
+    // El cronómetro y el intento siguen en pantalla aunque no puedan reanudarse.
+  }
+}
+
+export function borrarSimulacroEnCurso(): void {
+  if (!disponible()) return;
+  window.localStorage.removeItem(SIMULACRO_KEY);
 }
 
 // --- Clase en curso (la conversación con Rai) ---

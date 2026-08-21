@@ -4,22 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import type { Curso, Materia } from "@/lib/profile";
 import { tituloDeTema } from "@/lib/plan/etapas";
 import { UMBRAL_PRUEBA_ETAPA, MINIMO_EVALUABLE_PRUEBA } from "@/lib/tutor/acuerdo";
+import {
+  borrarPruebaEtapaEnCurso,
+  guardarPruebaEtapaEnCurso,
+  leerPruebaEtapaEnCurso,
+} from "@/lib/storage";
 import { Reveal } from "./Reveal";
 import { Fireworks } from "./Fireworks";
 
-// La "prueba" de una etapa del camino: 8 preguntas del banco SOLO de ese tema.
-// ≥80% supera la etapa; menos = refuerzo con Rai, sin castigo. Las respuestas
-// se validan en el servidor (HMAC), igual que el diagnóstico. Los umbrales
-// viven en acuerdo.ts (no acá) porque registrarPruebaEtapa necesita EXACTAMENTE
-// el mismo criterio al guardar la evidencia — si cada uno tuviera su copia,
-// la pantalla podía decir "aprobada" y el mapa no marcar la etapa, o al revés.
 const TOTAL = 8;
 const UMBRAL = UMBRAL_PRUEBA_ETAPA;
-// Mínimo de preguntas para que la prueba sea EVALUABLE. Varios temas del
-// banco tienen solo 2: la niña respondía 2 de 2 correctas y el resultado era
-// "buen intento" — reprobada para siempre, por más veces que lo intentara. Si
-// el banco solo ofrece 2, esa es la mejor evidencia disponible y no es culpa
-// de ella. Bajo eso no se evalúa: se avisa que faltan preguntas.
 const MINIMO_EVALUABLE = MINIMO_EVALUABLE_PRUEBA;
 
 interface PreguntaCliente {
@@ -28,7 +22,11 @@ interface PreguntaCliente {
   opciones: string[];
 }
 
+// Prueba de etapa con checkpoints por respuesta validada. El borrador contiene
+// solo conteos, ids ya usados y enunciados fallados: nunca respuestas correctas
+// ni tokens de validacion.
 export function PruebaEtapa({
+  pupiloId,
   materia,
   curso,
   tema,
@@ -36,41 +34,73 @@ export function PruebaEtapa({
   onContinuar,
   onSalir,
 }: {
+  pupiloId: string;
   materia: Materia;
   curso: Curso;
   tema: string;
-  // Registra la evidencia ANTES de mostrar la pantalla final. Continuar solo
-  // navega: si la tablet se cierra en el resultado, el esfuerzo no se pierde.
   onTerminar: (correctos: number, total: number, enunciadosFallados: string[]) => void;
   onContinuar: (correctos: number, total: number) => void;
   onSalir: () => void;
 }) {
   const [pregunta, setPregunta] = useState<PreguntaCliente | null>(null);
   const [token, setToken] = useState("");
-  const [n, setN] = useState(0); // respondidas
+  const [n, setN] = useState(0);
   const [correctos, setCorrectos] = useState(0);
   const [feedback, setFeedback] = useState<{ acierto: boolean; indiceCorrecto: number } | null>(null);
   const [eleccion, setEleccion] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [terminada, setTerminada] = useState(false);
+  const [restaurado, setRestaurado] = useState(false);
   const usadas = useRef<string[]>([]);
-  const dificultad = useRef(2); // mini-adaptativo: sube al acertar, baja al fallar
+  const dificultad = useRef(2);
   const respondidasRef = useRef(0);
   const correctosRef = useRef(0);
   const resultadoRegistrado = useRef(false);
-  // Para que Rai pueda retomar la próxima clase con otro enfoque en vez de
-  // solo saber el puntaje (ver refuerzoPendiente en acuerdo.ts).
+  const enviando = useRef(false);
   const falladas = useRef<string[]>([]);
 
   useEffect(() => {
-    void cargarPregunta();
+    const borrador = leerPruebaEtapaEnCurso(pupiloId, materia, curso, tema);
+    if (borrador) {
+      usadas.current = borrador.usadasIds;
+      dificultad.current = borrador.dificultad;
+      respondidasRef.current = borrador.respondidas;
+      correctosRef.current = borrador.correctos;
+      falladas.current = borrador.enunciadosFallados;
+      setN(borrador.respondidas);
+      setCorrectos(borrador.correctos);
+    }
+    setRestaurado(true);
+  }, [pupiloId, materia, curso, tema]);
+
+  useEffect(() => {
+    if (restaurado) void cargarPregunta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [restaurado]);
+
+  function guardarCheckpoint() {
+    guardarPruebaEtapaEnCurso({
+      pupiloId,
+      materia,
+      curso,
+      tema,
+      respondidas: respondidasRef.current,
+      correctos: correctosRef.current,
+      usadasIds: usadas.current,
+      dificultad: dificultad.current,
+      enunciadosFallados: falladas.current,
+    });
+  }
 
   async function cargarPregunta() {
+    if (respondidasRef.current >= TOTAL) {
+      finalizar(respondidasRef.current, correctosRef.current);
+      return;
+    }
     setCargando(true);
     setFeedback(null);
     setEleccion(null);
+    enviando.current = false;
     try {
       const params = new URLSearchParams({
         materia,
@@ -82,23 +112,22 @@ export function PruebaEtapa({
       const res = await fetch(`/api/diagnostico/pregunta?${params}`);
       const data = await res.json();
       if (!data.pregunta) {
-        // se acabaron las preguntas del tema: terminamos con lo respondido
         finalizar(respondidasRef.current, correctosRef.current);
-        setCargando(false);
         return;
       }
-      usadas.current.push(data.pregunta.id);
       setPregunta(data.pregunta);
       setToken(data.token);
     } catch {
-      setTerminada(true);
+      // No inventamos un resultado cuando el servidor no pudo validarlo.
+      setPregunta(null);
     } finally {
       setCargando(false);
     }
   }
 
   async function responder(indice: number) {
-    if (feedback || !pregunta) return;
+    if (feedback || !pregunta || enviando.current) return;
+    enviando.current = true;
     setEleccion(indice);
     try {
       const res = await fetch("/api/diagnostico/responder", {
@@ -107,27 +136,31 @@ export function PruebaEtapa({
         body: JSON.stringify({ preguntaId: pregunta.id, indice, token }),
       });
       const data = await res.json();
-      setFeedback(data);
+      if (!res.ok || typeof data.acierto !== "boolean") throw new Error("RESPUESTA_INVALIDA");
+
+      const nuevasRespondidas = respondidasRef.current + 1;
+      respondidasRef.current = nuevasRespondidas;
+      usadas.current = [...usadas.current, pregunta.id];
       if (data.acierto) {
-        const nuevosCorrectos = correctosRef.current + 1;
-        correctosRef.current = nuevosCorrectos;
-        setCorrectos(nuevosCorrectos);
+        correctosRef.current += 1;
+        setCorrectos(correctosRef.current);
         dificultad.current = Math.min(5, dificultad.current + 1);
       } else {
         dificultad.current = Math.max(1, dificultad.current - 1);
-        falladas.current.push(pregunta.enunciado);
+        falladas.current = [...falladas.current, pregunta.enunciado];
       }
+      setN(nuevasRespondidas);
+      guardarCheckpoint();
+      setFeedback(data);
     } catch {
-      /* si falla la validación, no contamos la pregunta */
+      enviando.current = false;
+      setEleccion(null);
     }
   }
 
   function siguiente() {
-    const respondidas = respondidasRef.current + 1;
-    respondidasRef.current = respondidas;
-    setN(respondidas);
-    if (respondidas >= TOTAL) {
-      finalizar(respondidas, correctosRef.current);
+    if (respondidasRef.current >= TOTAL) {
+      finalizar(respondidasRef.current, correctosRef.current);
     } else {
       void cargarPregunta();
     }
@@ -136,17 +169,19 @@ export function PruebaEtapa({
   function finalizar(totalRespondidas: number, totalCorrectas: number) {
     if (resultadoRegistrado.current) return;
     resultadoRegistrado.current = true;
+    setN(totalRespondidas);
+    setCorrectos(totalCorrectas);
     if (totalRespondidas >= MINIMO_EVALUABLE) {
       onTerminar(totalCorrectas, totalRespondidas, falladas.current);
     }
+    // La evidencia final ya quedo guardada por onTerminar; un intento no
+    // evaluable no debe bloquear una prueba nueva.
+    borrarPruebaEtapaEnCurso();
     setTerminada(true);
   }
 
-  // --- pantalla final ---
   if (terminada) {
-    // n = preguntas respondidas (puede ser <5 si el banco se agotó)
     const totalReal = Math.max(1, n);
-    // Sin preguntas suficientes no hay prueba: no se aprueba NI se reprueba.
     const evaluable = n >= MINIMO_EVALUABLE;
     const paso = evaluable && correctos / totalReal >= UMBRAL;
     const incompleta = evaluable && n < TOTAL;
@@ -155,11 +190,7 @@ export function PruebaEtapa({
         {paso && <Fireworks />}
         <Reveal variant="lead" delay={80}>
           <h1 className="max-w-[16ch] text-[30px]">
-            {!evaluable
-              ? "Todavía no hay prueba"
-              : paso
-                ? "¡Etapa superada!"
-                : "Buen intento"}
+            {!evaluable ? "Todavía no hay prueba" : paso ? "¡Etapa superada!" : "Buen intento"}
           </h1>
         </Reveal>
         <Reveal delay={420}>
@@ -174,10 +205,7 @@ export function PruebaEtapa({
           </p>
         </Reveal>
         <Reveal delay={560}>
-          <button
-            onClick={() => (evaluable ? onContinuar(correctos, totalReal) : onSalir())}
-            className="cta px-9"
-          >
+          <button onClick={() => (evaluable ? onContinuar(correctos, totalReal) : onSalir())} className="cta px-9">
             Volver a mi camino
           </button>
         </Reveal>
@@ -185,15 +213,12 @@ export function PruebaEtapa({
     );
   }
 
-  // --- pregunta en curso ---
   return (
     <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-16">
       <div className="flex items-center justify-between py-2">
         <button
           onClick={() => {
-            if (window.confirm("¿Salir de la prueba? Las respuestas de este intento no se guardarán.")) {
-              onSalir();
-            }
+            if (window.confirm("¿Salir de la prueba? Tu avance validado queda guardado para retomarlo después.")) onSalir();
           }}
           aria-label="Salir de la prueba"
           className="flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink"
@@ -201,19 +226,22 @@ export function PruebaEtapa({
           ←
         </button>
         <span className="text-[12px] uppercase tracking-wider text-sage-deep">
-          Prueba · {tituloDeTema(tema)} · {n + 1} de {TOTAL}
+          Prueba · {n + 1} de {TOTAL}
         </span>
         <span className="w-9" />
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-7 text-center">
-        {cargando || !pregunta ? (
+        {cargando ? (
           <p className="text-[15px] italic text-ink-soft">Preparando tu pregunta…</p>
+        ) : !pregunta ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-[15px] text-ink-soft">No pudimos preparar la siguiente pregunta.</p>
+            <button onClick={() => void cargarPregunta()} className="cta px-7">Intentar de nuevo</button>
+          </div>
         ) : (
           <>
-            <p className="mx-auto max-w-[30ch] font-serif text-[23px] leading-[1.3] text-ink">
-              {pregunta.enunciado}
-            </p>
+            <p className="mx-auto max-w-[30ch] font-serif text-[23px] leading-[1.3] text-ink">{pregunta.enunciado}</p>
             <div className="flex w-full max-w-[360px] flex-col gap-2.5 md:max-w-[480px]">
               {pregunta.opciones.map((op, i) => {
                 const esCorrecta = feedback && i === feedback.indiceCorrecto;
@@ -222,7 +250,7 @@ export function PruebaEtapa({
                   <button
                     key={i}
                     onClick={() => responder(i)}
-                    disabled={!!feedback}
+                    disabled={!!feedback || enviando.current}
                     className={
                       "rounded-xl border px-4 py-3 text-[15px] transition-colors " +
                       (esCorrecta
@@ -243,7 +271,7 @@ export function PruebaEtapa({
                   {feedback.acierto ? "¡Muy bien!" : "Casi — mira cuál era."}
                 </p>
                 <button onClick={siguiente} className="cta px-8">
-                  {n + 1 >= TOTAL ? "Ver mi resultado" : "Siguiente"}
+                  {n >= TOTAL ? "Ver mi resultado" : "Siguiente"}
                 </button>
               </div>
             )}

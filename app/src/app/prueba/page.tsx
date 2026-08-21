@@ -32,6 +32,7 @@ export default function PruebaRuta() {
     <main className="min-h-screen">
       <TopBar />
       <PruebaEtapa
+        pupiloId={pupilo.id}
         materia={foco.materia}
         curso={pupilo.curso}
         tema={foco.tema}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MATERIAS, type Materia, type PerfilNino } from "@/lib/profile";
 import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 import {
@@ -30,6 +30,7 @@ export function Diagnostico({
   // cierre la pestaña) obligaba a repetirlas todas. Son pruebas largas y quien
   // las da es un niño de básica en una tablet.
   const [hechas, setHechas] = useState<Record<string, ResultadoMateria>>({});
+  const hechasVivas = useRef<Record<string, ResultadoMateria>>({});
   // materia actualmente en curso (null = estamos en el menú)
   const [enCurso, setEnCurso] = useState<Materia | null>(null);
   // materia recién completada que estamos celebrando (null = no celebrando)
@@ -39,18 +40,23 @@ export function Diagnostico({
   // inicial: en el servidor no hay localStorage y no calzaría al hidratar).
   useEffect(() => {
     const guardado = leerDiagnosticoEnCurso(perfil.id);
-    if (guardado) setHechas(guardado);
+    if (guardado) {
+      hechasVivas.current = guardado;
+      setHechas(guardado);
+    }
   }, [perfil.id]);
 
   const completas = materias.filter((m) => hechas[m]).length;
   const todasListas = completas === materias.length;
 
   function alTerminarMateria(r: ResultadoMateria) {
-    setHechas((h) => {
-      const actualizadas = { ...h, [r.materia]: r };
-      guardarDiagnosticoEnCurso(perfil.id, actualizadas);
-      return actualizadas;
-    });
+    // Persistencia síncrona antes de cambiar de pantalla: el checkpoint fino
+    // puede borrarse con seguridad solo cuando esta materia ya está en el
+    // borrador general del diagnóstico.
+    const actualizadas = { ...hechasVivas.current, [r.materia]: r };
+    hechasVivas.current = actualizadas;
+    guardarDiagnosticoEnCurso(perfil.id, actualizadas);
+    setHechas(actualizadas);
     setEnCurso(null);
     setCelebrando(r.materia); // mostrar felicitación
   }
@@ -61,9 +67,10 @@ export function Diagnostico({
 
   if (enCurso) {
     return (
-      <DiagnosticoMateria
-        key={enCurso}
-        materia={enCurso}
+        <DiagnosticoMateria
+          key={enCurso}
+          pupiloId={perfil.id}
+          materia={enCurso}
         curso={perfil.curso}
         nombre={nombre}
         onListo={alTerminarMateria}
