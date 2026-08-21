@@ -8,8 +8,8 @@ import { Reveal } from "@/components/Reveal";
 // enlace antes que la persona, la cookie de sesión quedó en ESE cliente, no
 // en el navegador real — el correo igual quedó confirmado en la base, solo
 // que esta visita no tiene con qué loguear. Por eso el mensaje se decide acá
-// mirando la sesión, en vez de mandar a "/" y dejar que el arranque decida
-// (que en el caso sin sesión termina en /landing, sin explicar nada).
+// mirando la sesión, en vez de mandar a una ruta privada y dejar que el
+// arranque decida sin explicar nada cuando no existe sesión.
 export default function VerificadoRuta() {
   const { data: session, isPending } = authClient.useSession();
 
@@ -35,7 +35,7 @@ export default function VerificadoRuta() {
           <Reveal delay={450}>
             <button
               type="button"
-              onClick={() => (window.location.href = "/panel")}
+              onClick={() => (window.location.href = "/app")}
               className="cta mt-2"
             >
               Continuar

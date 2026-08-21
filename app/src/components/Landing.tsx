@@ -615,29 +615,88 @@ function SeccionSonidoFoco() {
 // ---------------------------------------------------------------- Q&A / FAQs
 const PREGUNTAS_FRECUENTES = [
   {
-    pregunta: "¿Qué son los exámenes libres y a quiénes están dirigidos?",
-    respuesta: "Los exámenes libres son un mecanismo oficial del Ministerio de Educación de Chile (MINEDUC) que permite certificar estudios de educación básica o media a personas que no asisten al sistema regular escolar, ya sea por opción familiar (homeschooling, pedagogías alternativas), deporte de alto rendimiento, arte, o salud.",
+    pregunta: "¿Qué son los Exámenes Libres y a quiénes están dirigidos?",
+    respuesta:
+      "Los exámenes libres son un mecanismo oficial del Ministerio de Educación de Chile (MINEDUC) que permite certificar estudios de educación básica o media a personas que no asisten al sistema regular escolar, ya sea por opción familiar (homeschooling, pedagogías alternativas), deporte de alto rendimiento, arte, o salud.",
   },
   {
-    pregunta: "¿Cómo se asegura Rai de cubrir los temarios oficiales?",
-    respuesta: "Rai se conecta directamente con una base de datos documental que contiene las Bases Curriculares oficiales de Chile y los temarios vigentes publicados por el MINEDUC. El plan de estudio se adapta a esos objetivos de aprendizaje (OA) específicos, enfocándose estrictamente en lo que el examen de validación de estudios va a medir.",
+    pregunta: "¿Cómo se asegura RAI de cubrir los temarios oficiales del MINEDUC?",
+    respuesta:
+      "RAI se conecta directamente con una base de datos documental que contiene las Bases Curriculares oficiales de Chile y los temarios vigentes publicados por la Unidad de Currículum del MINEDUC. El plan se adapta a esos objetivos de aprendizaje (OA) específicos.",
   },
   {
-    pregunta: "¿Mi hijo puede responder hablando en vez de escribir?",
-    respuesta: "Sí. En el chat con Rai hay un botón de micrófono: el niño lo presiona, habla, y sus palabras aparecen escritas para enviarlas. Es especialmente útil para los más pequeños, que aún escriben lento. Las respuestas de Rai se leen en pantalla.",
+    pregunta: "¿Mi hijo puede responder hablando en vez de escribir en pantalla?",
+    respuesta:
+      "Sí. En el chat con RAI hay un botón de micrófono: el niño lo presiona, habla, y sus palabras aparecen escritas para enviarlas. Es especialmente útil para los estudiantes más pequeños de 1° a 4° básico que aún escriben lento.",
   },
   {
     pregunta: "¿El primer mes es realmente gratuito? ¿Necesito tarjeta de crédito?",
-    respuesta: "Sí, el primer mes es 100% gratuito para que puedas probar la metodología y el tutor con tranquilidad. No solicitamos tarjetas de crédito ni datos bancarios para iniciar. Si decides continuar después del mes de prueba, podrás seleccionar y pagar el plan mensual o anual que prefieras.",
+    respuesta:
+      "Sí, el primer mes es 100% gratuito para que puedas probar la metodología y el tutor con tranquilidad. No solicitamos tarjetas de crédito ni datos bancarios para iniciar. Si decides continuar después del mes de prueba, eliges tu plan.",
   },
   {
-    pregunta: "¿Qué control tiene el apoderado sobre el proceso?",
-    respuesta: "Los padres tienen acceso a un panel de control exclusivo donde pueden ver en tiempo real la cantidad de sesiones realizadas, el tiempo de estudio diario, los resúmenes pedagógicos que genera Rai al final de cada tutoría, los temas dominados y las brechas que necesitan mayor apoyo académico.",
+    pregunta: "¿Qué control e información tiene el apoderado sobre el proceso?",
+    respuesta:
+      "Los padres tienen acceso a un panel de control exclusivo donde pueden ver en tiempo real la cantidad de sesiones realizadas, el tiempo de estudio diario, los resúmenes pedagógicos redactados por RAI, los temas dominados y las brechas a reforzar.",
+  },
+  {
+    pregunta: "¿El certificado de Exámenes Libres es 100% válido en Chile?",
+    respuesta:
+      "Sí, el certificado de estudios es emitido directamente por el Ministerio de Educación de Chile (MINEDUC) con firma electrónica avanzada. Tiene la misma validez legal que la libreta de notas de un colegio tradicional para matricularse o certificar nivel.",
+  },
+  {
+    pregunta: "¿En qué fechas y dónde se rinden las pruebas presenciales?",
+    respuesta:
+      "El MINEDUC fija dos periodos de evaluación al año (habitualmente junio/julio y octubre/noviembre). Las pruebas se rinden en colegios examinadores designados por la Secretaría Regional Ministerial (SECREDUC) correspondientes a tu comuna.",
+  },
+  {
+    pregunta: "¿Cómo ayuda RAI a niños que se distraen o se aburren fácil?",
+    respuesta:
+      "RAI no usa PDFs largos. Las sesiones duran de 15 a 25 minutos y combinan conversación cercana, interactivos dinámicos (sopas de letras, conectores, ruedas, secuencias) y sonidos ambientales de foco (lira, ruido blanco, lluvia) para mantener la concentración.",
+  },
+  {
+    pregunta: "¿Qué asignaturas se evalúan de 1° a 8° básico?",
+    respuesta:
+      "Las asignaturas troncales evaluadas son Matemática, Lenguaje y Comunicación, Ciencias Naturales e Historia, Geografía y Ciencias Sociales. Según el nivel (5° a 8° básico), también se incluye la asignatura de Idioma Extranjero Inglés.",
+  },
+  {
+    pregunta: "¿Puedo registrar a varios de mis hijos en la misma cuenta?",
+    respuesta:
+      "Sí, la plataforma permite registrar múltiples hermanos en una sola cuenta de apoderado. Cada hijo tiene su propia sesión, avance independiente y tutor personalizado, además de descuentos familiares de 10%, 15% y 20% a partir del 2° hijo.",
   },
 ];
 
 function Faq() {
   const [abierto, setAbierto] = useState<number | null>(null);
+
+  // Divide las 10 preguntas en 2 columnas para escritorio
+  const col1 = PREGUNTAS_FRECUENTES.slice(0, 5);
+  const col2 = PREGUNTAS_FRECUENTES.slice(5, 10);
+
+  function renderFaqItem(faq: typeof PREGUNTAS_FRECUENTES[0], index: number) {
+    const isOpen = abierto === index;
+    return (
+      <div key={index} className="border-b border-hair/60 pb-4">
+        <button
+          type="button"
+          onClick={() => setAbierto(isOpen ? null : index)}
+          className="flex w-full items-center justify-between text-left py-2.5 focus:outline-none"
+        >
+          <span className="text-[16px] font-medium text-ink pr-3">{faq.pregunta}</span>
+          <span className="text-[20px] font-semibold text-sage-deep shrink-0">
+            {isOpen ? "−" : "+"}
+          </span>
+        </button>
+        <div
+          className={`mt-2 text-[14px] leading-[1.6] text-ink-soft overflow-hidden transition-all duration-300 ${
+            isOpen ? "max-h-[350px] opacity-100 pb-2" : "max-h-0 opacity-0 pointer-events-none"
+          }`}
+        >
+          {faq.respuesta}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section className="border-t border-hair py-20">
@@ -650,32 +709,16 @@ function Faq() {
         <h2 className="mb-10 text-[32px] sm:text-[40px] font-serif">Dudas frecuentes</h2>
       </Reveal>
 
-      <div className="flex flex-col gap-4">
-        {PREGUNTAS_FRECUENTES.map((faq, i) => {
-          const isOpen = abierto === i;
-          return (
-            <Reveal key={i} delay={800 + i * 350}>
-              <div className="border-b border-hair/60 pb-4">
-                <button
-                  type="button"
-                  onClick={() => setAbierto(isOpen ? null : i)}
-                  className="flex w-full items-center justify-between text-left py-2 focus:outline-none"
-                >
-                  <span className="text-[17px] font-medium text-ink">{faq.pregunta}</span>
-                  <span className="text-[20px] text-sage-deep">{isOpen ? "−" : "+"}</span>
-                </button>
-                <div
-                  className={`mt-2 text-[14.5px] leading-[1.6] text-ink-soft overflow-hidden transition-all duration-300 ${
-                    isOpen ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-                  }`}
-                >
-                  {faq.respuesta}
-                </div>
-              </div>
-            </Reveal>
-          );
-        })}
-      </div>
+      <Reveal delay={600}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+          <div className="flex flex-col gap-4">
+            {col1.map((faq, i) => renderFaqItem(faq, i))}
+          </div>
+          <div className="flex flex-col gap-4">
+            {col2.map((faq, i) => renderFaqItem(faq, i + 5))}
+          </div>
+        </div>
+      </Reveal>
     </section>
   );
 }

@@ -23,11 +23,11 @@ function AuthContenido() {
       errorInicial={codigoError ? MENSAJES_ERROR[codigoError] : undefined}
       onSuccess={() => {
         // Tras login/registro, la sesión ya está activa pero el arranque de
-        // AppProvider no vuelve a rutear (ya corrió). Navegamos a "/" con carga
-        // completa para que el arranque corra de nuevo, sincronice la cuenta y
+        // AppProvider no vuelve a rutear (ya corrió). Navegamos a una ruta
+        // privada con carga completa para que el arranque sincronice la cuenta y
         // rutee a /panel o /registro. Antes esto solo hacía console.log → la
         // pantalla quedaba en blanco hasta recargar a mano.
-        window.location.href = "/panel";
+        window.location.href = "/app";
       }}
     />
   );

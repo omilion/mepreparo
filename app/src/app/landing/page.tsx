@@ -26,7 +26,7 @@ export default function LandingRuta() {
     // Carga completa intencional: AppProvider dejo la portada en paz por ser
     // publica. Al entrar a una ruta privada debe arrancar de nuevo, recuperar
     // la cuenta y sincronizarla antes de decidir el destino definitivo.
-    window.location.assign(esAlumno ? "/hoy" : "/panel");
+    window.location.assign("/app");
   }
 
   function comenzar() {
