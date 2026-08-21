@@ -1,26 +1,14 @@
-// Service worker MÍNIMO (Fase 5.1): cachea el shell de la app y los assets
-// estáticos para que se pueda ABRIR sin internet. Deliberadamente NO cachea
-// nada bajo /api/ — Rai necesita la API en vivo, y fingir que responde
-// offline sería peor que decir la verdad. Si /api/* falla, falla: el cliente
-// (Tutor.tsx) ya sabe mostrar el mensaje honesto.
+// Service worker deliberadamente pequeno y seguro.
+//
+// Las paginas, los datos RSC y los archivos de /_next pertenecen a un build
+// concreto. Cachearlos aqui puede mezclar dos despliegues y dejar la PWA en
+// un ciclo de recargas. Por eso solo guardamos recursos publicos inmutables;
+// todo lo que ejecuta la aplicacion siempre se obtiene de la red/navegador.
+const CACHE_RECURSOS = "mepreparo-recursos-seguros-v1";
+const PREFIJO_CACHE_APP = "mepreparo-";
 
-// Subir a mano cada vez que cambie este archivo o la lista de PRECACHE: es lo
-// único que hace que `activate` borre el caché de la versión anterior (ver
-// más abajo). Con "v1" fijo para siempre, un despliegue nuevo NUNCA
-// invalidaba los assets estáticos ya cacheados — un cliente que alguna vez
-// cacheó un chunk viejo lo seguía sirviendo indefinidamente, incluso después
-// de recargar, porque la estrategia de assets estáticos es cache-primero.
-const VERSION = "v2";
-const CACHE_SHELL = `mepreparo-shell-${VERSION}`;
-const CACHE_ESTATICOS = `mepreparo-estaticos-${VERSION}`;
-
-// Rutas de navegación estables (sin hash de build) que vale la pena tener
-// listas desde el instalar, más los iconos de la PWA.
-const PRECACHE = [
-  "/",
-  "/hoy",
-  "/mapa",
-  "/manifest.webmanifest",
+const RECURSOS_SEGUROS = [
+  "/offline.html",
   "/icon.svg",
   "/icon-192.png",
   "/icon-512.png",
@@ -30,25 +18,46 @@ const PRECACHE = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
-      .open(CACHE_SHELL)
-      .then((cache) => cache.addAll(PRECACHE))
-      .catch(() => {}) // una ruta 404 en precache no debe tumbar la instalación
+      .open(CACHE_RECURSOS)
+      .then((cache) =>
+        Promise.allSettled(
+          RECURSOS_SEGUROS.map((recurso) => cache.add(recurso))
+        )
+      )
       .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((claves) =>
-        Promise.all(
-          claves
-            .filter((k) => k !== CACHE_SHELL && k !== CACHE_ESTATICOS)
-            .map((k) => caches.delete(k))
-        )
-      )
-      .then(() => self.clients.claim())
+    (async () => {
+      const claves = await caches.keys();
+      const veniaDelWorkerAntiguo = claves.some(
+        (clave) =>
+          clave.startsWith("mepreparo-shell-") ||
+          clave.startsWith("mepreparo-estaticos-")
+      );
+
+      await Promise.all(
+        claves
+          .filter(
+            (clave) =>
+              clave.startsWith(PREFIJO_CACHE_APP) &&
+              clave !== CACHE_RECURSOS
+          )
+          .map((clave) => caches.delete(clave))
+      );
+      await self.clients.claim();
+
+      // Saca de inmediato del worker v2 a quienes ya estaban atrapados. Solo
+      // ocurre en esta migracion; una instalacion nueva no recarga la pagina.
+      if (veniaDelWorkerAntiguo) {
+        const ventanas = await self.clients.matchAll({ type: "window" });
+        await Promise.allSettled(
+          ventanas.map((ventana) => ventana.navigate(ventana.url))
+        );
+      }
+    })()
   );
 });
 
@@ -59,44 +68,39 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // NUNCA interceptar la API: que falle de verdad si no hay red, en vez de
-  // servir una respuesta vieja de Rai o de un ejercicio.
-  if (url.pathname.startsWith("/api/")) return;
-
-  // Navegación (el niño abre o recarga una página): red primero, y si no hay
-  // red, la versión cacheada de ESA ruta, o si nunca se cacheó, el shell "/".
+  // Conservamos una salida clara sin internet, pero nunca una pagina de Next
+  // perteneciente a un build anterior.
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const copia = res.clone();
-          caches.open(CACHE_SHELL).then((cache) => cache.put(request, copia));
-          return res;
-        })
-        .catch(
-          () =>
-            caches.match(request).then((r) => r || caches.match("/"))
-        )
+      fetch(request).catch(async () => {
+        const offline = await caches.match("/offline.html");
+        return (
+          offline ||
+          new Response("Sin conexion. Vuelve a intentarlo cuando tengas red.", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          })
+        );
+      })
     );
     return;
   }
 
-  // Assets estáticos (JS/CSS/fuentes/imágenes de _next y públicos): cache
-  // primero, y de paso los va guardando la primera vez que se piden — así el
-  // shell queda offline-capaz progresivamente, sin tener que listar a mano
-  // los nombres con hash que genera cada build.
+  // No almacenar API, RSC, JS, CSS ni ningun archivo de Next. El navegador
+  // siempre debe recibir recursos del despliegue vigente.
+  if (!RECURSOS_SEGUROS.includes(url.pathname)) return;
+
   event.respondWith(
-    caches.match(request).then((cacheada) => {
-      if (cacheada) return cacheada;
-      return fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            const copia = res.clone();
-            caches.open(CACHE_ESTATICOS).then((cache) => cache.put(request, copia));
-          }
-          return res;
-        })
-        .catch(() => cacheada); // sin red y sin caché: no hay nada que devolver
+    caches.open(CACHE_RECURSOS).then(async (cache) => {
+      try {
+        const respuesta = await fetch(request);
+        if (respuesta.ok) await cache.put(request, respuesta.clone());
+        return respuesta;
+      } catch (error) {
+        const guardada = await cache.match(request);
+        if (guardada) return guardada;
+        throw error;
+      }
     })
   );
 });

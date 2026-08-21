@@ -1,59 +1,76 @@
 "use client";
 
 import { useEffect } from "react";
+import {
+  CLAVE_RECUPERACION_DESPLIEGUE,
+  esCacheDeMePreparo,
+  esErrorDeDespliegue,
+  puedeIntentarRecuperacion,
+} from "@/lib/despliegue";
 
-// Tras cada deploy, una pestaña que quedó abierta desde ANTES sigue con el
-// JS viejo en memoria: cualquier acción de servidor o "chunk" que ya no
-// existe en el build nuevo revienta con "Failed to find Server Action" o
-// "Loading chunk X failed". No es un error del servidor: hay que traer la
-// versión actual.
-//
-// Un simple location.reload() NO alcanza: el service worker (RegistrarSW)
-// cachea los assets estáticos "cache-primero" y, si el navegador ya tenía
-// algo cacheado con ese nombre, lo sigue sirviendo aunque se recargue la
-// página — la recarga vuelve a pedirle los mismos archivos viejos al SW y
-// el error se repite. Primero descontrolado (unregister) y borramos los
-// cachés; recién ahí recargamos para que la petición vaya de verdad a la red.
-const CLAVE_RECARGA = "mp-recarga-por-deploy";
-
-function esErrorDeDeploy(mensaje: string): boolean {
-  return (
-    /Failed to find Server Action/i.test(mensaje) ||
-    /Loading chunk .* failed/i.test(mensaje) ||
-    /ChunkLoadError/i.test(mensaje)
-  );
+function esWorkerDeMePreparo(registro: ServiceWorkerRegistration): boolean {
+  const workers = [registro.active, registro.waiting, registro.installing];
+  return workers.some((worker) => {
+    if (!worker) return false;
+    try {
+      const url = new URL(worker.scriptURL);
+      return url.origin === window.location.origin && url.pathname === "/sw.js";
+    } catch {
+      return false;
+    }
+  });
 }
 
-async function recargarUnaVez() {
-  // guard con sessionStorage: si el error persistiera después de recargar
-  // (no debería, ahora que limpiamos SW + cachés), esto evita un loop.
-  if (sessionStorage.getItem(CLAVE_RECARGA)) return;
-  sessionStorage.setItem(CLAVE_RECARGA, "1");
+async function recuperarDespliegue() {
+  const ultimoIntento = sessionStorage.getItem(
+    CLAVE_RECUPERACION_DESPLIEGUE
+  );
+  if (!puedeIntentarRecuperacion(ultimoIntento)) return;
+
+  // Se escribe antes de cualquier await para que dos errores simultaneos no
+  // inicien dos limpiezas ni dos recargas.
+  sessionStorage.setItem(
+    CLAVE_RECUPERACION_DESPLIEGUE,
+    String(Date.now())
+  );
+
   try {
     if ("serviceWorker" in navigator) {
       const registros = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registros.map((r) => r.unregister()));
+      await Promise.all(
+        registros
+          .filter(esWorkerDeMePreparo)
+          .map((registro) => registro.unregister())
+      );
     }
+
     if ("caches" in window) {
       const claves = await caches.keys();
-      await Promise.all(claves.map((k) => caches.delete(k)));
+      await Promise.all(
+        claves.filter(esCacheDeMePreparo).map((clave) => caches.delete(clave))
+      );
     }
   } catch {
-    // si la limpieza falla, igual conviene recargar a que quedarse atascado
+    // Incluso si una limpieza parcial falla, la red puede resolver la recarga.
   } finally {
+    // Nunca se toca localStorage: cuenta, alumnos y progreso se conservan.
     window.location.reload();
   }
 }
 
 export function DetectorDespliegue() {
   useEffect(() => {
-    function alError(e: ErrorEvent) {
-      if (esErrorDeDeploy(e.message || "")) void recargarUnaVez();
+    function alError(evento: ErrorEvent) {
+      if (esErrorDeDespliegue(evento.message || "")) {
+        void recuperarDespliegue();
+      }
     }
-    function alRechazo(e: PromiseRejectionEvent) {
-      const msg = e.reason?.message || String(e.reason || "");
-      if (esErrorDeDeploy(msg)) void recargarUnaVez();
+
+    function alRechazo(evento: PromiseRejectionEvent) {
+      const mensaje = evento.reason?.message || String(evento.reason || "");
+      if (esErrorDeDespliegue(mensaje)) void recuperarDespliegue();
     }
+
     window.addEventListener("error", alError);
     window.addEventListener("unhandledrejection", alRechazo);
     return () => {
