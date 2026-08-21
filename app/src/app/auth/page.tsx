@@ -27,7 +27,7 @@ function AuthContenido() {
         // completa para que el arranque corra de nuevo, sincronice la cuenta y
         // rutee a /panel o /registro. Antes esto solo hacía console.log → la
         // pantalla quedaba en blanco hasta recargar a mano.
-        window.location.href = "/";
+        window.location.href = "/panel";
       }}
     />
   );

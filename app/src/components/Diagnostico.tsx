@@ -6,7 +6,6 @@ import type { ResultadoMateria } from "@/lib/diagnostico/tipos";
 import {
   leerDiagnosticoEnCurso,
   guardarDiagnosticoEnCurso,
-  borrarDiagnosticoEnCurso,
 } from "@/lib/storage";
 import { DiagnosticoMateria } from "./DiagnosticoMateria";
 import { CelebracionMateria } from "./CelebracionMateria";
@@ -57,8 +56,6 @@ export function Diagnostico({
   }
 
   function verResultados() {
-    // el diagnóstico queda guardado en el perfil: el borrador ya no hace falta
-    borrarDiagnosticoEnCurso();
     onListo(materias.map((m) => hechas[m]).filter(Boolean));
   }
 
@@ -143,39 +140,30 @@ export function Diagnostico({
         </div>
       </Reveal>
 
-      <Reveal delay={760}>
-        <div className="flex w-[300px] max-w-full flex-col items-center gap-3 md:w-[380px]">
-          <p className="text-[12.5px] tabular-nums text-ink-soft">
-            {completas} de {materias.length} completadas
-          </p>
+      {todasListas && (
+        <Reveal delay={640}>
           <button
             type="button"
             onClick={verResultados}
-            disabled={!todasListas}
-            className="cta w-[280px] max-w-full disabled:cursor-not-allowed disabled:opacity-40 md:w-[360px]"
+            className="zen-btn zen-btn-primary min-w-[220px]"
           >
             Ver mis resultados
           </button>
-        </div>
-      </Reveal>
+        </Reveal>
+      )}
     </div>
   );
 }
 
 function Check() {
   return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M5 12.5 10 17l9-10" />
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2.5}
+        d="M5 13l4 4L19 7"
+      />
     </svg>
   );
 }

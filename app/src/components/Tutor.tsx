@@ -1487,8 +1487,7 @@ ${traza}` : m.texto };
       return;
     }
 
-    // esta salida sí cierra la clase: ya no hay nada que retomar
-    borrarClaseEnCurso();
+    // esta salida sí cierra la clase: intentamos guardar la sesión y su resumen
     setCargando(true);
     const duracionMin = Math.max(1, Math.round((Date.now() - inicioSesion.current) / 60000));
     const nMensajes = mensajes.length;
@@ -1564,6 +1563,8 @@ ${traza}` : m.texto };
         tutoria: tutoriaActualizada,
       });
     } finally {
+      // El borrador se borra ÚNICAMENTE tras asegurar la sesión en el perfil local
+      borrarClaseEnCurso();
       setCargando(false);
       if (opciones.mostrarResumen) {
         setCierreVisible({ ...cierre, despues });

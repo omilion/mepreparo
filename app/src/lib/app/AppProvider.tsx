@@ -391,6 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         p.diagnostico![r.materia] = { nivel: r.nivel, brechas: r.brechas };
       }
       setCuenta(guardarPupilo(cuenta, p));
+      borrarDiagnosticoEnCurso();
       router.push("/resultado");
     },
     [cuenta, pupilo, router]

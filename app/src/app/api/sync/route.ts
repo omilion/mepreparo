@@ -9,6 +9,7 @@ import { verifyStudentToken } from "@/lib/auth-student";
 import { sanearTutoria } from "@/lib/tutor/sanearMemoria";
 import { chequearLimite } from "@/lib/rateLimit";
 import { obtenerOCrearSuscripcion } from "@/lib/pagos/repositorio";
+import { fusionarPerfilNino } from "@/lib/tutor/fusion";
 
 export async function POST(req: NextRequest) {
   const limite = chequearLimite(req, { clave: "sync", max: 60, ventanaMs: 60_000 });
@@ -96,77 +97,92 @@ export async function POST(req: NextRequest) {
 
     for (const cp of clientPupilos) {
       const dbPupilo = dbPupilosMap.get(cp.id);
-      const clientUpdateStr = cp.updatedAt || cp.creadoEn || new Date().toISOString();
-      const clientUpdateMs = new Date(clientUpdateStr).getTime();
 
-      // Si no existe en la BD o el cliente es más reciente: guardamos en la BD
-      if (!dbPupilo || clientUpdateMs > dbPupilo.updatedAt.getTime()) {
-        // Preservar pinHash si existe en la BD y el cliente no lo envía (o si viene en modo alumno)
-        let contextoFinal = (cp.contexto || {}) as Record<string, unknown>;
-        const dbContexto = (dbPupilo?.contexto || {}) as Record<string, unknown>;
-        if (dbContexto.pinHash && (!contextoFinal.pinHash || isStudentMode)) {
-          contextoFinal = { ...contextoFinal, pinHash: dbContexto.pinHash };
-        }
+      const basePupilo: PerfilNino | undefined = dbPupilo
+        ? {
+            id: dbPupilo.id,
+            nombre: dbPupilo.nombre,
+            curso: dbPupilo.curso as any,
+            examen: {
+              fecha: dbPupilo.examenFecha,
+              materias: dbPupilo.examenMaterias as any[],
+            },
+            disponibilidad: {
+              horasSemana: dbPupilo.horasSemana,
+            },
+            contexto: (dbPupilo.contexto || {}) as any,
+            diagnostico: (dbPupilo.diagnostico || undefined) as any,
+            tutoria: (dbPupilo.tutoria || undefined) as any,
+            creadoEn: dbPupilo.creadoEn.toISOString(),
+            updatedAt: dbPupilo.updatedAt.toISOString(),
+          }
+        : undefined;
 
-        const insertData = {
-          id: cp.id,
-          cuentaId: userId,
-          nombre: cp.nombre,
-          curso: cp.curso,
-          examenFecha: cp.examen.fecha,
-          examenMaterias: cp.examen.materias,
-          horasSemana: cp.disponibilidad.horasSemana,
-          contexto: contextoFinal,
-          diagnostico: cp.diagnostico || null,
-          // Se sanea SIEMPRE lo que empuja el cliente: su localStorage puede
-          // traer memoria vieja con enunciados de actividad como clave de
-          // tema. Limpiar solo la base no sirve — el cliente la vuelve a subir.
-          tutoria: sanearTutoria(cp.tutoria, cp.curso),
-          creadoEn: new Date(cp.creadoEn || Date.now()),
-          updatedAt: new Date(clientUpdateStr),
-        };
+      // Fusión acumulativa de perfiles (Field-Level Merge): evita pérdidas
+      const fusionado = fusionarPerfilNino(basePupilo, cp);
 
-        if (!dbPupilo) {
-          await db.insert(pupilosTable).values(insertData);
-        } else {
+      // Preservar pinHash si existe en la BD y el cliente no lo envía (o si viene en modo alumno)
+      let contextoFinal = (fusionado.contexto || {}) as Record<string, unknown>;
+      const dbContexto = (dbPupilo?.contexto || {}) as Record<string, unknown>;
+      if (dbContexto.pinHash && (!contextoFinal.pinHash || isStudentMode)) {
+        contextoFinal = { ...contextoFinal, pinHash: dbContexto.pinHash };
+      }
+
+      const insertData = {
+        id: fusionado.id,
+        cuentaId: userId,
+        nombre: fusionado.nombre,
+        curso: fusionado.curso,
+        examenFecha: fusionado.examen.fecha,
+        examenMaterias: fusionado.examen.materias,
+        horasSemana: fusionado.disponibilidad.horasSemana,
+        contexto: contextoFinal,
+        diagnostico: fusionado.diagnostico || null,
+        tutoria: sanearTutoria(fusionado.tutoria, fusionado.curso),
+        creadoEn: new Date(fusionado.creadoEn || Date.now()),
+        updatedAt: new Date(fusionado.updatedAt || Date.now()),
+      };
+
+      if (!dbPupilo) {
+        await db.insert(pupilosTable).values(insertData);
+      } else {
+        await db
+          .update(pupilosTable)
+          .set(insertData)
+          .where(eq(pupilosTable.id, fusionado.id));
+      }
+
+      // Sincronizar las sesiones asociadas a este pupilo en la tabla sesiones relacional
+      const sesionesList = fusionado.tutoria?.sesiones || [];
+      if (sesionesList.length > 0) {
+        for (const s of sesionesList) {
+          const sessionId = `${fusionado.id}_${new Date(s.fecha).getTime()}`;
+          // Upsert de la sesión
           await db
-            .update(pupilosTable)
-            .set(insertData)
-            .where(eq(pupilosTable.id, cp.id));
-        }
-
-        // Sincronizar las sesiones asociadas a este pupilo en la tabla sesiones relacional
-        const sesionesList = cp.tutoria?.sesiones || [];
-        if (sesionesList.length > 0) {
-          for (const s of sesionesList) {
-            const sessionId = `${cp.id}_${new Date(s.fecha).getTime()}`;
-            // Upsert de la sesión
-            await db
-              .insert(sesionesTable)
-              .values({
-                id: sessionId,
-                pupiloId: cp.id,
-                cuentaId: userId,
-                fecha: new Date(s.fecha),
+            .insert(sesionesTable)
+            .values({
+              id: sessionId,
+              pupiloId: fusionado.id,
+              cuentaId: userId,
+              fecha: new Date(s.fecha),
+              duracionMin: s.duracionMin,
+              dia: s.dia,
+              materia: s.materia,
+              titulo: s.titulo,
+              resumen: s.resumen,
+              nMensajes: s.nMensajes,
+            })
+            .onConflictDoUpdate({
+              target: sesionesTable.id,
+              set: {
                 duracionMin: s.duracionMin,
                 dia: s.dia,
                 materia: s.materia,
                 titulo: s.titulo,
                 resumen: s.resumen,
                 nMensajes: s.nMensajes,
-              })
-              .onConflictDoUpdate({
-                target: sesionesTable.id,
-                set: {
-                  duracionMin: s.duracionMin,
-                  dia: s.dia,
-                  materia: s.materia,
-                  titulo: s.titulo,
-                  resumen: s.resumen,
-                  nMensajes: s.nMensajes,
-                },
-              });
-          }
+              },
+            });
         }
       }
     }

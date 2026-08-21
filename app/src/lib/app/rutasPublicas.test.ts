@@ -28,6 +28,11 @@ describe("esRutaLibre", () => {
     expect(esRutaLibre("/demo")).toBe(true);
   });
 
+  it("mantiene publica la portada aunque exista una sesion", () => {
+    expect(esRutaLibre("/")).toBe(true);
+    expect(esRutaLibre("/landing")).toBe(true);
+  });
+
   it("mantiene libres las rutas internas y el login por QR", () => {
     expect(esRutaLibre("/rai")).toBe(true);
     expect(esRutaLibre("/admin")).toBe(true);
@@ -38,7 +43,7 @@ describe("esRutaLibre", () => {
   // Lo contrario importa igual: el flujo del niño SÍ debe rutearse según su
   // estado, o alguien sin diagnóstico caería directo en el mapa.
   it("NO libera las pantallas del flujo del alumno ni del apoderado", () => {
-    for (const r of ["/", "/hoy", "/tutor", "/mapa", "/panel", "/prueba", "/wizard", "/registro"]) {
+    for (const r of ["/hoy", "/tutor", "/mapa", "/panel", "/prueba", "/wizard", "/registro"]) {
       expect(esRutaLibre(r)).toBe(false);
     }
   });

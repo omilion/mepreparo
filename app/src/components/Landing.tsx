@@ -67,23 +67,25 @@ import Link from "next/link";
 export function Landing({
   onComenzar,
   onProbar,
+  textoAccion,
 }: {
   onComenzar: () => void;
   onProbar: () => void;
+  textoAccion?: string;
 }) {
   return (
     <div className="zen-page pb-28">
-      <Hero onComenzar={onComenzar} onProbar={onProbar} />
+      <Hero onComenzar={onComenzar} onProbar={onProbar} textoAccion={textoAccion} />
       <RumboAlExamen />
       <SeccionTutor />
       <SeccionPlanExamen />
       <SeccionValorTypewriter />
       <SeccionApoderado />
       <ComoFunciona />
-      <Precios onComenzar={onComenzar} />
+      <Precios onComenzar={onComenzar} textoAccion={textoAccion} />
       <SeccionSonidoFoco />
       <Faq />
-      <CierreCTA onComenzar={onComenzar} />
+      <CierreCTA onComenzar={onComenzar} textoAccion={textoAccion} />
       <SeccionFooterSEO />
     </div>
   );
@@ -135,9 +137,11 @@ function RumboAlExamen() {
 function Hero({
   onComenzar,
   onProbar,
+  textoAccion,
 }: {
   onComenzar: () => void;
   onProbar: () => void;
+  textoAccion?: string;
 }) {
   return (
     <section className="flex min-h-[100vh] flex-col items-center justify-center pt-14 pb-20 text-center">
@@ -162,7 +166,7 @@ function Hero({
       <Reveal delay={1400}>
         <div className="mt-9 flex flex-col items-center gap-3">
           <button onClick={onComenzar} className="cta px-9">
-            Comienza gratis
+            {textoAccion ?? "Comienza gratis"}
           </button>
           <button
             onClick={onProbar}
@@ -227,7 +231,13 @@ function ComoFunciona() {
 }
 
 // ---------------------------------------------------------------- Precios
-function Precios({ onComenzar }: { onComenzar: () => void }) {
+function Precios({
+  onComenzar,
+  textoAccion,
+}: {
+  onComenzar: () => void;
+  textoAccion?: string;
+}) {
   const [anual, setAnual] = useState(true);
   const [n, setN] = useState(1);
   const precio = calcularPrecio(n, anual);
@@ -323,7 +333,7 @@ function Precios({ onComenzar }: { onComenzar: () => void }) {
           </div>
 
           <button onClick={onComenzar} className="cta mt-7">
-            Comienza gratis
+            {textoAccion ?? "Comienza gratis"}
           </button>
           <p className="mt-3 text-center text-[12px] text-ink-soft">
             Primer mes sin costo. Luego eliges tu plan.
@@ -671,7 +681,13 @@ function Faq() {
 }
 
 // ---------------------------------------------------------------- Cierre
-function CierreCTA({ onComenzar }: { onComenzar: () => void }) {
+function CierreCTA({
+  onComenzar,
+  textoAccion,
+}: {
+  onComenzar: () => void;
+  textoAccion?: string;
+}) {
   return (
     <section className="border-t border-hair py-16 text-center">
       <Reveal delay={150}>
@@ -681,7 +697,7 @@ function CierreCTA({ onComenzar }: { onComenzar: () => void }) {
       </Reveal>
       <Reveal delay={500}>
         <button onClick={onComenzar} className="cta mt-8 px-9">
-          Crear mi cuenta
+          {textoAccion ?? "Crear mi cuenta"}
         </button>
       </Reveal>
     </section>

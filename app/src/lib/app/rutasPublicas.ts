@@ -16,7 +16,17 @@
 // - /alumno/login: valida el token del QR y avisa por su cuenta
 //   (entrarComoAlumno). Si el arranque la ruteara, la mandaría a /landing en
 //   mitad de la validación y de paso quemaría `arranqueHecho`.
-const RUTAS_EXACTAS = ["/rai", "/admin", "/suscripcion", "/alumno/login"];
+// La portada es deliberadamente publica incluso con una sesion iniciada: una
+// familia debe poder mostrar o compartir examenes-libres.cl sin que el dominio
+// la mande a su panel privado. Desde la propia portada puede volver a la app.
+const RUTAS_EXACTAS = [
+  "/",
+  "/landing",
+  "/rai",
+  "/admin",
+  "/suscripcion",
+  "/alumno/login",
+];
 
 // Secciones públicas completas (la ruta y todo lo que cuelga de ella).
 // - /blog: todo el contenido que se indexa en buscadores. Si rebota, quien

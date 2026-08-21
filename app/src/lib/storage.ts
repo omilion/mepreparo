@@ -5,6 +5,7 @@
 
 import type { Cuenta, Materia, PerfilNino } from "./profile";
 import type { ResultadoMateria } from "./diagnostico/tipos";
+import { fusionarPerfilNino } from "./tutor/fusion";
 
 const KEY = "mp-cuenta";
 const ALUMNO_KEY = "mp-alumno-sesion";
@@ -291,10 +292,11 @@ export async function sincronizarConServidor(cuenta: Cuenta): Promise<Cuenta> {
     if (data && Array.isArray(data.pupilos)) {
       const serverPupilos = data.pupilos as PerfilNino[];
 
-      // Actualiza o conserva los pupilos locales para no pisar ni borrar datos no sincronizados
-      const nuevosPupilos = cuenta.pupilos.map((p) => {
+      // Fusión acumulativa con la cuenta local actual para preservar cambios que hayan ocurrido mientras la petición viajaba
+      const cuentaFresca = leerCuenta() || cuenta;
+      const nuevosPupilos = cuentaFresca.pupilos.map((p) => {
         const upd = serverPupilos.find((n) => n.id === p.id);
-        return upd ? upd : p;
+        return upd ? fusionarPerfilNino(p, upd) : p;
       });
 
       // Incorpora cualquier pupilo remoto que no estuviera en local (ej: agregado en otro navegador)
@@ -304,7 +306,7 @@ export async function sincronizarConServidor(cuenta: Cuenta): Promise<Cuenta> {
         }
       }
       
-      const cuentaActualizada = { ...cuenta, pupilos: nuevosPupilos };
+      const cuentaActualizada = { ...cuentaFresca, pupilos: nuevosPupilos };
       guardarCuenta(cuentaActualizada);
       
       // Notificar a las pantallas que se completó una sincronización de fondo

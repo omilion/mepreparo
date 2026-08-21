@@ -35,7 +35,7 @@ export default function VerificadoRuta() {
           <Reveal delay={450}>
             <button
               type="button"
-              onClick={() => (window.location.href = "/")}
+              onClick={() => (window.location.href = "/panel")}
               className="cta mt-2"
             >
               Continuar
