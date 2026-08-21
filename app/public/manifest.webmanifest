@@ -1,7 +1,7 @@
 {
-  "name": "mepreparo",
-  "short_name": "mepreparo",
-  "description": "Estudia con calma y prepara tu examen libre con un tutor que te conoce.",
+  "name": "RAI - Exámenes Libres Chile 2026",
+  "short_name": "RAI",
+  "description": "Prepara tus Exámenes Libres en Chile (1° a 8° básico) con Rai, tu tutor IA guiado por las bases curriculares del MINEDUC.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f3ee",

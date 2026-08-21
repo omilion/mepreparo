@@ -62,6 +62,8 @@ function FadeUpWords({ texto, delayBase = 300, stagger = 180 }: { texto: string;
   );
 }
 
+import Link from "next/link";
+
 export function Landing({
   onComenzar,
   onProbar,
@@ -82,6 +84,7 @@ export function Landing({
       <SeccionSonidoFoco />
       <Faq />
       <CierreCTA onComenzar={onComenzar} />
+      <SeccionFooterSEO />
     </div>
   );
 }
@@ -153,7 +156,7 @@ function Hero({
           Con Rai, un tutor inteligente que lo acompaña con un plan a la medida
           y soporte oficial de las bases curriculares de los{" "}
           <strong>exámenes libres en Chile</strong>. Tu hijo estudiará en casa con rumbo,
-          calma y confianza (¡con soporte de micrófono y voz para pre-lectores!).
+          calma y confianza (¡con micrófono para responder hablando!).
         </p>
       </Reveal>
       <Reveal delay={1400}>
@@ -403,7 +406,7 @@ function SeccionTutor() {
           <Reveal delay={1800}>
             <div className="flex items-start gap-2.5 text-left">
               <span className="text-sage-deep mt-0.5">✦</span>
-              <span><strong className="text-ink">Soporte de Voz:</strong> Los niños más pequeños (1° y 2° básico) conversan usando el micrófono, eliminando barreras de lectura.</span>
+              <span><strong className="text-ink">Responder hablando:</strong> Los niños más pequeños (1° y 2° básico) pueden contestarle a Rai por micrófono, sin tener que escribir.</span>
             </div>
           </Reveal>
         </div>
@@ -610,8 +613,8 @@ const PREGUNTAS_FRECUENTES = [
     respuesta: "Rai se conecta directamente con una base de datos documental que contiene las Bases Curriculares oficiales de Chile y los temarios vigentes publicados por el MINEDUC. El plan de estudio se adapta a esos objetivos de aprendizaje (OA) específicos, enfocándose estrictamente en lo que el examen de validación de estudios va a medir.",
   },
   {
-    pregunta: "¿Cómo funciona la interacción por voz para niños que no saben leer?",
-    respuesta: "Para niños de 1° y 2° básico (o quienes lo requieran), ofrecemos el Add-on de Voz Completa. El niño simplemente presiona un botón de micrófono, habla directamente a Rai (Rai procesa el audio y entiende la respuesta) y Rai le contesta hablando con voz clara y pausada. Esto elimina las barreras de lectura y la frustración tecnológica.",
+    pregunta: "¿Mi hijo puede responder hablando en vez de escribir?",
+    respuesta: "Sí. En el chat con Rai hay un botón de micrófono: el niño lo presiona, habla, y sus palabras aparecen escritas para enviarlas. Es especialmente útil para los más pequeños, que aún escriben lento. Las respuestas de Rai se leen en pantalla.",
   },
   {
     pregunta: "¿El primer mes es realmente gratuito? ¿Necesito tarjeta de crédito?",
@@ -682,5 +685,100 @@ function CierreCTA({ onComenzar }: { onComenzar: () => void }) {
         </button>
       </Reveal>
     </section>
+  );
+}
+
+function SeccionFooterSEO() {
+  return (
+    <footer className="border-t border-hair pt-14 pb-12 text-ink-soft">
+      <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <div className="font-serif text-[20px] font-bold text-ink">RAI</div>
+          <p className="mt-2 text-[13.5px] leading-[1.6]">
+            Plataforma de Inteligencia Artificial para la preparación de Exámenes Libres de Educación Básica (1° a 8° básico) en Chile.
+          </p>
+          <div className="mt-3 text-[12px] text-sage-deep font-mono">
+            examenes-libres.cl 🇨🇱
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-3 text-[13px] font-semibold uppercase tracking-wider text-ink">
+            Blog & Guías SEO
+          </h4>
+          <ul className="flex flex-col gap-2 text-[13.5px]">
+            <li>
+              <Link href="/blog" className="hover:text-sage-deep transition-colors">
+                Blog Principal
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/blog/guia-completa-examenes-libres-mineduc-2026"
+                className="hover:text-sage-deep transition-colors"
+              >
+                Guía Exámenes Libres 2026
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/blog/temarios-oficiales-examenes-libres-1-a-8-basico"
+                className="hover:text-sage-deep transition-colors"
+              >
+                Temarios MINEDUC 1° a 8°
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/blog/como-preparar-examenes-libres-en-casa-con-ia"
+                className="hover:text-sage-deep transition-colors"
+              >
+                Estudio con IA en Casa
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="mb-3 text-[13px] font-semibold uppercase tracking-wider text-ink">
+            Asignaturas Evaluadas
+          </h4>
+          <ul className="flex flex-col gap-2 text-[13.5px]">
+            <li>Matemática (Bases Curriculares)</li>
+            <li>Lenguaje y Comunicación</li>
+            <li>Ciencias Naturales</li>
+            <li>Historia, Geografía y C. Sociales</li>
+            <li>Idioma Extranjero Inglés</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="mb-3 text-[13px] font-semibold uppercase tracking-wider text-ink">
+            Legales & Acceso
+          </h4>
+          <ul className="flex flex-col gap-2 text-[13.5px]">
+            <li>
+              <Link href="/terminos" className="hover:text-sage-deep transition-colors">
+                Términos del Servicio
+              </Link>
+            </li>
+            <li>
+              <Link href="/privacidad" className="hover:text-sage-deep transition-colors">
+                Política de Privacidad
+              </Link>
+            </li>
+            <li>
+              <Link href="/demo" className="hover:text-sage-deep transition-colors">
+                Demo interactiva
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-12 border-t border-hair/60 pt-6 text-center text-[12.5px]">
+        © {new Date().getFullYear()} RAI — examenes-libres.cl · Todos los derechos reservados.
+      </div>
+    </footer>
   );
 }
