@@ -16,23 +16,8 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-// Herramientas internas que se abren escribiendo la URL a mano. El arranque no
-// debe rutearlas: si no, entras y te rebota al home antes de ver nada.
-// (/admin se protege solo, en el servidor, y no tiene nada que ver con el
-// flujo del niño: el arranque no debe moverlo de ahí.) /suscripcion tampoco:
-// es a donde el arranque manda si el acceso está bloqueado, y volver a
-// rutearla desde ahí formaría un loop.
-// /alumno/login valida el token del QR y luego avisa por su cuenta
-// (entrarComoAlumno). Si el arranque la ruteara, la mandaría a /landing en
-// mitad de la validación y de paso quemaría `arranqueHecho`.
-// /auth/verificado: a donde better-auth redirige tras confirmar el correo.
-// Si el enlace lo "gatilló" antes un escáner de seguridad del correo (Gmail,
-// Outlook), el clic real de la persona llega SIN sesión (better-auth solo
-// deja logueado al primer GET, y ese fue el del escáner) — el arranque la
-// mandaría a /landing sin explicar nada. Esta pantalla decide su propio
-// mensaje según si hay sesión o no, así que no puede dejar que el arranque
-// la pise antes de mostrarlo.
-const RUTAS_LIBRES = ["/rai", "/admin", "/suscripcion", "/alumno/login", "/auth/verificado"];
+// Qué pantallas NO debe rutear el arranque (y por qué): ver rutasPublicas.
+import { esRutaLibre } from "./rutasPublicas";
 import { authClient } from "@/lib/auth-client";
 import { accesoBloqueado } from "@/lib/pagos/cliente";
 import {
@@ -241,7 +226,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     // herramientas internas (/rai): se quedan donde están
-    if (RUTAS_LIBRES.includes(pathname)) {
+    if (esRutaLibre(pathname)) {
       arranqueHecho.current = true;
       setCargando(false);
       return;
