@@ -104,6 +104,7 @@ export function Simulacro({
   const [comentarioRai, setComentarioRai] = useState("");
   const [cargandoComentario, setCargandoComentario] = useState(false);
   const [restaurado, setRestaurado] = useState(false);
+  const [error, setError] = useState("");
 
   const puntero = useRef(0);
   const usadasPorTema = useRef<Record<string, string[]>>({});
@@ -192,6 +193,7 @@ export function Simulacro({
       return;
     }
     setCargando(true);
+    setError("");
     const tema = cola[puntero.current];
     const dificultad = dificultadInicial(tema, materia, acuerdo);
     try {
@@ -205,6 +207,7 @@ export function Simulacro({
       });
       const res = await fetch(`/api/diagnostico/pregunta?${params}`);
       const data = await res.json();
+      if (terminadaRef.current) return;
       if (!data.pregunta) {
         // este tema se quedó sin preguntas: saltamos el turno, no lo contamos
         fallidasSeguidas.current++;
@@ -223,14 +226,9 @@ export function Simulacro({
       setTemaActual(tema);
       enviando.current = false; // recién ahora hay una pregunta nueva que responder
     } catch {
-      fallidasSeguidas.current++;
-      puntero.current++;
-      guardarCheckpoint();
-      if (fallidasSeguidas.current >= 4) {
-        await terminar();
-        return;
-      }
-      void cargarPregunta();
+      // Un problema de red no consume una pregunta ni altera el intento.
+      setPregunta(null);
+      setError("No pudimos preparar la siguiente pregunta. Revisa tu conexión e intenta de nuevo.");
       return;
     } finally {
       setCargando(false);
@@ -244,7 +242,6 @@ export function Simulacro({
     enviando.current = true;
     const tema = temaActual;
     setCargando(true);
-    let acierto = false;
     try {
       const res = await fetch("/api/diagnostico/responder", {
         method: "POST",
@@ -252,22 +249,27 @@ export function Simulacro({
         body: JSON.stringify({ preguntaId: pregunta.id, indice, token }),
       });
       const data = await res.json();
-      acierto = res.ok && !!data.acierto;
+      if (!res.ok || typeof data.acierto !== "boolean") throw new Error("RESPUESTA_INVALIDA");
+      if (terminadaRef.current) return;
+
+      const acierto = data.acierto;
+      resultados.current = [...resultados.current, { tema, acierto }];
+      usadasPorTema.current[tema] = [...(usadasPorTema.current[tema] ?? []), pregunta.id];
+      puntero.current++;
+      setRespondidas(resultados.current.length);
+      guardarCheckpoint();
+
+      if (puntero.current >= cola.length) {
+        await terminar();
+      } else {
+        await cargarPregunta();
+      }
     } catch {
-      // Misma regla previa: un error de validación no concede puntaje.
-      acierto = false;
-    }
-
-    resultados.current = [...resultados.current, { tema, acierto }];
-    usadasPorTema.current[tema] = [...(usadasPorTema.current[tema] ?? []), pregunta.id];
-    puntero.current++;
-    setRespondidas(resultados.current.length);
-    guardarCheckpoint();
-
-    if (puntero.current >= cola.length) {
-      await terminar();
-    } else {
-      await cargarPregunta();
+      // Sin validación no se registra nada: la pregunta y el intento siguen
+      // intactos para que el niño pueda responder de nuevo al reconectarse.
+      enviando.current = false;
+      setCargando(false);
+      setError("No pudimos validar tu respuesta. Inténtalo de nuevo.");
     }
   }
 
@@ -451,8 +453,13 @@ export function Simulacro({
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-7 text-center">
-        {cargando || !pregunta ? (
+        {cargando ? (
           <p className="text-[15px] italic text-ink-soft">Preparando tu pregunta…</p>
+        ) : !pregunta ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-[15px] text-ink-soft">{error || "No pudimos preparar la siguiente pregunta."}</p>
+            <button onClick={() => void cargarPregunta()} className="cta px-7">Intentar de nuevo</button>
+          </div>
         ) : (
           <>
             <p className="mx-auto max-w-[30ch] font-serif text-[23px] leading-[1.3] text-ink">
@@ -472,6 +479,7 @@ export function Simulacro({
             <p className="text-[12.5px] text-ink-soft">
               Sin ayuda de Rai por ahora — vas a ver el resultado al final.
             </p>
+            {error && <p className="text-[13px] text-clay">{error}</p>}
           </>
         )}
       </div>
