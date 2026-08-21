@@ -5,6 +5,7 @@ import { useApp } from "@/lib/app/AppProvider";
 import { useRouter } from "next/navigation";
 import { PruebaEtapa } from "@/components/PruebaEtapa";
 import { TopBar } from "@/components/TopBar";
+import { MINIMO_EVALUABLE_PRUEBA, UMBRAL_PRUEBA_ETAPA } from "@/lib/tutor/acuerdo";
 
 export default function PruebaRuta() {
   const { pupilo, foco, alTerminarPrueba } = useApp();
@@ -21,6 +22,12 @@ export default function PruebaRuta() {
 
   if (!pupilo || !foco) return null;
 
+  const volverAlMapa = (evento?: string) => {
+    const params = new URLSearchParams({ materia: foco.materia, tema: foco.tema });
+    if (evento) params.set("evento", evento);
+    router.push(`/mapa?${params.toString()}`);
+  };
+
   return (
     <main className="min-h-screen">
       <TopBar />
@@ -29,7 +36,12 @@ export default function PruebaRuta() {
         curso={pupilo.curso}
         tema={foco.tema}
         onTerminar={alTerminarPrueba}
-        onSalir={() => router.push("/mapa")}
+        onContinuar={(correctos, total) => {
+          const superada =
+            total >= MINIMO_EVALUABLE_PRUEBA && correctos / total >= UMBRAL_PRUEBA_ETAPA;
+          volverAlMapa(superada ? "etapa_superada" : "refuerzo_necesario");
+        }}
+        onSalir={() => volverAlMapa()}
       />
     </main>
   );

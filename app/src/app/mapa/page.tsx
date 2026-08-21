@@ -1,15 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useApp } from "@/lib/app/AppProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MapaEtapas } from "@/components/MapaEtapas";
 import { StepFade } from "@/components/StepFade";
 import { TopBar } from "@/components/TopBar";
+import { MATERIAS, type Materia } from "@/lib/profile";
 
-export default function MapaRuta() {
+const MATERIAS_VALIDAS = new Set(MATERIAS.map((m) => m.id));
+
+function MapaContent() {
   const { pupilo, setFoco } = useApp();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const materiaParam = searchParams.get("materia");
+  const materiaInicial =
+    materiaParam && MATERIAS_VALIDAS.has(materiaParam as Materia)
+      ? (materiaParam as Materia)
+      : undefined;
+  const evento = searchParams.get("evento") ?? undefined;
+  const temaEvento = searchParams.get("tema") ?? undefined;
 
   // Guard: sin pupilo, al inicio
   useEffect(() => {
@@ -35,6 +46,9 @@ export default function MapaRuta() {
       <StepFade stepKey={`mapa-${pupilo.id}`} direction="next">
         <MapaEtapas
           perfil={pupilo}
+          materiaInicial={materiaInicial}
+          evento={evento}
+          temaEvento={temaEvento}
           onEstudiar={(materia, tema) => {
             setFoco({ materia, tema });
             router.push("/tutor");
@@ -53,5 +67,13 @@ export default function MapaRuta() {
         />
       </StepFade>
     </main>
+  );
+}
+
+export default function MapaRuta() {
+  return (
+    <Suspense fallback={null}>
+      <MapaContent />
+    </Suspense>
   );
 }

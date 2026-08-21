@@ -132,7 +132,7 @@ export function Diagnostico({
                 <span>{label}</span>
                 {superada ? (
                   <span className="flex items-center gap-1.5 text-[12.5px] text-sage-deep">
-                    <Check /> Superada
+                    <Check /> Completada
                   </span>
                 ) : (
                   <span className="text-ink-soft">→</span>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Curso, Materia } from "@/lib/profile";
-import type { AcuerdoTutoria } from "@/lib/tutor/acuerdo";
+import { UMBRAL_SIMULACRO_CIERRE, type AcuerdoTutoria } from "@/lib/tutor/acuerdo";
 import { rutaDeTemas, tituloDeTema } from "@/lib/plan/etapas";
 import { avisarEvento } from "@/lib/telemetriaCliente";
 import { Reveal } from "./Reveal";
@@ -23,7 +23,7 @@ const MIN_PREGUNTAS = 20;
 const PREGUNTAS_POR_TEMA = 4;
 const MAX_PREGUNTAS = 36;
 const SEGUNDOS_POR_PREGUNTA = 40;
-const MINIMO_EVALUABLE = 10;
+export const MINIMO_EVALUABLE_SIMULACRO = 10;
 
 interface PreguntaCliente {
   id: string;
@@ -61,7 +61,9 @@ export function Simulacro({
   nombre,
   acuerdo,
   pupiloId,
-  onTerminar,
+  numeroCierre,
+  onRegistrar,
+  onContinuar,
   onSalir,
 }: {
   materia: Materia;
@@ -69,11 +71,15 @@ export function Simulacro({
   nombre: string;
   acuerdo?: AcuerdoTutoria | null;
   pupiloId?: string;
-  // se llama SOLO cuando el niño confirma en la pantalla final (persiste y navega)
-  onTerminar: (desglose: DesgloseSimulacro[], correctos: number, total: number) => void;
+  numeroCierre?: 1 | 2;
+  // Persistir y navegar son actos distintos: al aparecer el resultado ya quedó
+  // registrado; el botón final solo lleva al siguiente estado del camino.
+  onRegistrar: (desglose: DesgloseSimulacro[], correctos: number, total: number) => void;
+  onContinuar: (correctos: number, total: number, numeroCierre?: 1 | 2) => void;
   onSalir: () => void;
 }) {
   const temas = useRef(rutaDeTemas(materia, curso, acuerdo)).current;
+  const numeroCierreInicial = useRef(numeroCierre).current;
   const totalPreguntas = useRef(
     temas.length === 0
       ? 0
@@ -214,8 +220,7 @@ export function Simulacro({
   async function terminar() {
     if (terminadaRef.current) return;
     terminadaRef.current = true;
-    setTerminada(true);
-    setCargando(false);
+    setCargando(true);
 
     const lista = await Promise.all(resultados.current);
     const desglose: DesgloseSimulacro[] = temas
@@ -231,11 +236,20 @@ export function Simulacro({
     // guarda para el botón "seguir" (cierre de la pantalla final)
     ultimoResultado.current = { desglose, correctos, total };
 
+    // Un resultado visible ya es un resultado guardado. Los intentos demasiado
+    // cortos no cuentan como evidencia ni consumen un ciclo de cierre.
+    if (total >= MINIMO_EVALUABLE_SIMULACRO) {
+      onRegistrar(desglose, correctos, total);
+    }
+
+    setTerminada(true);
+    setCargando(false);
+
     if (total > 0) {
       avisarEvento("simulacro_completado", { pupiloId, materia, meta: { correctos, total } });
     }
 
-    if (total >= MINIMO_EVALUABLE) {
+    if (total >= MINIMO_EVALUABLE_SIMULACRO) {
       setCargandoComentario(true);
       try {
         const res = await fetch("/api/simulacro/comentario", {
@@ -256,9 +270,11 @@ export function Simulacro({
   // --- pantalla final ---
   if (terminada) {
     const { desglose, correctos, total } = ultimoResultado.current;
-    const evaluable = total >= MINIMO_EVALUABLE;
+    const evaluable = total >= MINIMO_EVALUABLE_SIMULACRO;
     const ratio = total > 0 ? correctos / total : 0;
-    const bien = evaluable && ratio >= 0.6;
+    const bien = evaluable && ratio >= UMBRAL_SIMULACRO_CIERRE;
+    const esCierre = numeroCierreInicial !== undefined;
+    const segundoSinUmbral = evaluable && numeroCierreInicial === 2 && !bien;
 
     if (temas.length === 0) {
       return (
@@ -291,14 +307,24 @@ export function Simulacro({
         </Reveal>
         <Reveal variant="lead" delay={140}>
           <h1 className="max-w-[18ch] text-[28px]">
-            {!evaluable ? "Buen intento" : bien ? "¡Bien rendido!" : "Buen esfuerzo"}
+            {!evaluable
+              ? "Buen intento"
+              : bien
+                ? esCierre
+                  ? "¡Materia confirmada!"
+                  : "¡Muy buen resultado!"
+                : segundoSinUmbral
+                  ? "Ciclo completado"
+                  : "Buen esfuerzo"}
           </h1>
         </Reveal>
         <Reveal delay={280}>
           <p className="text-[15px] text-ink-soft">
             {evaluable
-              ? `Respondiste bien ${correctos} de ${total} preguntas.`
-              : `Alcanzaste a responder ${total} preguntas. Necesitamos al menos ${MINIMO_EVALUABLE} para que el simulacro cuente como evidencia.`}
+              ? segundoSinUmbral
+                ? `Respondiste bien ${correctos} de ${total} preguntas. Cerraste este ciclo y Rai seguirá reforzando contigo los temas que aún necesitan apoyo.`
+                : `Respondiste bien ${correctos} de ${total} preguntas.`
+              : `Alcanzaste a responder ${total} preguntas. Necesitamos al menos ${MINIMO_EVALUABLE_SIMULACRO} para que el simulacro cuente como evidencia.`}
           </p>
         </Reveal>
 
@@ -329,7 +355,10 @@ export function Simulacro({
         )}
 
         <Reveal delay={640}>
-          <button onClick={() => onTerminar(desglose, correctos, total)} className="cta px-9">
+          <button
+            onClick={() => onContinuar(correctos, total, numeroCierreInicial)}
+            className="cta px-9"
+          >
             Volver a mi camino
           </button>
         </Reveal>
@@ -342,7 +371,11 @@ export function Simulacro({
     <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-16">
       <div className="flex items-center justify-between py-2">
         <button
-          onClick={onSalir}
+          onClick={() => {
+            if (window.confirm("¿Salir del simulacro? Las respuestas de este intento no se guardarán.")) {
+              onSalir();
+            }
+          }}
           aria-label="Salir del simulacro"
           className="flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink"
         >

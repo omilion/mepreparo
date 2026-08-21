@@ -117,8 +117,24 @@ export function queHacerHoy(perfil: PerfilNino, curso: Curso): PlanDeHoy | null 
 
 // ¿Ya tuvo una sesión de estudio hoy? (mismo día calendario, hora local).
 export function yaEstudioHoy(perfil: PerfilNino): boolean {
-  const sesiones = perfil.tutoria?.sesiones ?? [];
-  if (sesiones.length === 0) return false;
-  const hoy = new Date().toDateString();
-  return sesiones.some((s) => new Date(s.fecha).toDateString() === hoy);
+  const acuerdo = perfil.tutoria;
+  if (!acuerdo) return false;
+  const ahora = new Date();
+  const hoyLocal = ahora.toDateString();
+  if ((acuerdo.sesiones ?? []).some((s) => new Date(s.fecha).toDateString() === hoyLocal)) {
+    return true;
+  }
+
+  // Las evidencias usan fecha UTC (YYYY-MM-DD). En Chile, después de las 20/21h
+  // UTC ya puede ser el día siguiente aunque localmente siga siendo hoy; aceptar
+  // ambas claves evita que una prueba nocturna aparezca como "no estudiaste".
+  const localIso = [
+    ahora.getFullYear(),
+    String(ahora.getMonth() + 1).padStart(2, "0"),
+    String(ahora.getDate()).padStart(2, "0"),
+  ].join("-");
+  const utcIso = ahora.toISOString().slice(0, 10);
+  return (acuerdo.temas ?? []).some((tema) =>
+    tema.evidencias.some((ev) => ev.fecha === localIso || ev.fecha === utcIso)
+  );
 }

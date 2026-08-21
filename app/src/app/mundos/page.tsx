@@ -22,7 +22,7 @@ export default function MundosRuta() {
     <main className="min-h-screen">
       <PrepararMundos
         perfil={pupilo}
-        onListo={(planMaterias) => {
+        onPreparado={(planMaterias) => {
           if (planMaterias && pupilo.tutoria) {
             const actualizado = {
               ...pupilo,
@@ -30,8 +30,8 @@ export default function MundosRuta() {
             };
             guardarPupiloEnfocado(actualizado);
           }
-          router.push("/mapa");
         }}
+        onContinuar={() => router.push("/mapa")}
       />
     </main>
   );

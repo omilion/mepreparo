@@ -162,7 +162,7 @@ describe("todoElCaminoCompleto", () => {
 });
 
 describe("yaEstudioHoy", () => {
-  it("sin sesiones: false", () => {
+  it("sin actividad: false", () => {
     expect(yaEstudioHoy(perfilBase(acuerdoCon()))).toBe(false);
   });
 
@@ -191,5 +191,29 @@ describe("yaEstudioHoy", () => {
       ],
     });
     expect(yaEstudioHoy(perfilBase(acuerdo))).toBe(false);
+  });
+
+  it("una prueba o ejercicio de hoy cuenta aunque no haya sesión cerrada", () => {
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const acuerdo = acuerdoCon({
+      temas: [
+        {
+          tema: "division",
+          materia: "matematica",
+          estado: "en_proceso",
+          actualizadoEn: fechaHoy,
+          evidencias: [
+            {
+              fecha: fechaHoy,
+              tipo: "ejercicios",
+              nota: "3 de 4 correctos",
+              correctos: 3,
+              total: 4,
+            },
+          ],
+        },
+      ],
+    });
+    expect(yaEstudioHoy(perfilBase(acuerdo))).toBe(true);
   });
 });

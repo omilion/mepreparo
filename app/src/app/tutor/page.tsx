@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useApp } from "@/lib/app/AppProvider";
 import { useRouter } from "next/navigation";
 import { Tutor } from "@/components/Tutor";
+import { queHacerHoy } from "@/lib/plan/hoy";
 
 export default function TutorRuta() {
   const { pupilo, foco, guardarPupiloEnfocado } = useApp();
@@ -30,6 +31,12 @@ export default function TutorRuta() {
 
   if (!pupilo) return null;
 
+  const planHoy = queHacerHoy(pupilo, pupilo.curso);
+  const duracionObjetivoMin =
+    planHoy && planHoy.materia === foco?.materia && planHoy.etapa?.tema === foco?.tema
+      ? planHoy.minutos
+      : 20;
+
   return (
     <Tutor
       // key por niño: al cambiar de pupilo, el Tutor se remonta LIMPIO (no arrastra
@@ -41,6 +48,7 @@ export default function TutorRuta() {
       // la materia de la etapa elegida manda sobre el horario del día: sin
       // esto la evidencia de la clase quedaba archivada en otra materia
       materiaFoco={foco?.materia}
+      duracionObjetivoMin={duracionObjetivoMin}
       onVolver={() => router.push(pupilo.tutoria ? "/hoy" : "/plan")}
       // Rai dio el visto bueno para la prueba: cierra y salta directo a
       // /prueba, que ya lee la etapa desde `foco` (materia+tema) tal como lo

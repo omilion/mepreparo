@@ -42,18 +42,56 @@ const TEMAS_MATERIAS: Record<Materia, ColorTheme> = {
   },
 };
 
+function mensajeDeTransicion(
+  evento: string | undefined,
+  tema: string | undefined,
+  materia: Materia,
+  preparacionCompleta: boolean
+): string | null {
+  const temaLabel = tema ? tituloDeTema(tema) : "esta etapa";
+  const materiaLabel = MATERIAS.find((m) => m.id === materia)?.label ?? materia;
+  switch (evento) {
+    case "etapa_superada":
+      return `¡Superaste ${temaLabel}! La siguiente etapa de ${materiaLabel} ya está disponible.`;
+    case "refuerzo_necesario":
+      return `${temaLabel} todavía necesita un poco de práctica. Rai lo retomará contigo con otro enfoque antes de volver a intentarlo.`;
+    case "materia_confirmada":
+      return preparacionCompleta
+        ? "¡Completaste toda tu preparación! Cerraste las materias de tu examen y Rai seguirá acompañándote en los repasos."
+        : `¡Confirmaste ${materiaLabel} en el simulacro! Esta materia ya quedó lista.`;
+    case "repaso_necesario":
+      return `El simulacro mostró qué conviene afirmar. Ahora Rai te guiará por un repaso corto antes del segundo intento.`;
+    case "ciclo_cerrado_con_refuerzo":
+      return preparacionCompleta
+        ? "Completaste toda tu preparación. Rai seguirá reforzando contigo los temas que aún necesitan apoyo antes del examen."
+        : `Completaste el ciclo de ${materiaLabel}. Puedes seguir avanzando y Rai mantendrá presentes los temas que aún necesitan apoyo.`;
+    case "simulacro_incompleto":
+      return "Este intento fue demasiado corto para contar como evidencia. Tu avance anterior sigue intacto.";
+    case "simulacro_practica":
+      return `Tu simulacro de práctica de ${materiaLabel} quedó guardado. Usa el desglose para elegir qué repasar.`;
+    default:
+      return null;
+  }
+}
+
 // El HOME del alumno: el camino de etapas de una materia (mapa lineal zen).
 // Cada etapa = un tema del banco; su estado viene de la memoria de Rai.
 // Tocar la etapa actual ofrece: estudiar con Rai o rendir la prueba.
 
 export function MapaEtapas({
   perfil,
+  materiaInicial,
+  evento,
+  temaEvento,
   onEstudiar,
   onPrueba,
   onTutorLibre,
   onSimulacro,
 }: {
   perfil: PerfilNino;
+  materiaInicial?: Materia;
+  evento?: string;
+  temaEvento?: string;
   onEstudiar: (materia: Materia, tema: string) => void;
   onPrueba: (materia: Materia, tema: string) => void;
   onTutorLibre: () => void;
@@ -61,7 +99,11 @@ export function MapaEtapas({
 }) {
   // materia inicial: la que toca hoy según el horario; si no, la primera del examen
   const deHoy = perfil.tutoria ? materiasDeHoy(perfil.tutoria) : [];
-  const [materia, setMateria] = useState<Materia>(deHoy[0] ?? perfil.examen.materias[0]);
+  const [materia, setMateria] = useState<Materia>(
+    materiaInicial && perfil.examen.materias.includes(materiaInicial)
+      ? materiaInicial
+      : deHoy[0] ?? perfil.examen.materias[0]
+  );
 
   const etapas = etapasDeMateria(materia, perfil.curso, perfil.tutoria);
   const progreso = progresoDeMateria(etapas);
@@ -73,6 +115,18 @@ export function MapaEtapas({
   // etapas superadas" sin ninguna pista de que faltaba algo más.
   const fase = faseDeMateria(materia, perfil.curso, perfil.tutoria);
   const debiles = temasEnRepaso(materia, perfil.curso, perfil.tutoria);
+  const ultimoCierre = (perfil.tutoria?.simulacrosCierre ?? [])
+    .filter((s) => s.materia === materia)
+    .at(-1);
+  const cerradaConRefuerzo =
+    fase === "materia_lista" && ultimoCierre?.numero === 2 && !ultimoCierre.aprobado;
+  const preparacionCompleta = perfil.examen.materias.every(
+    (m) => faseDeMateria(m, perfil.curso, perfil.tutoria) === "materia_lista"
+  );
+  const mensajeEvento =
+    materia === materiaInicial
+      ? mensajeDeTransicion(evento, temaEvento, materia, preparacionCompleta)
+      : null;
 
   const theme = TEMAS_MATERIAS[materia] || TEMAS_MATERIAS.matematica;
 
@@ -102,6 +156,17 @@ export function MapaEtapas({
         </header>
       </Reveal>
 
+      {mensajeEvento && (
+        <Reveal delay={105}>
+          <div
+            className="mx-auto max-w-[380px] rounded-xl border px-4 py-3 text-center text-[14px] leading-[1.45]"
+            style={{ borderColor: "var(--materia-primary)", background: "var(--materia-bg-soft)" }}
+          >
+            {mensajeEvento}
+          </div>
+        </Reveal>
+      )}
+
       {/* El camino completo ya no basta por sí solo: falta el simulacro de
           cierre (mixto, cronometrado, sin ayuda de Rai) que confirma que no
           se olvidó nada. Esta franja evita que el mapa diga solo "9 de 9"
@@ -117,7 +182,10 @@ export function MapaEtapas({
             {fase === "repaso" &&
               `En repaso antes del segundo simulacro: ${debiles.map(tituloDeTema).join(", ")}.`}
             {fase === "simulacro_2_pendiente" && "Repaso listo — falta tu segundo simulacro."}
-            {fase === "materia_lista" && "¡Materia lista! Tu simulacro de cierre lo confirmó."}
+            {fase === "materia_lista" &&
+              (cerradaConRefuerzo
+                ? "Ciclo completado. Rai seguirá reforzando algunos temas contigo."
+                : "¡Materia lista! Tu simulacro de cierre lo confirmó.")}
           </div>
         </Reveal>
       )}
@@ -143,7 +211,8 @@ export function MapaEtapas({
 
       {/* el simulacro solo tiene sentido con ALGO de camino recorrido: si el
           niño recién empieza, tirarle 20+ preguntas cronometradas desanima */}
-      {progreso.superadas > 0 && (
+      {(fase !== "aprendiendo" ||
+        progreso.superadas >= Math.max(2, Math.ceil(progreso.total / 2))) && (
         <Reveal delay={220}>
           <div className="text-center">
             <button

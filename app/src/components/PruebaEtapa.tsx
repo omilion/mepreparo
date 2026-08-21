@@ -33,13 +33,16 @@ export function PruebaEtapa({
   curso,
   tema,
   onTerminar,
+  onContinuar,
   onSalir,
 }: {
   materia: Materia;
   curso: Curso;
   tema: string;
-  // reporta el resultado para registrar la evidencia y volver al mapa
+  // Registra la evidencia ANTES de mostrar la pantalla final. Continuar solo
+  // navega: si la tablet se cierra en el resultado, el esfuerzo no se pierde.
   onTerminar: (correctos: number, total: number, enunciadosFallados: string[]) => void;
+  onContinuar: (correctos: number, total: number) => void;
   onSalir: () => void;
 }) {
   const [pregunta, setPregunta] = useState<PreguntaCliente | null>(null);
@@ -52,6 +55,9 @@ export function PruebaEtapa({
   const [terminada, setTerminada] = useState(false);
   const usadas = useRef<string[]>([]);
   const dificultad = useRef(2); // mini-adaptativo: sube al acertar, baja al fallar
+  const respondidasRef = useRef(0);
+  const correctosRef = useRef(0);
+  const resultadoRegistrado = useRef(false);
   // Para que Rai pueda retomar la próxima clase con otro enfoque en vez de
   // solo saber el puntaje (ver refuerzoPendiente en acuerdo.ts).
   const falladas = useRef<string[]>([]);
@@ -77,7 +83,7 @@ export function PruebaEtapa({
       const data = await res.json();
       if (!data.pregunta) {
         // se acabaron las preguntas del tema: terminamos con lo respondido
-        setTerminada(true);
+        finalizar(respondidasRef.current, correctosRef.current);
         setCargando(false);
         return;
       }
@@ -103,7 +109,9 @@ export function PruebaEtapa({
       const data = await res.json();
       setFeedback(data);
       if (data.acierto) {
-        setCorrectos((c) => c + 1);
+        const nuevosCorrectos = correctosRef.current + 1;
+        correctosRef.current = nuevosCorrectos;
+        setCorrectos(nuevosCorrectos);
         dificultad.current = Math.min(5, dificultad.current + 1);
       } else {
         dificultad.current = Math.max(1, dificultad.current - 1);
@@ -115,13 +123,23 @@ export function PruebaEtapa({
   }
 
   function siguiente() {
-    const respondidas = n + 1;
+    const respondidas = respondidasRef.current + 1;
+    respondidasRef.current = respondidas;
     setN(respondidas);
     if (respondidas >= TOTAL) {
-      setTerminada(true);
+      finalizar(respondidas, correctosRef.current);
     } else {
       void cargarPregunta();
     }
+  }
+
+  function finalizar(totalRespondidas: number, totalCorrectas: number) {
+    if (resultadoRegistrado.current) return;
+    resultadoRegistrado.current = true;
+    if (totalRespondidas >= MINIMO_EVALUABLE) {
+      onTerminar(totalCorrectas, totalRespondidas, falladas.current);
+    }
+    setTerminada(true);
   }
 
   // --- pantalla final ---
@@ -157,7 +175,7 @@ export function PruebaEtapa({
         </Reveal>
         <Reveal delay={560}>
           <button
-            onClick={() => (evaluable ? onTerminar(correctos, totalReal, falladas.current) : onSalir())}
+            onClick={() => (evaluable ? onContinuar(correctos, totalReal) : onSalir())}
             className="cta px-9"
           >
             Volver a mi camino
@@ -172,7 +190,11 @@ export function PruebaEtapa({
     <div className="zen-page flex min-h-[calc(100vh-58px)] flex-col pb-16">
       <div className="flex items-center justify-between py-2">
         <button
-          onClick={onSalir}
+          onClick={() => {
+            if (window.confirm("¿Salir de la prueba? Las respuestas de este intento no se guardarán.")) {
+              onSalir();
+            }
+          }}
           aria-label="Salir de la prueba"
           className="flex h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:text-ink"
         >

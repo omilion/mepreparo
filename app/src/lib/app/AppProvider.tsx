@@ -130,7 +130,9 @@ interface AppState {
   setPinBloqueado: (v: boolean) => void;
   setModoAuth: (m: "login" | "registro") => void;
 
-  // transiciones (navegan con el router)
+  // transiciones. Las evaluaciones persisten aquí, pero la pantalla que muestra
+  // el resultado decide cuándo navegar: ver un resultado ya debe significar que
+  // quedó guardado, aunque la pestaña se cierre antes de tocar "continuar".
   irAPupilo: (id: string) => void;
   alRegistrar: (pupilosNuevos: PerfilNino[]) => void;
   alConfigurarHijo: (perfil: PerfilNino) => void;
@@ -455,14 +457,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const tutoria = registrarPruebaEtapa(base, foco.tema, foco.materia, correctos, total, enunciadosFallados);
       notificarLogros(p.id, temasSuperadosNuevos(base.temas, tutoria.temas));
       setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
-      setFoco(null);
-      router.push("/mapa");
     },
     [cuenta, pupilo, foco, router]
   );
 
   // Igual que alTerminarPrueba pero para un simulacro (varios temas a la vez):
-  // guarda el desglose completo como evidencia dura y vuelve al mapa. `foco`
+  // guarda el desglose completo como evidencia dura. La pantalla conserva la
+  // materia y decide el evento con que volverá al mapa. `foco`
   // no aplica aquí (el simulacro no es de un solo tema), por eso la materia
   // llega como argumento explícito.
   const alTerminarSimulacro = useCallback(
@@ -491,7 +492,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : registrarSimulacro(base, materia, desglose);
       notificarLogros(p.id, temasSuperadosNuevos(base.temas, tutoria.temas));
       setCuenta(guardarPupilo(cuenta, { ...p, tutoria }));
-      router.push("/mapa");
     },
     [cuenta, pupilo, router]
   );

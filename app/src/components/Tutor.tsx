@@ -131,6 +131,7 @@ export function Tutor({
   onIrAPrueba,
   temaFoco,
   materiaFoco,
+  duracionObjetivoMin = 20,
 }: {
   perfil: PerfilNino;
   onVolver: () => void;
@@ -148,6 +149,8 @@ export function Tutor({
   // …y en ESTA materia. Sin esto la clase se guiaba solo por el horario del
   // día, y la evidencia terminaba archivada en la materia equivocada.
   materiaFoco?: Materia;
+  // La promesa visible en "Hoy" debe gobernar el cierre real de la clase.
+  duracionObjetivoMin?: number;
 }) {
   const { setAccionesDevTutor } = useApp();
   const nombre = perfil.nombre.trim() || "tú";
@@ -165,6 +168,12 @@ export function Tutor({
   // la esquina para dar espacio a la conversación (transición fluida).
   const [compacta, setCompacta] = useState(false);
   const [sesionTerminada, setSesionTerminada] = useState(false);
+  const [horarioPreparado, setHorarioPreparado] = useState<PerfilNino | null>(null);
+  const [cierreVisible, setCierreVisible] = useState<{
+    titulo: string;
+    resumen: string;
+    despues: () => void;
+  } | null>(null);
   // En algunos navegadores móviles 100dvh tarda en reaccionar al teclado. La
   // altura del visualViewport sí excluye el teclado, así que la usamos cuando
   // está disponible para que la caja de escritura nunca quede tapada.
@@ -454,12 +463,12 @@ ${traza}` : m.texto };
     const duracionMs = Date.now() - inicioSesion.current;
     const duracionMin = duracionMs / 60000;
 
-    // Sesión de ~45 min / 30 turnos (una clase real; en 5 min un niño no aprende).
-    // FASE DE CIERRE: cuando se acerca el final, le pedimos a Rai que redondee con
-    // naturalidad (sin cortar en seco). Solo si el niño sigue más allá del TOPE
-    // DURO cerramos nosotros, como red de seguridad.
-    const cerrandose = turnosKid >= 26 || duracionMin >= 40;
-    const topeDuro = turnosKid >= 32 || duracionMin >= 48;
+    // La duración prometida en "Hoy" gobierna esta sesión: Rai empieza a
+    // redondear tres minutos antes y deja tres de margen para no cortar una idea.
+    const inicioCierreMin = Math.max(5, duracionObjetivoMin - 3);
+    const topeSesionMin = duracionObjetivoMin + 3;
+    const cerrandose = turnosKid >= 26 || duracionMin >= inicioCierreMin;
+    const topeDuro = turnosKid >= 32 || duracionMin >= topeSesionMin;
 
     try {
       const res = await fetch("/api/tutor", {
@@ -1385,9 +1394,17 @@ ${traza}` : m.texto };
       sesiones: [],
     };
     const nuevo = sembrarTemasDesdeDiagnostico(base, perfil.diagnostico);
-    // Primera vez: persiste y navega a "mundos". Si no hay callback dedicado,
-    // cae al de persistir (compatibilidad).
-    (onHorarioCreado ?? onGuardarPerfil)?.({ ...perfil, tutoria: nuevo });
+    // Guardamos de inmediato, pero no navegamos: primero dejamos que el niño
+    // lea la confirmación de Rai y continúe de forma explícita. Así tampoco se
+    // pierde el horario si la tablet se bloquea en esta pantalla.
+    const preparado = { ...perfil, tutoria: nuevo };
+    onGuardarPerfil?.(preparado);
+    setHorarioPreparado(preparado);
+  }
+
+  function confirmarHorario() {
+    if (!horarioPreparado) return;
+    (onHorarioCreado ?? onGuardarPerfil)?.(horarioPreparado);
   }
 
   function quizasGuardarHorario(horario?: AcuerdoTutoria["horario"]) {
@@ -1431,7 +1448,10 @@ ${traza}` : m.texto };
   // home por el botón de inicio, o directo a la prueba si Rai lo dio por listo.
   // Sin este parámetro, ir a la prueba obligaba a salir primero — y ahí se
   // perdía el hilo de la clase.
-  async function cerrarSesionYSeguir(despues: () => void) {
+  async function cerrarSesionYSeguir(
+    despues: () => void,
+    opciones: { mostrarResumen?: boolean; cerrarAunqueCorta?: boolean } = {}
+  ) {
     // La despedida usa el mismo gesto que la llegada: la esfera se abre, se
     // entibia y lanza un anillo. Rai se va como llegó.
     reaccionar(["saludo", 2600]);
@@ -1448,9 +1468,22 @@ ${traza}` : m.texto };
     // Si no hay acuerdo o el niño participó menos de 2 veces, no guardamos sesión
     const acuerdoActual = acuerdoVivo.current;
     if (participacion < 2 || !acuerdoActual) {
-      // clase demasiado corta para guardarla como sesión, pero SÍ vale la pena
-      // poder retomarla: no se borra la clase en curso.
-      despues();
+      // El botón de inicio es una salida intencional: no dejamos una clase corta
+      // reapareciendo como si se hubiera cerrado accidentalmente. La recuperación
+      // sigue existiendo para cierres reales de pestaña o bloqueo de la tablet.
+      if (opciones.cerrarAunqueCorta) borrarClaseEnCurso();
+      if (opciones.mostrarResumen) {
+        setCierreVisible({
+          titulo: participacion > 0 ? "Cerraste por hoy" : "Nos vemos pronto",
+          resumen:
+            participacion > 0
+              ? "Fue una sesión breve. Puedes continuar desde tu camino cuando quieras."
+              : "Cuando tengas ganas de estudiar, Rai estará aquí para acompañarte.",
+          despues,
+        });
+      } else {
+        despues();
+      }
       return;
     }
 
@@ -1459,6 +1492,10 @@ ${traza}` : m.texto };
     setCargando(true);
     const duracionMin = Math.max(1, Math.round((Date.now() - inicioSesion.current) / 60000));
     const nMensajes = mensajes.length;
+    let cierre = {
+      titulo: `Sesión de ${materia}`,
+      resumen: "Hoy avanzaste un paso en tu camino.",
+    };
 
     try {
       const res = await fetch("/api/tutor", {
@@ -1474,6 +1511,10 @@ ${traza}` : m.texto };
 
       if (!res.ok) throw new Error("TUTOR_HTTP_ERROR");
       const data = await res.json();
+      cierre = {
+        titulo: data.titulo || `Sesión de ${materia}`,
+        resumen: data.resumen || "Hoy avanzaste un paso en tu camino.",
+      };
       const nuevaSesion = {
         fecha: new Date().toISOString(),
         duracionMin,
@@ -1524,16 +1565,41 @@ ${traza}` : m.texto };
       });
     } finally {
       setCargando(false);
-      despues();
+      if (opciones.mostrarResumen) {
+        setCierreVisible({ ...cierre, despues });
+      } else {
+        despues();
+      }
     }
   }
 
   // El botón de inicio: cierra y vuelve al home del niño.
-  const manejarVolver = () => cerrarSesionYSeguir(onVolver);
+  const manejarVolver = () =>
+    cerrarSesionYSeguir(onVolver, { mostrarResumen: true, cerrarAunqueCorta: true });
 
   // "Estoy lista": cierra la clase guardando TODO y salta a la prueba de la
   // etapa. Antes había que salir por el botón de inicio y buscarla en el mapa.
   const irAPrueba = () => cerrarSesionYSeguir(() => onIrAPrueba?.());
+
+  if (cierreVisible) {
+    return (
+      <div className="zen-page flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-4 text-center">
+        <AuraOrb materia={materia} estado="celebracion" size={112} />
+        <div>
+          <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-sage-deep">
+            Sesión terminada
+          </div>
+          <h1 className="max-w-[20ch] text-[28px]">{cierreVisible.titulo}</h1>
+          <p className="mt-3 max-w-[38ch] text-[15px] leading-[1.5] text-ink-soft">
+            {cierreVisible.resumen}
+          </p>
+        </div>
+        <button type="button" onClick={cierreVisible.despues} className="cta px-9">
+          Volver a mi inicio
+        </button>
+      </div>
+    );
+  }
 
   return (
     // 100dvh = altura REAL del viewport en móvil (se ajusta a la barra del
@@ -1652,7 +1718,16 @@ ${traza}` : m.texto };
       </div>
 
       {/* caja de escribir abajo, discreta */}
-      {sesionTerminada ? (
+      {horarioPreparado ? (
+        <div className="flex w-full flex-col items-center gap-3 py-4 text-center">
+          <p className="max-w-[34ch] text-[14px] leading-[1.45] text-ink-soft">
+            Nuestro horario quedó acordado. Ahora Rai preparará un camino a tu medida.
+          </p>
+          <button type="button" onClick={confirmarHorario} className="cta w-[250px]">
+            Preparar mi camino
+          </button>
+        </div>
+      ) : sesionTerminada ? (
         <div className="flex flex-col items-center gap-3 py-4 w-full">
           <button
             type="button"
@@ -1686,6 +1761,19 @@ ${traza}` : m.texto };
             esPrimera={esPrimera}
             tutorNombre={TUTOR.nombre}
           />
+          {!esPrimera &&
+            mensajes.filter((m) => m.de === "nino" || m.resuelto).length >= 2 && (
+              <div className="flex justify-center pb-3">
+                <button
+                  type="button"
+                  onClick={manejarVolver}
+                  disabled={cargando}
+                  className="text-[13px] text-ink-soft underline underline-offset-4 transition-colors hover:text-ink disabled:opacity-40"
+                >
+                  Terminar por hoy
+                </button>
+              </div>
+            )}
         </>
       )}
     </div>
@@ -1707,6 +1795,10 @@ function CajaTexto({
   const [texto, setTexto] = useState("");
   const [escuchando, setEscuchando] = useState(false);
   const [soportaVoz, setSoportaVoz] = useState(false);
+  // Sin esto, un micrófono que falla (permiso denegado, sin señal, sin red) solo
+  // dejaba de pulsar el botón: el niño no tenía forma de saber qué pasó ni qué
+  // hacer. El error iba a la consola, donde nadie lo ve.
+  const [errorVoz, setErrorVoz] = useState("");
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -1721,6 +1813,7 @@ function CajaTexto({
         rec.lang = "es-CL";
 
         rec.onresult = (e: any) => {
+          setErrorVoz("");
           const transcript = Array.from(e.results)
             .map((result: any) => result[0].transcript)
             .join("");
@@ -1730,6 +1823,16 @@ function CajaTexto({
         rec.onerror = (e: any) => {
           console.warn("Error en el micrófono", e);
           setEscuchando(false);
+          const codigo = e?.error;
+          setErrorVoz(
+            codigo === "not-allowed" || codigo === "service-not-allowed"
+              ? "Necesito permiso para usar el micrófono. Puedes escribir mientras tanto."
+              : codigo === "no-speech"
+                ? "No alcancé a escucharte. Toca el micrófono e inténtalo de nuevo."
+                : codigo === "audio-capture"
+                  ? "No encuentro un micrófono en este dispositivo."
+                  : "No pude escucharte. Puedes intentarlo otra vez o escribir."
+          );
         };
 
         rec.onend = () => {
@@ -1748,10 +1851,12 @@ function CajaTexto({
       setEscuchando(false);
     } else {
       try {
+        setErrorVoz("");
         recognitionRef.current.start();
         setEscuchando(true);
       } catch (err) {
         console.error("No se pudo iniciar el micrófono", err);
+        setErrorVoz("No pude encender el micrófono. Puedes escribir tu respuesta.");
       }
     }
   }
@@ -1771,7 +1876,7 @@ function CajaTexto({
     // input DESTACADO: caja con borde completo, fondo sutil, ~90% del ancho y
     // tipografía más grande — pensado para que el niño lo vea claro en tablet.
     <div
-      className="flex flex-none justify-center py-3"
+      className="flex flex-none flex-col items-center py-3"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       {/* py-2.5 (antes 1.5): la caja quedaba muy baja para tocarla con el dedo
@@ -1825,6 +1930,11 @@ function CajaTexto({
           ↑
         </button>
       </div>
+      {errorVoz && (
+        <p role="status" className="mt-2 w-[90%] text-center text-[13px] text-clay">
+          {errorVoz}
+        </p>
+      )}
     </div>
   );
 }

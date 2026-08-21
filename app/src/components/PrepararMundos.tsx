@@ -30,15 +30,18 @@ const TOPE_TOTAL = 90_000;
 
 export function PrepararMundos({
   perfil,
-  onListo,
+  onPreparado,
+  onContinuar,
 }: {
   perfil: PerfilNino;
-  // devuelve el plan generado (o null si no se pudo) para guardarlo y seguir al mapa
-  onListo: (plan: PlanMateria[] | null) => void;
+  // El plan se guarda al terminar de generarse; continuar solo revela el mapa.
+  onPreparado: (plan: PlanMateria[] | null) => void;
+  onContinuar: () => void;
 }) {
   const nombre = perfil.nombre.trim() || "estudiante";
   const materias = perfil.examen.materias;
   const [paso, setPaso] = useState(0);
+  const [resultadoListo, setResultadoListo] = useState(false);
   const arrancado = useRef(false);
 
   // guion: intro + una línea por materia + trazado + cierre.
@@ -131,7 +134,9 @@ export function PrepararMundos({
       setPaso(materias.length + 2); // "¡Todo listo!"
       await pausa(1500);
       if (cancelado) return;
-      onListo(plan.length > 0 ? plan : null);
+      const resultado = plan.length > 0 ? plan : null;
+      onPreparado(resultado);
+      setResultadoListo(true);
     })();
 
     return () => {
@@ -178,6 +183,16 @@ export function PrepararMundos({
           />
         ))}
       </div>
+
+      {resultadoListo && (
+        <button
+          type="button"
+          onClick={onContinuar}
+          className="cta px-9"
+        >
+          Ver mi camino
+        </button>
+      )}
 
       <style jsx>{`
         .mensaje-fade {

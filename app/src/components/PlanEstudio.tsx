@@ -6,6 +6,7 @@ import { calcularPlan } from "@/lib/plan/motor";
 import { calcularRacha } from "@/lib/plan/racha";
 import { Reveal } from "./Reveal";
 import { etapasDeMateria, progresoDeMateria } from "@/lib/plan/etapas";
+import { yaEstudioHoy as tieneActividadHoy } from "@/lib/plan/hoy";
 
 const COLOR_MATERIA: Record<string, string> = {
   matematica: "var(--sage)",
@@ -31,10 +32,7 @@ export function PlanEstudio({
   const sesiones = perfil.tutoria?.sesiones || [];
   const racha = useMemo(() => calcularRacha(sesiones), [sesiones]);
   
-  const yaEstudioHoy = useMemo(() => {
-    const hoyStr = new Date().toDateString();
-    return sesiones.some(s => new Date(s.fecha).toDateString() === hoyStr);
-  }, [sesiones]);
+  const yaEstudioHoy = useMemo(() => tieneActividadHoy(perfil), [perfil]);
 
   const diaHoyLabel = new Date().toLocaleDateString("es-CL", { weekday: "long" });
   const materiasHoy = perfil.tutoria ? materiasDeHoy(perfil.tutoria) : [];
@@ -184,7 +182,7 @@ export function PlanEstudio({
       <Reveal delay={860}>
         <div className="mx-auto flex w-full max-w-[420px] flex-col gap-3">
           <button type="button" className="premium-glow-button animate-moving-border" onClick={onTutor}>
-            Empezar a estudiar con el tutor
+            {perfil.tutoria ? "Ver mi camino" : "Conocer a Rai y organizar mi semana"}
           </button>
           <button
             type="button"
